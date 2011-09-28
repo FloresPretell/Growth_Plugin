@@ -10,7 +10,7 @@
 
 #include "level_set.h"
 #include "lib_disc/local_finite_element/local_shape_function_set.h"
-#include "lib_disc/spatial_discretization/disc_util/finite_volume_geometry.h"
+#include "lib_disc/spatial_disc/disc_util/finite_volume_geometry.h"
 #include "lib_disc/reference_element/reference_element.h"
 
 namespace ug{

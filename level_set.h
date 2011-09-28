@@ -13,7 +13,7 @@
 #include <vector>
 #include "lib_disc/common/groups_util.h"
 #include "lib_disc/function_spaces/approximation_space.h"
-#include "lib_disc/spatial_discretization/disc_util/finite_volume_geometry.h"
+#include "lib_disc/spatial_disc/disc_util/finite_volume_geometry.h"
 #include <boost/function.hpp>
 
 namespace ug{

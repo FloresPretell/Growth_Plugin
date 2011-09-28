@@ -13,7 +13,7 @@
 #include "lib_disc/dof_manager/conform/conform.h"
 #include "lib_disc/dof_manager/p1conform/p1conform.h"
 
-#include "lib_disc/spatial_discretization/constraints/constraint_interface.h"
+#include "lib_disc/spatial_disc/constraints/constraint_interface.h"
 
 #include <boost/function.hpp>
 #include "level_set.h"
