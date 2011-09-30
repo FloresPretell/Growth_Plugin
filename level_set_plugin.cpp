@@ -1,4 +1,4 @@
-// created by Raphael Prohl
+// created by Christian Wehner
 
 // extern headers
 #include <iostream>

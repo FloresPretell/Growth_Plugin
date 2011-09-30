@@ -289,9 +289,9 @@ bool FV1LevelSetDisc<TGridFunction>::compute_dnormal(TGridFunction& dnormal,TGri
 			dd.inner_multi_indices(vrt, 0, ind);
 			coord = aaPos[vrt];
 			BlockRef(dnormal[ind[0][0]],ind[0][1]) = BlockRef(vx[ind[0][0]],ind[0][1]) * aaGradient[vrt][0] + BlockRef(vy[ind[0][0]],ind[0][1]) * aaGradient[vrt][1];
-			if (BlockRef(phi[ind[0][0]],ind[0][1])<0)
-			    UG_LOG("coord=(" << coord[0] << "," << coord[1] << ") exact=" << coord[0]/sqrt(coord[0]*coord[0]+coord[1]*coord[1]) << " dnormal=" << BlockRef(dnormal[ind[0][0]],ind[0][1]) << "\n" << " v=(" << BlockRef(vx[ind[0][0]],ind[0][1]) << "," << BlockRef(vy[ind[0][0]],ind[0][1]) << ") " << " grad=(" << aaGradient[vrt][0] << "," << aaGradient[vrt][1] << ")" << "\n");
-		}
+///			if (BlockRef(phi[ind[0][0]],ind[0][1])<0)
+///			    UG_LOG("coord=(" << coord[0] << "," << coord[1] << ") exact=" << coord[0]/sqrt(coord[0]*coord[0]+coord[1]*coord[1]) << " dnormal=" << BlockRef(dnormal[ind[0][0]],ind[0][1]) << "\n" << " v=(" << BlockRef(vx[ind[0][0]],ind[0][1]) << "," << BlockRef(vy[ind[0][0]],ind[0][1]) << ") " << " grad=(" << aaGradient[vrt][0] << "," << aaGradient[vrt][1] << ")" << "\n");
+	    }
 ///		UG_LOG("#\n");
 	};
 	return true;
@@ -1980,7 +1980,7 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 		    for(size_t i = 0; i < m_neumann_sg.num_subsets(); ++i)
 		    {
 		        const int bndSi = m_neumann_sg[i];
-		        UG_LOG("Neumann boundary is: "<<bndSi<< "\n");
+//		        UG_LOG("Neumann boundary is: "<<bndSi<< "\n");
 		        geo.add_boundary_subset(bndSi);
 		    }
 
