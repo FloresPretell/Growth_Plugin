@@ -7,8 +7,7 @@
 
 #include "bridge/bridge.h"
 
-#include "lib_algebra/algebra_selector.h"
-#include "lib_algebra/algebra_types.h"
+#include "lib_algebra/cpu_algebra_types.h"
 
 #include "lib_disc/dof_manager/conform/conform.h"
 #include "lib_disc/dof_manager/p1conform/p1conform.h"
