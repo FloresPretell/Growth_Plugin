@@ -199,23 +199,19 @@ static bool Register__Algebra(bridge::Registry& reg, string parentGroup)
 }
 
 
-extern "C" void InitUGPlugin(ug::bridge::Registry* reg)
+extern "C" void InitUGPlugin(ug::bridge::Registry* reg, std::string parentGroup)
 {
-
-	string parentGroup("/ug4/Plugins");
+	std::string grp(parentGroup); grp.append("LevelSet/");
 
 	bool bReturn = true;
-	bReturn &= Register__Algebra<CPUAlgebra>(*reg, parentGroup);
-//	bReturn &= Register__Algebra<CPUBlockAlgebra<2> >(*reg, parentGroup);
-	bReturn &= Register__Algebra<CPUBlockAlgebra<3> >(*reg, parentGroup);
-//	bReturn &= Register__Algebra<CPUBlockAlgebra<4> >(*reg, parentGroup);
-//	bReturn &= Register__Algebra<CPUVariableBlockAlgebra >(*reg, parentGroup);
+	bReturn &= Register__Algebra<CPUAlgebra>(*reg, grp);
+//	bReturn &= Register__Algebra<CPUBlockAlgebra<2> >(*reg, grp);
+	bReturn &= Register__Algebra<CPUBlockAlgebra<3> >(*reg, grp);
+//	bReturn &= Register__Algebra<CPUBlockAlgebra<4> >(*reg, grp);
+//	bReturn &= Register__Algebra<CPUVariableBlockAlgebra >(*reg, grp);
 
 	try
 	{
-	//	get group string
-		string grp("/ug4/Plugins/Discretization");
-
 #ifdef UG_DIM_1
 	//	Domain dependend part 1D
 			RegisterIElemDiscs<Domain1d>(*reg, grp);
