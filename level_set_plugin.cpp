@@ -204,11 +204,21 @@ extern "C" void InitUGPlugin(ug::bridge::Registry* reg, std::string parentGroup)
 	std::string grp(parentGroup); grp.append("LevelSet/");
 
 	bool bReturn = true;
+#ifdef UG_CPU_1
 	bReturn &= Register__Algebra<CPUAlgebra>(*reg, grp);
-//	bReturn &= Register__Algebra<CPUBlockAlgebra<2> >(*reg, grp);
+#endif
+#ifdef UG_CPU_2
+	bReturn &= Register__Algebra<CPUBlockAlgebra<2> >(*reg, grp);
+#endif
+#ifdef UG_CPU_3
 	bReturn &= Register__Algebra<CPUBlockAlgebra<3> >(*reg, grp);
-//	bReturn &= Register__Algebra<CPUBlockAlgebra<4> >(*reg, grp);
-//	bReturn &= Register__Algebra<CPUVariableBlockAlgebra >(*reg, grp);
+#endif
+#ifdef UG_CPU_4
+	bReturn &= Register__Algebra<CPUBlockAlgebra<4> >(*reg, grp);
+#endif
+#ifdef UG_CPU_VAR
+	bReturn &= Register__Algebra<CPUVariableBlockAlgebra >(*reg, grp);
+#endif
 
 	try
 	{
