@@ -92,13 +92,13 @@ template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::fill_v_vec(TGridFunction& vel,int component)
 {
     //	get domain of grid function
-	domain_type& domain = vel.get_domain();
+	domain_type& domain = vel.domain();
 
 //	get grid type of domain
 	typedef typename domain_type::grid_type grid_type;
 
 //	get grid of domain
-	grid_type& grid = domain.get_grid();
+	grid_type& grid = domain.grid();
 
 	typedef typename domain_type::position_accessor_type position_accessor_type;
 
@@ -115,7 +115,7 @@ bool FV1LevelSetDisc<TGridFunction>::fill_v_vec(TGridFunction& vel,int component
 			VertexBase* vrt = *iter;
 			MathVector<dim> coord;
 			MathVector<dim> vnode;
-			position_accessor_type aaPos = domain.get_position_accessor();
+			position_accessor_type aaPos = domain.position_accessor();
 			coord = aaPos[vrt];
 
 			typedef typename TGridFunction::multi_index_vector_type index_type;
@@ -125,7 +125,7 @@ bool FV1LevelSetDisc<TGridFunction>::fill_v_vec(TGridFunction& vel,int component
 
 		//	read indices on vertex
 			typedef typename TGridFunction::dof_distribution_type dof_distribution_type;
-			const dof_distribution_type& dd = vel.get_dof_distribution();
+			const dof_distribution_type& dd = vel.dof_distribution();
 
 			dd.inner_multi_indices(vrt, 0, ind);
 			analytic_velocity(vnode,m_time,coord);
@@ -138,13 +138,13 @@ bool FV1LevelSetDisc<TGridFunction>::fill_v_vec(TGridFunction& vel,int component
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::compute_normal(TGridFunction& vx,TGridFunction& vy,TGridFunction& u){
     	//	get domain of grid function
-	domain_type& domain = u.get_domain();
+	domain_type& domain = u.domain();
 
 	//	get grid type of domain
 	typedef typename domain_type::grid_type grid_type;
 
 	//	get grid of domain
-	grid_type& grid = domain.get_grid();
+	grid_type& grid = domain.grid();
 
 	typedef typename domain_type::position_accessor_type position_accessor_type;
 
@@ -180,14 +180,14 @@ bool FV1LevelSetDisc<TGridFunction>::compute_normal(TGridFunction& vx,TGridFunct
 	SetAttachmentValues(aaGradient, grid.vertices_begin(), grid.vertices_end(), 0);
 
     MathVector<dim> coord;
-    position_accessor_type aaPos = domain.get_position_accessor();
+    position_accessor_type aaPos = domain.position_accessor();
 
 	typedef typename TGridFunction::multi_index_vector_type index_type;
     //	get vector holding all indices on the vertex
 	multi_index_vector_type ind;
     //	read indices on vertex
 	typedef typename TGridFunction::dof_distribution_type dof_distribution_type;
-	const dof_distribution_type& dd = u.get_dof_distribution();
+	const dof_distribution_type& dd = u.dof_distribution();
     // calculate scv size and gradient
     if (calculate_vertex_grad_vol(u,aaGradient, aaScvVolume)==false){UG_LOG("ERROR: gradient computation failed!"); return false;};
 	if (m_limiter==true){
@@ -219,13 +219,13 @@ bool FV1LevelSetDisc<TGridFunction>::compute_normal(TGridFunction& vx,TGridFunct
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::compute_dnormal(TGridFunction& dnormal,TGridFunction& vx,TGridFunction& vy,TGridFunction& phi,TGridFunction& u){
 	//	get domain of grid function
-	domain_type& domain = u.get_domain();
+	domain_type& domain = u.domain();
 
 	//	get grid type of domain
 	typedef typename domain_type::grid_type grid_type;
 
 	//	get grid of domain
-	grid_type& grid = domain.get_grid();
+	grid_type& grid = domain.grid();
 
 	typedef typename domain_type::position_accessor_type position_accessor_type;
 
@@ -267,10 +267,10 @@ bool FV1LevelSetDisc<TGridFunction>::compute_dnormal(TGridFunction& dnormal,TGri
 	multi_index_vector_type ind;
 	//	read indices on vertex
 	typedef typename TGridFunction::dof_distribution_type dof_distribution_type;
-	const dof_distribution_type& dd = u.get_dof_distribution();
+	const dof_distribution_type& dd = u.dof_distribution();
 
 	typedef typename domain_type::position_accessor_type position_accessor_type;
-	position_accessor_type aaPos = domain.get_position_accessor();
+	position_accessor_type aaPos = domain.position_accessor();
 ///UG_LOG("-------------\n");
 	// calculate scv size and gradient of u
     if (calculate_vertex_grad_vol_sign(u,aaGradient, aaScvVolume,phi,-1)==false){UG_LOG("ERROR: gradient computation failed!"); return false;};
@@ -300,13 +300,13 @@ bool FV1LevelSetDisc<TGridFunction>::compute_dnormal(TGridFunction& dnormal,TGri
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::compute_ddnormal(TGridFunction& ddnormal,TGridFunction& dnormal,TGridFunction& vx,TGridFunction& vy,TGridFunction& phi,TGridFunction& u){
 	//	get domain of grid function
-	domain_type& domain = u.get_domain();
+	domain_type& domain = u.domain();
 
 	//	get grid type of domain
 	typedef typename domain_type::grid_type grid_type;
 
 	//	get grid of domain
-	grid_type& grid = domain.get_grid();
+	grid_type& grid = domain.grid();
 
 	typedef typename domain_type::position_accessor_type position_accessor_type;
 
@@ -348,10 +348,10 @@ bool FV1LevelSetDisc<TGridFunction>::compute_ddnormal(TGridFunction& ddnormal,TG
 	multi_index_vector_type ind;
 	//	read indices on vertex
 	typedef typename TGridFunction::dof_distribution_type dof_distribution_type;
-	const dof_distribution_type& dd = u.get_dof_distribution();
+	const dof_distribution_type& dd = u.dof_distribution();
 
 	typedef typename domain_type::position_accessor_type position_accessor_type;
-	position_accessor_type aaPos = domain.get_position_accessor();
+	position_accessor_type aaPos = domain.position_accessor();
 ///UG_LOG("-------------\n");
 	// calculate scv size and gradient of u
 	compute_dnormal(dnormal,vx,vy,phi,u);
@@ -384,21 +384,21 @@ template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaGrad)
 {
 	//	get domain of grid function
-	domain_type& domain = uOld.get_domain();
+	domain_type& domain = uOld.domain();
 
 	//	get grid type of domain
 	typedef typename domain_type::grid_type grid_type;
 
 	//	get grid of domain
-	grid_type& grid = domain.get_grid();
+	grid_type& grid = domain.grid();
 
 	typedef typename domain_type::position_accessor_type position_accessor_type;
 
-	position_accessor_type aaPos = domain.get_position_accessor();
+	position_accessor_type aaPos = domain.position_accessor();
 
 	multi_index_vector_type ind;
 	typedef typename TGridFunction::dof_distribution_type dof_distribution_type;
-	const dof_distribution_type& dd = uOld.get_dof_distribution();
+	const dof_distribution_type& dd = uOld.dof_distribution();
 
 	//	create Attachment for scv-volume size
 	ANumber aMax;
@@ -540,7 +540,7 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaG
 
 		//	get position accessor
 		typedef typename domain_type::position_accessor_type position_accessor_type;
-		const position_accessor_type& aaPos = domain.get_position_accessor();
+		const position_accessor_type& aaPos = domain.position_accessor();
 
 		//	compute center of mass
 		MathVector<dim> center;
@@ -594,10 +594,10 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 	typedef typename dof_distribution_type::multi_index_vector_type multi_index_vector_type;
 
 	//	get domain
-	domain_type& domain = uNew.get_domain();
+	domain_type& domain = uNew.domain();
 
 	//	get grid of domain
-	// typename domain_type::grid_type& grid = domain.get_grid();
+	// typename domain_type::grid_type& grid = domain.grid();
 
 	//	create Multiindex
 	multi_index_vector_type multInd;
@@ -617,7 +617,7 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 
 	//	get position accessor
 	typedef typename domain_type::position_accessor_type position_accessor_type;
-	const position_accessor_type& aaPos = domain.get_position_accessor();
+	const position_accessor_type& aaPos = domain.position_accessor();
 
     //	coord and vertex array
 	MathVector<dim> coCoord[domain_traits<dim>::MaxNumVerticesOfElem];
@@ -630,14 +630,14 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 		coCoord[i] = aaPos[vVrt[i]];
 	};
 	// update fv geometry
-	geo.update(elem, &(coCoord[0]), &domain.get_subset_handler());
+	geo.update(elem, &(coCoord[0]), &domain.subset_handler());
 
     //UG_LOG("geo.num_scvf() " << geo.num_scvf() << "\n");
     //UG_LOG("geo.num_scv() " << geo.num_scv() << "\n");
 		
 //	read indices on vertex
 	typedef typename TGridFunction::dof_distribution_type dof_distribution_type;
-	const dof_distribution_type& dd = uOld.get_dof_distribution();
+	const dof_distribution_type& dd = uOld.dof_distribution();
 
 //  fill node value vector
 	std::vector<number> uValue(geo.num_scv());
@@ -890,7 +890,7 @@ bool FV1LevelSetDisc<TGridFunction>::
 calculate_vertex_vol(TGridFunction& u,aaSCV& aaScvVolume)
 {
 	//	get domain
-		domain_type& domain = u.get_domain();
+		domain_type& domain = u.domain();
 
 	//	create a FV Geometry for the dimension
 		DimFV1Geometry<dim> geo;
@@ -903,7 +903,7 @@ calculate_vertex_vol(TGridFunction& u,aaSCV& aaScvVolume)
 
 	//	get position accessor
 		typedef typename domain_type::position_accessor_type position_accessor_type;
-		const position_accessor_type& aaPos = domain.get_position_accessor();
+		const position_accessor_type& aaPos = domain.position_accessor();
 
 	//	sum up all contributions of the sub control volumes to one vertex in an attachment
 		for(int si = 0; si < u.num_subsets(); ++si)
@@ -925,7 +925,7 @@ calculate_vertex_vol(TGridFunction& u,aaSCV& aaScvVolume)
 					coCoord[i] = aaPos[elem->vertex(i)];
 
 			//	evaluate finite volume geometry
-				geo.update(elem, &(coCoord[0]), &domain.get_subset_handler());
+				geo.update(elem, &(coCoord[0]), &domain.subset_handler());
 
 
 			//	loop corners
@@ -966,10 +966,10 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 		typedef typename dof_distribution_type::multi_index_vector_type multi_index_vector_type;
 
 	//	get domain
-		domain_type& domain = u.get_domain();
+		domain_type& domain = u.domain();
 
 	//	get grid of domain
-		typename domain_type::grid_type& grid = domain.get_grid();
+		typename domain_type::grid_type& grid = domain.grid();
 
 	//	create Multiindex
 		multi_index_vector_type multInd;
@@ -996,7 +996,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 		VertexBase* vVrt[domain_traits<dim>::MaxNumVerticesOfElem];
 
 	//	sum up all contributions of the sub control volumes to one vertex in an attachment
-		for(int si = 0; si < domain.get_subset_handler().num_subsets(); ++si)
+		for(int si = 0; si < domain.subset_handler().num_subsets(); ++si)
 		{
 	        if (m_dirichlet_sg.num_subsets()!=0) if (m_dirichlet_sg.contains(si)==true) continue;
 	        if (m_neumann_sg.num_subsets()!=0) if (m_neumann_sg.contains(si)==true) continue;
@@ -1013,7 +1013,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 
 			//	get position accessor
 				typedef typename domain_type::position_accessor_type position_accessor_type;
-				const position_accessor_type& aaPos = domain.get_position_accessor();
+				const position_accessor_type& aaPos = domain.position_accessor();
 
 			//	get vertices and extract corner coordinates
 				const size_t numVertices = elem->num_vertices();
@@ -1023,7 +1023,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 				};
 
 			//	evaluate finite volume geometry
-				geo.update(elem, &(coCoord[0]), &domain.get_subset_handler());
+				geo.update(elem, &(coCoord[0]), &domain.subset_handler());
 
 				//UG_LOG("Num Verts loaded: "<<vVrt.size()<<"\n");
 				//UG_LOG("Num SCV computed: "<<geo.num_scv()<<"\n");m_vPP.
@@ -1034,7 +1034,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 
 			//	read indices on vertex
 				typedef typename TGridFunction::dof_distribution_type dof_distribution_type;
-				const dof_distribution_type& dd = u.get_dof_distribution();
+				const dof_distribution_type& dd = u.dof_distribution();
 
 				size_t noc = geo.num_scv();
 				for (size_t i=0;i < noc;i++)
@@ -1091,7 +1091,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 
 	// int count=0;
 	typedef typename domain_type::position_accessor_type position_accessor_type;
-	position_accessor_type aaPos = u.get_domain().get_position_accessor();
+	position_accessor_type aaPos = u.domain().position_accessor();
 	for (int si=0;si < u.num_subsets();++si){
 		//UG_LOG("si " << si << "\n");
 	    for(VertexBaseConstIterator iter = u.template begin<VertexBase>(si);
@@ -1132,10 +1132,10 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 		typedef typename dof_distribution_type::multi_index_vector_type multi_index_vector_type;
 
 		//	get domain
-		domain_type& domain = u.get_domain();
+		domain_type& domain = u.domain();
 
 		//	get grid of domain
-		typename domain_type::grid_type& grid = domain.get_grid();
+		typename domain_type::grid_type& grid = domain.grid();
 
 		//	create Multiindex
 		multi_index_vector_type multInd;
@@ -1162,7 +1162,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 		VertexBase* vVrt[domain_traits<dim>::MaxNumVerticesOfElem];
 
 		//	sum up all contributions of the sub control volumes to one vertex in an attachment
-		for(int si = 0; si < domain.get_subset_handler().num_subsets(); ++si)
+		for(int si = 0; si < domain.subset_handler().num_subsets(); ++si)
 		{
 	        if (m_dirichlet_sg.num_subsets()!=0) if (m_dirichlet_sg.contains(si)==true) continue;
 	        if (m_neumann_sg.num_subsets()!=0) if (m_neumann_sg.contains(si)==true) continue;
@@ -1179,7 +1179,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 
 				//	get position accessor
 				typedef typename domain_type::position_accessor_type position_accessor_type;
-				const position_accessor_type& aaPos = domain.get_position_accessor();
+				const position_accessor_type& aaPos = domain.position_accessor();
 
 				//	get vertices and extract corner coordinates
 				const size_t numVertices = elem->num_vertices();
@@ -1189,7 +1189,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 				};
 
 				//	evaluate finite volume geometry
-				geo.update(elem, &(coCoord[0]), &domain.get_subset_handler());
+				geo.update(elem, &(coCoord[0]), &domain.subset_handler());
 
 				//UG_LOG("Num Verts loaded: "<<vVrt.size()<<"\n");
 				//UG_LOG("Num SCV computed: "<<geo.num_scv()<<"\n");m_vPP.
@@ -1200,7 +1200,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 
 				//	read indices on vertex
 				typedef typename TGridFunction::dof_distribution_type dof_distribution_type;
-				const dof_distribution_type& dd = u.get_dof_distribution();
+				const dof_distribution_type& dd = u.dof_distribution();
 
 				size_t noc = geo.num_scv();
 				bool rightsign=true;
@@ -1281,7 +1281,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 
 		// int count=0;
 		typedef typename domain_type::position_accessor_type position_accessor_type;
-		position_accessor_type aaPos = u.get_domain().get_position_accessor();
+		position_accessor_type aaPos = u.domain().position_accessor();
 		for (int si=0;si < u.num_subsets();++si){
 			//UG_LOG("si " << si << "\n");
 			for(VertexBaseConstIterator iter = u.template begin<VertexBase>(si);
@@ -1309,13 +1309,13 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::assign_dirichlet(TGridFunction& numsol){
 	//	get domain of grid function
-		domain_type& domain = numsol.get_domain();
+		domain_type& domain = numsol.domain();
 
 	//	get grid type of domain
 		typedef typename domain_type::grid_type grid_type;
 
 	//	get grid of domain
-		grid_type& grid = domain.get_grid();
+		grid_type& grid = domain.grid();
 
 		typedef typename domain_type::position_accessor_type position_accessor_type;
 
@@ -1334,7 +1334,7 @@ bool FV1LevelSetDisc<TGridFunction>::assign_dirichlet(TGridFunction& numsol){
 				VertexBase* vrt = *iter;
 				number exactVal;
 				MathVector<dim> coord;
-				position_accessor_type aaPos = domain.get_position_accessor();
+				position_accessor_type aaPos = domain.position_accessor();
 				coord = aaPos[vrt];
 
 				typedef typename TGridFunction::multi_index_vector_type index_type;
@@ -1344,7 +1344,7 @@ bool FV1LevelSetDisc<TGridFunction>::assign_dirichlet(TGridFunction& numsol){
 
 			//	read indices on vertex
 				typedef typename TGridFunction::dof_distribution_type dof_distribution_type;
-				const dof_distribution_type& dd = numsol.get_dof_distribution();
+				const dof_distribution_type& dd = numsol.dof_distribution();
 
 				const size_t numInd = dd.inner_multi_indices(vrt, 0, ind);
 
@@ -1380,11 +1380,11 @@ bool FV1LevelSetDisc<TGridFunction>::assign_dirichlet(TGridFunction& numsol){
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::overwrite(TGridFunction& unew,TGridFunction& uold,TGridFunction& phi,int sign){
 	//	get domain of grid function
-	domain_type& domain = unew.get_domain();
+	domain_type& domain = unew.domain();
 	//	get grid type of domain
 	typedef typename domain_type::grid_type grid_type;
 	//	get grid of domain
-	grid_type& grid = domain.get_grid();
+	grid_type& grid = domain.grid();
 	typedef typename domain_type::position_accessor_type position_accessor_type;
 	//	element iterator type
 	typedef typename domain_traits<dim>::const_iterator ElemIterator;
@@ -1402,7 +1402,7 @@ bool FV1LevelSetDisc<TGridFunction>::overwrite(TGridFunction& unew,TGridFunction
 			multi_index_vector_type ind;
 		//	read indices on vertex
 			typedef typename TGridFunction::dof_distribution_type dof_distribution_type;
-			const dof_distribution_type& dd = unew.get_dof_distribution();
+			const dof_distribution_type& dd = unew.dof_distribution();
 			dd.inner_multi_indices(vrt, 0, ind);
 		    number phiValue = BlockRef(phi[ind[0][0]],ind[0][1]);
 			int nodeSign;
@@ -1418,11 +1418,11 @@ bool FV1LevelSetDisc<TGridFunction>::overwrite(TGridFunction& unew,TGridFunction
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::overwrite(TGridFunction& unew,number value,TGridFunction& phi,int sign){
 	//	get domain of grid function
-	domain_type& domain = unew.get_domain();
+	domain_type& domain = unew.domain();
 	//	get grid type of domain
 	typedef typename domain_type::grid_type grid_type;
 	//	get grid of domain
-	grid_type& grid = domain.get_grid();
+	grid_type& grid = domain.grid();
 	typedef typename domain_type::position_accessor_type position_accessor_type;
 	//	element iterator type
 	typedef typename domain_traits<dim>::const_iterator ElemIterator;
@@ -1440,7 +1440,7 @@ bool FV1LevelSetDisc<TGridFunction>::overwrite(TGridFunction& unew,number value,
 			multi_index_vector_type ind;
 		//	read indices on vertex
 			typedef typename TGridFunction::dof_distribution_type dof_distribution_type;
-			const dof_distribution_type& dd = unew.get_dof_distribution();
+			const dof_distribution_type& dd = unew.dof_distribution();
 			dd.inner_multi_indices(vrt, 0, ind);
 		    number phiValue = BlockRef(phi[ind[0][0]],ind[0][1]);
 			int nodeSign;
@@ -1458,13 +1458,13 @@ template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::compute_error(TGridFunction& numsol)
 {
 //	get domain of grid function
-	domain_type& domain = numsol.get_domain();
+	domain_type& domain = numsol.domain();
 
 //	get grid type of domain
 	typedef typename domain_type::grid_type grid_type;
 
 //	get grid of domain
-	grid_type& grid = domain.get_grid();
+	grid_type& grid = domain.grid();
 
 	typedef typename domain_type::position_accessor_type position_accessor_type;
 
@@ -1500,7 +1500,7 @@ bool FV1LevelSetDisc<TGridFunction>::compute_error(TGridFunction& numsol)
 			VertexBase* vrt = *iter;
 			number exactVal;
 			MathVector<dim> coord;
-			position_accessor_type aaPos = domain.get_position_accessor();
+			position_accessor_type aaPos = domain.position_accessor();
 			coord = aaPos[vrt];
 		
 			typedef typename TGridFunction::multi_index_vector_type index_type;
@@ -1510,7 +1510,7 @@ bool FV1LevelSetDisc<TGridFunction>::compute_error(TGridFunction& numsol)
 
 		//	read indices on vertex
 			typedef typename TGridFunction::dof_distribution_type dof_distribution_type;
-			const dof_distribution_type& dd = numsol.get_dof_distribution();
+			const dof_distribution_type& dd = numsol.dof_distribution();
 
 			const size_t numInd = dd.inner_multi_indices(vrt, 0, ind);
 
@@ -1557,24 +1557,24 @@ template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::init_function(TGridFunction& u)
 {
 //	get domain of grid function
-	domain_type& domain = u.get_domain();
+	domain_type& domain = u.domain();
 
 //	get grid type of domain
 	typedef typename domain_type::grid_type grid_type;
 
 //	get grid of domain
-	grid_type& grid = domain.get_grid();
+	grid_type& grid = domain.grid();
 
 	typedef typename domain_type::position_accessor_type position_accessor_type;
 
 	//	read indices on vertex
-	position_accessor_type aaPos = domain.get_position_accessor();
+	position_accessor_type aaPos = domain.position_accessor();
 	typedef typename TGridFunction::multi_index_vector_type index_type;
 	typedef typename TGridFunction::dof_distribution_type dof_distribution_type;
-	const dof_distribution_type& dd = u.get_dof_distribution();
+	const dof_distribution_type& dd = u.dof_distribution();
 
 
-	for (int si=0;si<domain.get_subset_handler().num_subsets();++si){
+	for (int si=0;si<domain.subset_handler().num_subsets();++si){
 		for(VertexBaseConstIterator iter = u.template begin<VertexBase>(si);
 									   iter != grid.template end<VertexBase>(si); ++iter)
 		{
@@ -1595,13 +1595,13 @@ template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::runtimetest(TGridFunction& uNew)
 {
 	//	get domain of grid function
-	domain_type& domain = uNew.get_domain();
+	domain_type& domain = uNew.domain();
 
 	//	get grid type of domain
 	typedef typename domain_type::grid_type grid_type;
 
 	//	get grid of domain
-//	grid_type& grid = domain.get_grid();
+//	grid_type& grid = domain.grid();
 
 	//	element iterator type
 	typedef typename domain_traits<dim>::const_iterator ElemIterator;
@@ -1614,7 +1614,7 @@ bool FV1LevelSetDisc<TGridFunction>::runtimetest(TGridFunction& uNew)
 
 //	get position accessor
 	typedef typename domain_type::position_accessor_type position_accessor_type;
-	const position_accessor_type& aaPos = domain.get_position_accessor();
+	const position_accessor_type& aaPos = domain.position_accessor();
 
 //	resize corners
 //	std::vector<MathVector<dim> > coCoord;
@@ -1636,7 +1636,7 @@ bool FV1LevelSetDisc<TGridFunction>::runtimetest(TGridFunction& uNew)
 				coCoord[i] = aaPos[elem->vertex(i)];
 
 		//	evaluate finite volume geometry
-			geo.update(elem, &(coCoord[0]), &domain.get_subset_handler());
+			geo.update(elem, &(coCoord[0]), &domain.subset_handler());
 		};
 	};
 
@@ -1655,7 +1655,7 @@ bool FV1LevelSetDisc<TGridFunction>::runtimetest(TGridFunction& uNew)
 			CollectVertices(vVrt, grid, elem);
 			//	get position accessor
 			typedef typename domain_type::position_accessor_type position_accessor_type;
-			const position_accessor_type& aaPos = domain.get_position_accessor();
+			const position_accessor_type& aaPos = domain.position_accessor();
 			//	resize corners
 			std::vector<MathVector<dim> > coCoord;
 			//	extract corner coordinates
@@ -1665,7 +1665,7 @@ bool FV1LevelSetDisc<TGridFunction>::runtimetest(TGridFunction& uNew)
 	};
 	
 
-	for (int si=0;si<domain.get_subset_handler().num_subsets();++si){
+	for (int si=0;si<domain.subset_handler().num_subsets();++si){
 		//	get iterators
 		ElemIterator iter = uNew.template begin<ElemType>(si);
 		ElemIterator iterEnd = uNew.template end<ElemType>(si);
@@ -1682,7 +1682,7 @@ bool FV1LevelSetDisc<TGridFunction>::runtimetest(TGridFunction& uNew)
 
 	MathVector<dim> coord;
 	typedef typename domain_type::position_accessor_type position_accessor_type;
-	position_accessor_type aaPos = domain.get_position_accessor();
+	position_accessor_type aaPos = domain.position_accessor();
 
 	for (int si=0;si<uNew.num_subsets();++si){
 		VertexBaseConstIterator iter = uNew.template begin<VertexBase>(si);
@@ -1700,13 +1700,13 @@ bool FV1LevelSetDisc<TGridFunction>::runtimetest(TGridFunction& uNew)
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::update_ls_subsets(TGridFunction& phi){
 	//	get domain of grid function
-    domain_type& domain = phi.get_domain();
+    domain_type& domain = phi.domain();
 
     //	get grid type of domain
     typedef typename domain_type::grid_type grid_type;
 
     //	get grid of domain
-    // grid_type& grid = domain.get_grid();
+    // grid_type& grid = domain.grid();
 
     typedef typename domain_type::position_accessor_type position_accessor_type;
 
@@ -1716,15 +1716,15 @@ bool FV1LevelSetDisc<TGridFunction>::update_ls_subsets(TGridFunction& phi){
     //	element type
     typedef typename domain_traits<dim>::geometric_base_object ElemType;
 
-    const dof_distribution_type& dd = phi.get_dof_distribution();
+    const dof_distribution_type& dd = phi.dof_distribution();
 
     //	create Multiindex
     multi_index_vector_type ind;
 
 	//	get element iterator type
 	typedef typename domain_traits<dim>::const_iterator ElemIterator;
-	m_inactive_sg.set_subset_handler(domain.get_subset_handler());
-    for (int si=0;si<domain.get_subset_handler().num_subsets();++si){
+	m_inactive_sg.set_subset_handler(domain.subset_handler());
+    for (int si=0;si<domain.subset_handler().num_subsets();++si){
     	UG_LOG("******************* si " << si << " **********************\n");
 		if (m_dirichlet_sg.num_subsets()!=0) if (m_dirichlet_sg.contains(si)==true) continue;
         if (m_neumann_sg.num_subsets()!=0) if (m_neumann_sg.contains(si)==true) continue;
@@ -1767,14 +1767,14 @@ bool FV1LevelSetDisc<TGridFunction>::update_ls_subsets(TGridFunction& phi){
 				};
 			};
 			if (firstNonzero==-1) // all element nodes are on zero ls
-			     domain.get_subset_handler().assign_subset(elem,m_inside_elements_si);
+			     domain.subset_handler().assign_subset(elem,m_inside_elements_si);
 			// add nodes on zero ls to zero ls node subsetgroup
 			for (int i=0;i<noc;i++){
 				if (phiCo[i]==0){
-    			    int oldindex = domain.get_subset_handler().get_subset_index(vVrt[i]);
+    			    int oldindex = domain.subset_handler().get_subset_index(vVrt[i]);
 	            	if (m_dirichlet_sg.num_subsets()!=0) if (m_dirichlet_sg.contains(oldindex)==true) continue;
 		            if (m_neumann_sg.num_subsets()!=0) if (m_neumann_sg.contains(oldindex)==true) continue;
-                    domain.get_subset_handler().assign_subset(vVrt[i],m_onls_nodes_si);
+                    domain.subset_handler().assign_subset(vVrt[i],m_onls_nodes_si);
  				};
 			};
 			bool onls=false;
@@ -1786,37 +1786,37 @@ bool FV1LevelSetDisc<TGridFunction>::update_ls_subsets(TGridFunction& phi){
 			};
 			if (onls==false){
 			    if (phiCo[firstNonzero]<0){
-			    //	UG_LOG("si before " << domain.get_subset_handler().get_subset_index(elem));
-				    domain.get_subset_handler().assign_subset(elem,m_inside_elements_si);
+			    //	UG_LOG("si before " << domain.subset_handler().get_subset_index(elem));
+				    domain.subset_handler().assign_subset(elem,m_inside_elements_si);
 				    UG_LOG("element is inside \n");
-				//    UG_LOG("si after " << domain.get_subset_handler().get_subset_index(elem) << "\n");
+				//    UG_LOG("si after " << domain.subset_handler().get_subset_index(elem) << "\n");
 				//    UG_LOG("-- nr of subsets: " << phi.num_subsets() << " " << m_inside_elements_si <<  "\n");
 				};
 				if (phiCo[firstNonzero]>0){
-				//	UG_LOG("si before " << domain.get_subset_handler().get_subset_index(elem));
-				    domain.get_subset_handler().assign_subset(elem,m_outside_elements_si);
-				//    UG_LOG("si after " << domain.get_subset_handler().get_subset_index(elem) <<  "\n");
+				//	UG_LOG("si before " << domain.subset_handler().get_subset_index(elem));
+				    domain.subset_handler().assign_subset(elem,m_outside_elements_si);
+				//    UG_LOG("si after " << domain.subset_handler().get_subset_index(elem) <<  "\n");
 				//    UG_LOG("|| nr of subsets: " << phi.num_subsets() << " " << m_outside_elements_si << "\n");
 				};
 			};
 			if (onls==true){
-				//UG_LOG("si before " << domain.get_subset_handler().get_subset_index(elem));
-			    domain.get_subset_handler().assign_subset(elem,m_onls_elements_si);
-			    //UG_LOG("si after " << domain.get_subset_handler().get_subset_index(elem) <<  "\n");
+				//UG_LOG("si before " << domain.subset_handler().get_subset_index(elem));
+			    domain.subset_handler().assign_subset(elem,m_onls_elements_si);
+			    //UG_LOG("si after " << domain.subset_handler().get_subset_index(elem) <<  "\n");
 			    //UG_LOG("// nr of subsets: " << phi.num_subsets() << " " << m_onls_elements_si << "\n");
 			    for (int i=0;i<noc;i++){
-   					int oldindex = domain.get_subset_handler().get_subset_index(vVrt[i]);
+   					int oldindex = domain.subset_handler().get_subset_index(vVrt[i]);
 	    		    if (m_dirichlet_sg.num_subsets()!=0) if (m_dirichlet_sg.contains(oldindex)==true) continue;
        	            if (m_neumann_sg.num_subsets()!=0) if (m_neumann_sg.contains(oldindex)==true) continue;
 				    if (phiCo[i]<0){
-					    domain.get_subset_handler().assign_subset(vVrt[i],m_inside_nodes_si);
+					    domain.subset_handler().assign_subset(vVrt[i],m_inside_nodes_si);
 					    UG_LOG("node is inside \n");
 					};
 					if (phiCo[i]>0){
-					    domain.get_subset_handler().assign_subset(vVrt[i],m_outside_nodes_si);
+					    domain.subset_handler().assign_subset(vVrt[i],m_outside_nodes_si);
 					};
 					if (phiCo[i]==0){
-						domain.get_subset_handler().assign_subset(vVrt[i],m_onls_nodes_si);
+						domain.subset_handler().assign_subset(vVrt[i],m_onls_nodes_si);
 					}
 				};
 			};
@@ -1857,29 +1857,29 @@ bool FV1LevelSetDisc<TGridFunction>::init_ls_subsets(TGridFunction& phi){
 template<typename TGridFunction>
 void FV1LevelSetDisc<TGridFunction>::create_ls_subsets(TGridFunction& phi){
 	//	get domain
-	domain_type& domain = phi.get_domain();
-	UG_LOG("nr of subsets: " << domain.get_subset_handler().num_subsets() << "\n");
-   	m_inside_elements_si = domain.get_subset_handler().num_subsets();
+	domain_type& domain = phi.domain();
+	UG_LOG("nr of subsets: " << domain.subset_handler().num_subsets() << "\n");
+   	m_inside_elements_si = domain.subset_handler().num_subsets();
    	m_outside_elements_si = m_inside_elements_si + 1;
    	m_onls_elements_si = m_inside_elements_si + 2;
    	m_inside_nodes_si = m_inside_elements_si + 3;
    	m_outside_nodes_si = m_inside_elements_si + 4;
    	m_onls_nodes_si = m_inside_elements_si + 5;
-   	domain.get_subset_handler().subset_required(phi.num_subsets()+5);
-   	UG_LOG("nr of subsets:" << domain.get_subset_handler().num_subsets() << "\n");
+   	domain.subset_handler().subset_required(phi.num_subsets()+5);
+   	UG_LOG("nr of subsets:" << domain.subset_handler().num_subsets() << "\n");
 };
 
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunction& uOld)
 {
 	//	get domain of grid function
-	domain_type& domain = uNew.get_domain();
+	domain_type& domain = uNew.domain();
 
 	//	get grid type of domain
 	typedef typename domain_type::grid_type grid_type;
 
 	//	get grid of domain
-	grid_type& grid = domain.get_grid();
+	grid_type& grid = domain.grid();
 
 	typedef typename domain_type::position_accessor_type position_accessor_type;
 
@@ -1915,7 +1915,7 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 	SetAttachmentValues(aaGradient, grid.vertices_begin(), grid.vertices_end(), 0);
 
 
-	// const dof_distribution_type& dd = uNew.get_dof_distribution();
+	// const dof_distribution_type& dd = uNew.dof_distribution();
 	m_maxCFL=0;
 	
 	//UG_LOG("***************************************************\n");
@@ -1941,14 +1941,14 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 	};*/
 	VecAssign(uNew,uOld);
     MathVector<dim> coord;
-    position_accessor_type aaPos = domain.get_position_accessor();
+    position_accessor_type aaPos = domain.position_accessor();
 
 	typedef typename TGridFunction::multi_index_vector_type index_type;
     //	get vector holding all indices on the vertex
 	multi_index_vector_type ind;
     //	read indices on vertex
 	typedef typename TGridFunction::dof_distribution_type dof_distribution_type;
-	const dof_distribution_type& dd = uNew.get_dof_distribution();
+	const dof_distribution_type& dd = uNew.dof_distribution();
 
 	for (size_t step=0;step<m_nrOfSteps;step++)
 	{
@@ -1992,7 +1992,7 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 			    ElemType* elem = *iter;
 			    //UG_LOG("element \n");
 			    // uNew = uOld
-			    assemble_element(elem, geo, uNew. get_domain().get_grid(),uNew,uOld,aaGradient,aaScvVolume);
+			    assemble_element(elem, geo, uNew. domain().grid(),uNew,uOld,aaGradient,aaScvVolume);
 		    };
 	    };
 		for (int si=0;si<uOld.num_subsets();++si){

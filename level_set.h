@@ -160,8 +160,8 @@ class FV1LevelSetDisc
 		bool set_dirichlet_boundary(TGridFunction& uNew,const char* subsets){
 		    std::string m_dirichletSubsets = subsets;
 			//	get domain of grid function
-			domain_type& domain = uNew.get_domain();
-			if(!ConvertStringToSubsetGroup(m_dirichlet_sg, domain.get_subset_handler(), m_dirichletSubsets.c_str()))
+			domain_type& domain = uNew.domain();
+			if(!ConvertStringToSubsetGroup(m_dirichlet_sg, domain.subset_handler(), m_dirichletSubsets.c_str()))
 			{
 			    UG_LOG("ERROR while parsing Subsets.\n");
 				return false;
@@ -172,8 +172,8 @@ class FV1LevelSetDisc
 	   bool set_outflow_boundary(TGridFunction& uNew,const char* subsets){
 		    std::string m_neumannSubsets = subsets;
 			//	get domain of grid function
-			domain_type& domain = uNew.get_domain();
-			if(!ConvertStringToSubsetGroup(m_neumann_sg, domain.get_subset_handler(), m_neumannSubsets.c_str()))
+			domain_type& domain = uNew.domain();
+			if(!ConvertStringToSubsetGroup(m_neumann_sg, domain.subset_handler(), m_neumannSubsets.c_str()))
 		    {
 			     UG_LOG("ERROR while parsing Subsets.\n");
 			     return false;
