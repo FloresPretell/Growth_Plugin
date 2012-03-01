@@ -27,12 +27,6 @@ class FV1LevelSetDisc
 		
 	///	algebra type
 		typedef typename TGridFunction::algebra_type algebra_type;
-	
-	/// dof distribution type	
-		typedef typename TGridFunction::dof_distribution_type dof_distribution_type;
-
-		typedef typename TGridFunction::dof_distribution_type::implementation_type
-				dof_distribution_impl_type;
 
 		typedef boost::function<void (number& value,
 				                              const MathVector<domain_type::dim>& x,
@@ -54,7 +48,7 @@ class FV1LevelSetDisc
 		typedef typename Grid::VertexAttachmentAccessor<Attachment<MathVector<dim> > > aaGrad;
 
 		// 	Type of multi index vector
-		typedef typename dof_distribution_type::multi_index_vector_type multi_index_vector_type;
+		typedef std::vector<MultiIndex<2> > multi_index_vector_type;
 		
 		// edge iterator
 		typedef geometry_traits<EdgeBase>::const_iterator EdgeBaseConstIterator;
@@ -121,7 +115,7 @@ class FV1LevelSetDisc
 		bool advect_lsf(TGridFunction& uNew,TGridFunction& u);
 	    bool init_function(TGridFunction& u);
 	///	adds a post process to be used when stepping the level set function
-		void add_post_process(IConstraint<dof_distribution_impl_type, algebra_type>& pp) {m_vPP.push_back(&pp);}
+		void add_post_process(IConstraint<algebra_type>& pp) {m_vPP.push_back(&pp);}
 
 		void set_vel_x(){m_velocity_type=HardcodedData;};
 		void set_vel_y(){m_velocity_type=HardcodedData;};
@@ -160,7 +154,7 @@ class FV1LevelSetDisc
 		bool set_dirichlet_boundary(TGridFunction& uNew,const char* subsets){
 		    std::string m_dirichletSubsets = subsets;
 			//	get domain of grid function
-			domain_type& domain = uNew.domain();
+			domain_type& domain = *uNew.domain();
 			if(!ConvertStringToSubsetGroup(m_dirichlet_sg, domain.subset_handler(), m_dirichletSubsets.c_str()))
 			{
 			    UG_LOG("ERROR while parsing Subsets.\n");
@@ -172,7 +166,7 @@ class FV1LevelSetDisc
 	   bool set_outflow_boundary(TGridFunction& uNew,const char* subsets){
 		    std::string m_neumannSubsets = subsets;
 			//	get domain of grid function
-			domain_type& domain = uNew.domain();
+			domain_type& domain = *uNew.domain();
 			if(!ConvertStringToSubsetGroup(m_neumann_sg, domain.subset_handler(), m_neumannSubsets.c_str()))
 		    {
 			     UG_LOG("ERROR while parsing Subsets.\n");
@@ -270,7 +264,7 @@ class FV1LevelSetDisc
 
 	private:
 	///	vector holding all scheduled post processes
-		std::vector<IConstraint<dof_distribution_impl_type, algebra_type>*> m_vPP;
+		std::vector<IConstraint<algebra_type>*> m_vPP;
       	number m_dt;
 		number m_time;
     	number m_gamma;
