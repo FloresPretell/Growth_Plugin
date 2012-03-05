@@ -14,10 +14,6 @@
 #include <boost/function.hpp>
 #include "level_set.h"
 
-#ifdef UG_PARALLEL
-	#include "lib_disc/parallelization/parallel_grid_function.h"
-#endif
-
 namespace ug{
 using namespace ug::bridge;
 
@@ -29,12 +25,7 @@ static void Register__Algebra_Domain(bridge::Registry& reg, string parentGroup)
 	typedef typename TAlgebra::vector_type vector_type;
 	typedef typename TAlgebra::matrix_type matrix_type;
 	typedef ApproximationSpace<TDomain> approximation_space_type;
-
-#ifdef UG_PARALLEL
-		typedef ParallelGridFunction<GridFunction<TDomain, SurfaceDoFDistribution, TAlgebra> > function_type;
-#else
-		typedef GridFunction<TDomain, SurfaceDoFDistribution, TAlgebra> function_type;
-#endif
+	typedef GridFunction<TDomain, SurfaceDoFDistribution, TAlgebra> function_type;
 
 //	group string
 	stringstream grpSS; grpSS << parentGroup << "/" << dim << "d";
