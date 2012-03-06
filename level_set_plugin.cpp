@@ -14,6 +14,8 @@
 #include <boost/function.hpp>
 #include "level_set.h"
 
+using namespace std;
+
 namespace ug{
 using namespace ug::bridge;
 
