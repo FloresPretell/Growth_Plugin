@@ -528,7 +528,7 @@ template <typename TElem>
 bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometry<dim>& geo, grid_type& grid,TGridFunction& uNew,const TGridFunction& uOld,aaGrad& aaGradient, aaSCV& aaVolume )
 {
 	//	get domain
-	domain_type& domain = *uNew.domain().get_impl();
+	domain_type& domain = *uNew.domain().get();
 
 	//	get grid of domain
 	// typename domain_type::grid_type& grid = domain.grid();
@@ -561,7 +561,7 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 		coCoord[i] = aaPos[vVrt[i]];
 	};
 	// update fv geometry
-	geo.update(elem, &(coCoord[0]), uOld.domain()->subset_handler().get_impl());
+	geo.update(elem, &(coCoord[0]), uOld.domain()->subset_handler().get());
 
     //UG_LOG("geo.num_scvf() " << geo.num_scvf() << "\n");
     //UG_LOG("geo.num_scv() " << geo.num_scv() << "\n");
@@ -817,7 +817,7 @@ bool FV1LevelSetDisc<TGridFunction>::
 calculate_vertex_vol(TGridFunction& u,aaSCV& aaScvVolume)
 {
 	//	get domain
-		domain_type& domain = *u.domain().get_impl();
+		domain_type& domain = *u.domain().get();
 
 	//	create a FV Geometry for the dimension
 		DimFV1Geometry<dim> geo;
@@ -850,7 +850,7 @@ calculate_vertex_vol(TGridFunction& u,aaSCV& aaScvVolume)
 					coCoord[i] = aaPos[elem->vertex(i)];
 
 			//	evaluate finite volume geometry
-				geo.update(elem, &(coCoord[0]), domain.subset_handler().get_impl());
+				geo.update(elem, &(coCoord[0]), domain.subset_handler().get());
 
 
 			//	loop corners
@@ -888,7 +888,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 	//	static const int dim = domain_type::dim;
 
 	//	get domain
-		domain_type& domain = *u.domain().get_impl();
+		domain_type& domain = *u.domain().get();
 
 	//	get grid of domain
 		typename domain_type::grid_type& grid = *domain.grid();
@@ -943,7 +943,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 				};
 
 			//	evaluate finite volume geometry
-				geo.update(elem, &(coCoord[0]), domain.subset_handler().get_impl());
+				geo.update(elem, &(coCoord[0]), domain.subset_handler().get());
 
 				//UG_LOG("Num Verts loaded: "<<vVrt.size()<<"\n");
 				//UG_LOG("Num SCV computed: "<<geo.num_scv()<<"\n");m_vPP.
@@ -1045,7 +1045,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 		//	static const int dim = domain_type::dim;
 
 		//	get domain
-		domain_type& domain = *u.domain().get_impl();
+		domain_type& domain = *u.domain().get();
 
 		//	get grid of domain
 		typename domain_type::grid_type& grid = *domain.grid();
@@ -1100,7 +1100,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 				};
 
 				//	evaluate finite volume geometry
-				geo.update(elem, &(coCoord[0]), domain.subset_handler().get_impl());
+				geo.update(elem, &(coCoord[0]), domain.subset_handler().get());
 
 				//UG_LOG("Num Verts loaded: "<<vVrt.size()<<"\n");
 				//UG_LOG("Num SCV computed: "<<geo.num_scv()<<"\n");m_vPP.
@@ -1215,7 +1215,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::assign_dirichlet(TGridFunction& numsol){
 	//	get domain of grid function
-		domain_type& domain = *numsol.domain().get_impl();
+		domain_type& domain = *numsol.domain().get();
 
 	//	get grid type of domain
 		typedef typename domain_type::grid_type grid_type;
@@ -1331,7 +1331,7 @@ template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::compute_error(TGridFunction& numsol)
 {
 //	get domain of grid function
-	domain_type& domain = *numsol.domain().get_impl();
+	domain_type& domain = *numsol.domain().get();
 
 //	get grid type of domain
 	typedef typename domain_type::grid_type grid_type;
@@ -1425,7 +1425,7 @@ template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::init_function(TGridFunction& u)
 {
 //	get domain of grid function
-	domain_type& domain = *u.domain().get_impl();
+	domain_type& domain = *u.domain().get();
 
 //	get grid type of domain
 	typedef typename domain_type::grid_type grid_type;
@@ -1457,7 +1457,7 @@ template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::runtimetest(TGridFunction& uNew)
 {
 	//	get domain of grid function
-	domain_type& domain = *uNew.domain().get_impl();
+	domain_type& domain = *uNew.domain().get();
 
 	//	get grid type of domain
 	typedef typename domain_type::grid_type grid_type;
@@ -1496,7 +1496,7 @@ bool FV1LevelSetDisc<TGridFunction>::runtimetest(TGridFunction& uNew)
 				coCoord[i] = aaPos[elem->vertex(i)];
 
 		//	evaluate finite volume geometry
-			geo.update(elem, &(coCoord[0]), domain.subset_handler().get_impl());
+			geo.update(elem, &(coCoord[0]), domain.subset_handler().get());
 		};
 	};
 
@@ -1560,7 +1560,7 @@ bool FV1LevelSetDisc<TGridFunction>::runtimetest(TGridFunction& uNew)
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::update_ls_subsets(TGridFunction& phi){
 	//	get domain of grid function
-    domain_type& domain = *phi.domain().get_impl();
+    domain_type& domain = *phi.domain().get();
 
     //	get grid type of domain
     typedef typename domain_type::grid_type grid_type;
@@ -1712,7 +1712,7 @@ bool FV1LevelSetDisc<TGridFunction>::init_ls_subsets(TGridFunction& phi){
 template<typename TGridFunction>
 void FV1LevelSetDisc<TGridFunction>::create_ls_subsets(TGridFunction& phi){
 	//	get domain
-	domain_type& domain = *phi.domain().get_impl();
+	domain_type& domain = *phi.domain().get();
 	UG_LOG("nr of subsets: " << domain.subset_handler()->num_subsets() << "\n");
    	m_inside_elements_si = domain.subset_handler()->num_subsets();
    	m_outside_elements_si = m_inside_elements_si + 1;
@@ -1728,7 +1728,7 @@ template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunction& uOld)
 {
 	//	get domain of grid function
-	domain_type& domain = *uNew.domain().get_impl();
+	domain_type& domain = *uNew.domain().get();
 
 	//	get grid type of domain
 	typedef typename domain_type::grid_type grid_type;
