@@ -115,7 +115,7 @@ class FV1LevelSetDisc
 		bool advect_lsf(TGridFunction& uNew,TGridFunction& u);
 	    bool init_function(TGridFunction& u);
 	///	adds a post process to be used when stepping the level set function
-		void add_post_process(IConstraint<algebra_type>& pp) {m_vPP.push_back(&pp);}
+		void add_post_process(SmartPtr<IConstraint<algebra_type> > pp) {m_vPP.push_back(pp);}
 
 		void set_vel_x(){m_velocity_type=HardcodedData;};
 		void set_vel_y(){m_velocity_type=HardcodedData;};
@@ -256,7 +256,7 @@ class FV1LevelSetDisc
 
 	private:
 	///	vector holding all scheduled post processes
-		std::vector<IConstraint<algebra_type>*> m_vPP;
+		std::vector<SmartPtr<IConstraint<algebra_type> > > m_vPP;
       	number m_dt;
 		number m_time;
     	number m_gamma;
