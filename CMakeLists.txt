@@ -17,10 +17,11 @@ set(SOURCES	level_set_plugin.cpp)
 
 
 
-add_library(LevelSetPlugin SHARED ${SOURCES})
 
 if(STATIC)
-	target_link_libraries (LevelSetPlugin ug4_s)
+	# add the sources to ug4's sources
+	EXPORTSOURCES(plugins/experimental/level_set ${SOURCES})
 else(STATIC)
+	add_library(LevelSetPlugin SHARED ${SOURCES})
 	target_link_libraries (LevelSetPlugin ug4)
 endif(STATIC)
