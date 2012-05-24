@@ -121,8 +121,8 @@ static void RegisterIElemDiscs(bridge::Registry& reg, string grp)
 	static const int dim = TDomain::dim;
 
 //	suffix and tag
-	string dimSuffix = GetDomainSuffix<dim>();
-	string dimTag = GetDomainTag<dim>();
+	string dimSuffix = GetDomainSuffix<TDomain>();
+	string dimTag = GetDomainTag<TDomain>();
 
 // NOTHING TO REGISTER HERE
 }
