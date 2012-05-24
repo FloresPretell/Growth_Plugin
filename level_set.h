@@ -14,9 +14,11 @@
 #include "lib_disc/common/groups_util.h"
 #include "lib_disc/function_spaces/approximation_space.h"
 #include "lib_disc/spatial_disc/disc_util/finite_volume_geometry.h"
+#include "lib_disc/spatial_disc/constraints/constraint_interface.h"
 #include <boost/function.hpp>
 
 namespace ug{
+namespace LevelSet{
 
 template<typename TGridFunction>
 class FV1LevelSetDisc
@@ -301,6 +303,7 @@ class FV1LevelSetDisc
 		int m_onls_nodes_si;
 };
 
+} // end namespace LevelSet
 } // end namespace ug
 
 // include implementation

@@ -15,6 +15,7 @@
 #include "lib_grid/algorithms/attachment_util.h"
 
 namespace ug{
+namespace LevelSet{
 
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::analytic_velocity(MathVector<dim> & v,number t,MathVector<dim> x)
@@ -1927,6 +1928,7 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 	return true;
 }
 
+} // end namespace LevelSet
 } // end namespace ug
 
 #endif /* LEVEL_SET_UTIL_IMPL_H_ */
