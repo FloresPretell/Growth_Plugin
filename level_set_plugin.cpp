@@ -125,7 +125,7 @@ static void DomainAlgebra(Registry& reg, string grp)
 extern "C" void
 InitUGPlugin_LevelSet(Registry* reg, string grp)
 {
-	grp.append("SpatialDisc/LevelSet/");
+	grp.append("/SpatialDisc/LevelSet");
 	typedef LevelSet::Functionality Functionality;
 
 	try{
