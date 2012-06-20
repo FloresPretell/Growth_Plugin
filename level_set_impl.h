@@ -123,6 +123,10 @@ bool FV1LevelSetDisc<TGridFunction>::fill_v_vec(TGridFunction& vel,int component
 	return true;
 };
 
+// next functions used for extrapolation equations as described in
+// T.D. Aslam - A partial differential equation approach to multidimensional extrapolation JCP 193 2003
+
+// compute normal given by \frac{\nabla \phi}{|\nabla \phi|}
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::compute_normal(TGridFunction& vx,TGridFunction& vy,TGridFunction& u)
 {
@@ -189,6 +193,7 @@ bool FV1LevelSetDisc<TGridFunction>::compute_normal(TGridFunction& vx,TGridFunct
 	return true;
 }
 
+// compute directional derivative in normal direction given by \normal \cdot \nabla u (see Aslam p. 2)
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::compute_dnormal(TGridFunction& dnormal,TGridFunction& vx,TGridFunction& vy,TGridFunction& phi,TGridFunction& u)
 {
@@ -254,6 +259,7 @@ bool FV1LevelSetDisc<TGridFunction>::compute_dnormal(TGridFunction& dnormal,TGri
 	return true;
 };
 
+// compute directional derivative in normal direction of directional derivative in normal direction given by \normal \cdot \nabla (\normal \cdot \nabla u) (see Aslam p. 3)
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::compute_ddnormal(TGridFunction& ddnormal,TGridFunction& dnormal,TGridFunction& vx,TGridFunction& vy,TGridFunction& phi,TGridFunction& u)
 {
@@ -321,7 +327,7 @@ bool FV1LevelSetDisc<TGridFunction>::compute_ddnormal(TGridFunction& ddnormal,TG
 	return true;
 };
 
-
+// limit previously computed gradient so that the control-volume-wise linear interpolation function does not introduce new maxima or minima into the data 
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaGrad)
 {
@@ -523,7 +529,7 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaG
 };
 
 
-/// assemble element
+// assemble element using upwind
 template<typename TGridFunction>
 template <typename TElem>
 bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometry<dim>& geo, grid_type& grid,TGridFunction& uNew,const TGridFunction& uOld,aaGrad& aaGradient, aaSCV& aaVolume )
@@ -869,12 +875,8 @@ calculate_vertex_vol(TGridFunction& u,aaSCV& aaScvVolume)
 
 }
 
-/*************************
 
-COMPUTE VERTEX GRAD AND VOLUME OF CONTROL VOLUME 
-
-**************************/
-
+// compute gradient in vertices and volume of control volume
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::
 calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolume)
@@ -1032,7 +1034,8 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 	return true ;
 }
 
-	template<typename TGridFunction>
+// compute gradient in vertices and volume of control volume in region given by sign of level set function
+template<typename TGridFunction>
 	bool FV1LevelSetDisc<TGridFunction>::
 	calculate_vertex_grad_vol_sign(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolume,TGridFunction& phi,int sign)
 	{
@@ -1212,7 +1215,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 		return true ;
 	}
 
-
+// set Dirichlet values in solution vector
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::assign_dirichlet(TGridFunction& numsol){
 	//	get domain of grid function
@@ -1276,6 +1279,8 @@ bool FV1LevelSetDisc<TGridFunction>::assign_dirichlet(TGridFunction& numsol){
 	return true;
 }
 
+// in region given by level set sign:
+// overwrite values in parameter unew with values of uold
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::overwrite(TGridFunction& unew,TGridFunction& uold,TGridFunction& phi,int sign)
 {
@@ -1301,6 +1306,8 @@ bool FV1LevelSetDisc<TGridFunction>::overwrite(TGridFunction& unew,TGridFunction
     return true;
 };
 
+// in region given by level set sign:
+// overwrite values in parameter unew with parameter value
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::overwrite(TGridFunction& unew,number value,TGridFunction& phi,int sign)
 {
@@ -1327,7 +1334,8 @@ bool FV1LevelSetDisc<TGridFunction>::overwrite(TGridFunction& unew,number value,
     return true;
 };
 
-
+// for test problems:
+// compute error by using analytical solution
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::compute_error(TGridFunction& numsol)
 {
@@ -1422,6 +1430,7 @@ bool FV1LevelSetDisc<TGridFunction>::compute_error(TGridFunction& numsol)
 	return true;	
 };
 
+// initialize level set function with analytical solution
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::init_function(TGridFunction& u)
 {
@@ -1454,6 +1463,7 @@ bool FV1LevelSetDisc<TGridFunction>::init_function(TGridFunction& u)
 	return true;
 };
 
+// for runtime testing, delete later
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::runtimetest(TGridFunction& uNew)
 {
@@ -1558,6 +1568,8 @@ bool FV1LevelSetDisc<TGridFunction>::runtimetest(TGridFunction& uNew)
 	return true;
 }
 
+// assign subsets as given by level set function 
+// ug subset system would have to be changed for this to be useful
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::update_ls_subsets(TGridFunction& phi){
 	//	get domain of grid function
@@ -1725,6 +1737,8 @@ void FV1LevelSetDisc<TGridFunction>::create_ls_subsets(TGridFunction& phi){
    	UG_LOG("nr of subsets:" << domain.subset_handler()->num_subsets() << "\n");
 };
 
+// main function for assembling and solving ls equation as described in 
+// Frolkovic/Mikula, HIGH-RESOLUTION FLUX-BASED LEVEL SET METHOD, SIAM
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunction& uOld)
 {
