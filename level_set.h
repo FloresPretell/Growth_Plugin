@@ -12,6 +12,7 @@
 
 #include <vector>
 #include "lib_disc/common/groups_util.h"
+#include "lib_disc/spatial_disc/ip_data/ip_data.h"
 #include "lib_disc/function_spaces/approximation_space.h"
 #include "lib_disc/spatial_disc/disc_util/finite_volume_geometry.h"
 #include "lib_disc/spatial_disc/constraints/constraint_interface.h"
@@ -29,10 +30,6 @@ class FV1LevelSetDisc
 		
 	///	algebra type
 		typedef typename TGridFunction::algebra_type algebra_type;
-
-		typedef boost::function<void (number& value,
-				                              const MathVector<domain_type::dim>& x,
-				                              number time)> NumberFunctor;// see grid_function_util.h
 
 	///	world dimension
 		static const int dim = domain_type::dim;
@@ -123,9 +120,9 @@ class FV1LevelSetDisc
 		void set_vel_y(){m_velocity_type=HardcodedData;};
 		void set_vel_z(){m_velocity_type=HardcodedData;};
 
-		void set_vel_x(const NumberFunctor& v){m_velocity_type=FunctorData;m_vel_x_fct = v;};
-		void set_vel_y(const NumberFunctor& v){m_vel_y_fct = v;};
-		void set_vel_z(const NumberFunctor& v){m_vel_z_fct = v;};
+		void set_vel_x(SmartPtr<IDirectIPData<number,dim> > v){m_velocity_type=FunctorData;m_vel_x_fct = v;};
+		void set_vel_y(SmartPtr<IDirectIPData<number,dim> > v){m_vel_y_fct = v;};
+		void set_vel_z(SmartPtr<IDirectIPData<number,dim> > v){m_vel_z_fct = v;};
 
 		void set_vel_x(TGridFunction& v){m_velocity_type=VectorData;m_vel_x_vec = &v;};
 		void set_vel_y(TGridFunction& v){m_vel_y_vec = &v;};
@@ -136,12 +133,12 @@ class FV1LevelSetDisc
 		void set_vel_z(number v){m_constantv_z = v;};
 
 		void set_source(){m_source_type=HardcodedData;};
-		void set_source(const NumberFunctor& s){m_source_type=FunctorData;m_source_fct= s;};
+		void set_source(SmartPtr<IDirectIPData<number,dim> > s){m_source_type=FunctorData;m_source_fct= s;};
 		void set_source(TGridFunction& s){m_source_type=VectorData;m_source_vec = &s;};
 		void set_source(number s){m_source_type=ConstantData;m_source_constant=s;}
 
 		void set_dirichlet_data(){m_dirichlet_data_type=HardcodedData;};
-		void set_dirichlet_data(const NumberFunctor& s){m_dirichlet_data_type=FunctorData;m_solution_fct=s;}
+		void set_dirichlet_data(SmartPtr<IDirectIPData<number,dim> > s){m_dirichlet_data_type=FunctorData;m_solution_fct=s;}
 		void set_dirichlet_data(number d){m_dirichlet_data_type=ConstantData;m_dirichlet_constant=d;};
 
 		bool fill_v_vec(TGridFunction& vel,int component);
@@ -277,11 +274,11 @@ class FV1LevelSetDisc
 		SubsetGroup m_neumann_sg;
 		SubsetGroup m_dirichlet_sg;
 		SubsetGroup m_inactive_sg;
-		NumberFunctor m_vel_x_fct;
-		NumberFunctor m_vel_y_fct;
-		NumberFunctor m_vel_z_fct;
-		NumberFunctor m_source_fct;
-		NumberFunctor m_solution_fct;
+		SmartPtr<IDirectIPData<number,dim> > m_vel_x_fct;
+		SmartPtr<IDirectIPData<number,dim> > m_vel_y_fct;
+		SmartPtr<IDirectIPData<number,dim> > m_vel_z_fct;
+		SmartPtr<IDirectIPData<number,dim> > m_source_fct;
+		SmartPtr<IDirectIPData<number,dim> > m_solution_fct;
 		TGridFunction* m_vel_x_vec;
 		TGridFunction* m_vel_y_vec;
 		TGridFunction* m_vel_z_vec;

@@ -7,6 +7,7 @@
 
 #include "bridge/util.h"
 
+
 #include "level_set.h"
 
 using namespace std;
@@ -41,14 +42,12 @@ static void DomainAlgebra(Registry& reg, string grp)
 	typedef typename TAlgebra::matrix_type matrix_type;
 	typedef ApproximationSpace<TDomain> approximation_space_type;
 	typedef GridFunction<TDomain, SurfaceDoFDistribution, TAlgebra> function_type;
+	static const int dim = TDomain::dim;
 
 // 	FV1LevelSetDisc
 	{
 		typedef FV1LevelSetDisc<function_type> T;
 		typedef typename function_type::domain_type domain_type;
-		typedef boost::function<void (number& value,
-									  const MathVector<domain_type::dim>& x,
-									  number time)> NumberFunctor;
 		string name = string("FV1LevelSetDisc").append(suffix);
 		reg.add_class_<T>(name, grp)
 			.add_constructor()
@@ -67,10 +66,10 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.add_method("set_dirichlet_boundary",&T::set_dirichlet_boundary)
 			.add_method("set_outflow_boundary",&T::set_outflow_boundary)
 			.add_method("init_function", &T::init_function)
-			.add_method("set_vel_x", static_cast<void (T::*)(const NumberFunctor&)>(&T::set_vel_x))
-			.add_method("set_vel_y", static_cast<void (T::*)(const NumberFunctor&)>(&T::set_vel_y))
-			.add_method("set_vel_z", static_cast<void (T::*)(const NumberFunctor&)>(&T::set_vel_z))
-			.add_method("set_source", static_cast<void (T::*)(const NumberFunctor&)>(&T::set_source))
+			.add_method("set_vel_x", static_cast<void (T::*)(SmartPtr<IDirectIPData<number,dim> >)>(&T::set_vel_x))
+			.add_method("set_vel_y", static_cast<void (T::*)(SmartPtr<IDirectIPData<number,dim> >)>(&T::set_vel_y))
+			.add_method("set_vel_z", static_cast<void (T::*)(SmartPtr<IDirectIPData<number,dim> >)>(&T::set_vel_z))
+			.add_method("set_source", static_cast<void (T::*)(SmartPtr<IDirectIPData<number,dim> >)>(&T::set_source))
 			.add_method("set_vel_x", static_cast<void (T::*)(function_type&)>(&T::set_vel_x))
 			.add_method("set_vel_y", static_cast<void (T::*)(function_type&)>(&T::set_vel_y))
 			.add_method("set_vel_z", static_cast<void (T::*)(function_type&)>(&T::set_vel_z))
@@ -84,7 +83,7 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.add_method("set_source", static_cast<void (T::*)(number)>(&T::set_source))
 			.add_method("set_source", static_cast<void (T::*)()>(&T::set_source))
 			.add_method("set_dirichlet_data", static_cast<void (T::*)(number)>(&T::set_dirichlet_data))
-			.add_method("set_dirichlet_data", static_cast<void (T::*)(const NumberFunctor&)>(&T::set_dirichlet_data))
+			.add_method("set_dirichlet_data", static_cast<void (T::*)(SmartPtr<IDirectIPData<number,dim> >)>(&T::set_dirichlet_data))
 			.add_method("set_dirichlet_data", static_cast<void (T::*)()>(&T::set_dirichlet_data))
 			.add_method("compute_normal",&T::compute_normal)
 			.add_method("compute_dnormal",&T::compute_dnormal)

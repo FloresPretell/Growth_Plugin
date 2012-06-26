@@ -606,9 +606,9 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
         	    break;
             case FunctorData:
         	    for (size_t i=0;i < noc;i++){
-        		    m_vel_x_fct(coVelocity[i][0],coCoord[i],m_time+0.5*m_dt);
-        	        if (dim>=2) m_vel_y_fct(coVelocity[i][1],coCoord[i],m_time);
-        	        if (dim>=3) m_vel_z_fct(coVelocity[i][2],coCoord[i],m_time);
+        		    (*m_vel_x_fct)(coVelocity[i][0],coCoord[i],m_time+0.5*m_dt, 0);
+        	        if (dim>=2) (*m_vel_y_fct)(coVelocity[i][1],coCoord[i],m_time, 0);
+        	        if (dim>=3) (*m_vel_z_fct)(coVelocity[i][2],coCoord[i],m_time, 0);
         	    }
         	    break;
             case VectorData:
@@ -664,9 +664,9 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 				for (size_t ip=0;ip < geo.num_scvf();ip++){
 					const typename DimFV1Geometry<dim>::SCVF& scvf = geo.scvf(ip);
 					MathVector<dim>	ipCoord = scvf.global_ip();
-				    m_vel_x_fct(ipVelocity[ip][0],ipCoord,m_time);
-			        if (dim>=2) m_vel_y_fct(ipVelocity[ip][1],ipCoord,m_time);
-				    if (dim>=3) m_vel_z_fct(ipVelocity[ip][2],ipCoord,m_time);
+				    (*m_vel_x_fct)(ipVelocity[ip][0],ipCoord,m_time, 0);
+			        if (dim>=2) (*m_vel_y_fct)(ipVelocity[ip][1],ipCoord,m_time, 0);
+				    if (dim>=3) (*m_vel_z_fct)(ipVelocity[ip][2],ipCoord,m_time, 0);
 				};
 				break;
 			case VectorData:
@@ -688,7 +688,7 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
           	for (size_t i=0;i<noc;i++) coSource[i] = analytic_source(m_time,coCoord[i]);
        	    break;
         case FunctorData:
-        	for (size_t i=0;i<noc;i++) m_source_fct(coSource[i],coCoord[i],m_time);
+        	for (size_t i=0;i<noc;i++) (*m_source_fct)(coSource[i],coCoord[i],m_time, 0);
         	break;
         case VectorData:
         	for (size_t i=0;i<noc;i++){
@@ -874,7 +874,6 @@ calculate_vertex_vol(TGridFunction& u,aaSCV& aaScvVolume)
 	return true ;
 
 }
-
 
 // compute gradient in vertices and volume of control volume
 template<typename TGridFunction>
@@ -1258,7 +1257,7 @@ bool FV1LevelSetDisc<TGridFunction>::assign_dirichlet(TGridFunction& numsol){
 		                exactVal= analytic_solution(m_time,coord);
 				        break;
 				    case (FunctorData):
-				    	m_solution_fct(exactVal,coord,m_time);
+				    	(*m_solution_fct)(exactVal,coord,m_time,si);
 				        break;
 				    case (ConstantData):
 				    	exactVal = m_dirichlet_constant;
@@ -1399,7 +1398,7 @@ bool FV1LevelSetDisc<TGridFunction>::compute_error(TGridFunction& numsol)
 				     exactVal= analytic_solution(m_time,coord);
 				     break;
 				case (FunctorData):
-				   	m_solution_fct(exactVal,coord,m_time);
+				   	(*m_solution_fct)(exactVal,coord,m_time,si);
 				    break;
 				case (ConstantData):
 				   	exactVal = m_dirichlet_constant;
@@ -1878,7 +1877,7 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 		    			    		    coord = aaPos[vrt];
 		    			    		    uNew.inner_multi_indices(vrt, 0, ind);
 		    			    		    number sourceValue;
-		    			    		    m_source_fct(sourceValue,coord,m_time+0.5*m_dt);
+		    			    		    (*m_source_fct)(sourceValue,coord,m_time+0.5*m_dt, si);
 		    			    		    BlockRef(uNew[ind[0][0]],ind[0][1]) += m_dt*sourceValue;
 		    			    		}
 		    			    		break;
