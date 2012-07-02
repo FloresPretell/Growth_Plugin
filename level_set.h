@@ -40,8 +40,8 @@ class FV1LevelSetDisc
 	///	grid type
 		typedef typename domain_type::grid_type grid_type;
 
-	///	type of scv-size attachment
-		typedef typename Grid::VertexAttachmentAccessor<Attachment<number> > aaSCV;
+	///	type of volume-size attachment
+		typedef typename Grid::VertexAttachmentAccessor<Attachment<number> > aaVol;
 
 	///	type of gradient attachment
 		typedef typename Grid::VertexAttachmentAccessor<Attachment<MathVector<dim> > > aaGrad;
@@ -233,17 +233,17 @@ class FV1LevelSetDisc
 	    bool analytic_velocity(MathVector<dim>&,number, MathVector<dim>);
 
 	///	fills the scvVolume attachment for all element types
-	    bool calculate_vertex_vol(TGridFunction& u, aaSCV& aaScvVolume);
+	    bool calculate_vertex_vol(TGridFunction& u, aaVol& aaVolVolume);
 
 //	    template <typename TElem>
-//   	    bool calculate_vertex_grad_vol(grid_type& grid,TGridFunction& u, aaGrad& aaGradient, aaSCV& aaVolume );
+//   	    bool calculate_vertex_grad_vol(grid_type& grid,TGridFunction& u, aaGrad& aaGradient, aaVol& aaVolume );
 
-	    bool calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient, aaSCV& aaVolume );
+	    bool calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient, aaVol& aaVolume );
 
-	    bool calculate_vertex_grad_vol_sign(TGridFunction&, aaGrad& ,aaSCV& ,TGridFunction& ,int);
+	    bool calculate_vertex_grad_vol_sign(TGridFunction&, aaGrad& ,aaVol& ,TGridFunction& ,int);
 
 		template <typename TElem>
-		bool assemble_element(TElem& elem, DimFV1Geometry<dim>& geo, grid_type& grid,TGridFunction& uNew,const TGridFunction& uOld,aaGrad& aaGradient, aaSCV& aaVolume );
+		bool assemble_element(TElem& elem, DimFV1Geometry<dim>& geo, grid_type& grid,TGridFunction& uNew,const TGridFunction& uOld,aaGrad& aaGradient, aaVol& aaVolume );
 
 //fordebug		template <typename TElem>
 //		bool assemble_divergence(TElem& elem,grid_type& grid,TGridFunction& uNew,aaDiv& aaDivergence,aaGrad& aaGradient );

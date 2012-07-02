@@ -151,11 +151,11 @@ bool FV1LevelSetDisc<TGridFunction>::compute_normal(TGridFunction& vx,TGridFunct
 	grid.attach_to_vertices(aGradient);
 
 	//	get attachment accessor to access values
-	Grid::VertexAttachmentAccessor<ANumber> aaScvVolume(grid, aScvVolume);
+	Grid::VertexAttachmentAccessor<ANumber> aaVolume(grid, aScvVolume);
 	Grid::VertexAttachmentAccessor<AGradient> aaGradient(grid, aGradient);
 
 	// initialize attachment value
-	SetAttachmentValues(aaScvVolume, grid.vertices_begin(), grid.vertices_end(), 0);
+	SetAttachmentValues(aaVolume, grid.vertices_begin(), grid.vertices_end(), 0);
 	SetAttachmentValues(aaGradient, grid.vertices_begin(), grid.vertices_end(), 0);
 
     MathVector<dim> coord;
@@ -166,7 +166,7 @@ bool FV1LevelSetDisc<TGridFunction>::compute_normal(TGridFunction& vx,TGridFunct
 
     //	read indices on vertex
     // calculate scv size and gradient
-    if (calculate_vertex_grad_vol(u,aaGradient, aaScvVolume)==false){UG_LOG("ERROR: gradient computation failed!"); return false;};
+    if (calculate_vertex_grad_vol(u,aaGradient, aaVolume)==false){UG_LOG("ERROR: gradient computation failed!"); return false;};
 	if (m_limiter==true){
 		limit_grad(u,aaGradient);
 	};
@@ -218,11 +218,11 @@ bool FV1LevelSetDisc<TGridFunction>::compute_dnormal(TGridFunction& dnormal,TGri
 	grid.attach_to_vertices(aGradient);
 
 	//	get attachment accessor to access values
-	Grid::VertexAttachmentAccessor<ANumber> aaScvVolume(grid, aScvVolume);
+	Grid::VertexAttachmentAccessor<ANumber> aaVolume(grid, aScvVolume);
 	Grid::VertexAttachmentAccessor<AGradient> aaGradient(grid, aGradient);
 
 	// initialize attachment value
-	SetAttachmentValues(aaScvVolume, grid.vertices_begin(), grid.vertices_end(), 0);
+	SetAttachmentValues(aaVolume, grid.vertices_begin(), grid.vertices_end(), 0);
 	SetAttachmentValues(aaGradient, grid.vertices_begin(), grid.vertices_end(), 0);
 
 	MathVector<dim> coord;
@@ -235,11 +235,11 @@ bool FV1LevelSetDisc<TGridFunction>::compute_dnormal(TGridFunction& dnormal,TGri
 	position_accessor_type aaPos = u.domain()->position_accessor();
 ///UG_LOG("-------------\n");
 	// calculate scv size and gradient of u
-    if (calculate_vertex_grad_vol_sign(u,aaGradient, aaScvVolume,phi,-1)==false){UG_LOG("ERROR: gradient computation failed!"); return false;};
+    if (calculate_vertex_grad_vol_sign(u,aaGradient, aaVolume,phi,-1)==false){UG_LOG("ERROR: gradient computation failed!"); return false;};
 	if (m_limiter==true){
 //		limit_grad(u,aaGradient);
 	};
-	// if (calculate_vertex_grad_vol(u,aaGradient, aaScvVolume)==false){UG_LOG("ERROR: gradient computation failed!"); return false;};
+	// if (calculate_vertex_grad_vol(u,aaGradient, aaVolume)==false){UG_LOG("ERROR: gradient computation failed!"); return false;};
 	// calculate normal of phi
 	compute_normal(vx,vy,phi);
 	for (int si=0;si<u.num_subsets();++si){
@@ -284,11 +284,11 @@ bool FV1LevelSetDisc<TGridFunction>::compute_ddnormal(TGridFunction& ddnormal,TG
 	grid.attach_to_vertices(aGradient);
 
 	//	get attachment accessor to access values
-	Grid::VertexAttachmentAccessor<ANumber> aaScvVolume(grid, aScvVolume);
+	Grid::VertexAttachmentAccessor<ANumber> aaVolume(grid, aScvVolume);
 	Grid::VertexAttachmentAccessor<AGradient> aaGradient(grid, aGradient);
 
 	// initialize attachment value
-	SetAttachmentValues(aaScvVolume, grid.vertices_begin(), grid.vertices_end(), 0);
+	SetAttachmentValues(aaVolume, grid.vertices_begin(), grid.vertices_end(), 0);
 	SetAttachmentValues(aaGradient, grid.vertices_begin(), grid.vertices_end(), 0);
 
 	MathVector<dim> coord;
@@ -299,11 +299,11 @@ bool FV1LevelSetDisc<TGridFunction>::compute_ddnormal(TGridFunction& ddnormal,TG
 
 	// calculate scv size and gradient of u
 	compute_dnormal(dnormal,vx,vy,phi,u);
-    if (calculate_vertex_grad_vol_sign(dnormal,aaGradient, aaScvVolume,phi,-1)==false){UG_LOG("ERROR: gradient computation failed!"); return false;};
+    if (calculate_vertex_grad_vol_sign(dnormal,aaGradient, aaVolume,phi,-1)==false){UG_LOG("ERROR: gradient computation failed!"); return false;};
     if (m_limiter==true){
     //	limit_grad(dnormal,aaGradient);
     };
-	// if (calculate_vertex_grad_vol(u,aaGradient, aaScvVolume)==false){UG_LOG("ERROR: gradient computation failed!"); return false;};
+	// if (calculate_vertex_grad_vol(u,aaGradient, aaVolume)==false){UG_LOG("ERROR: gradient computation failed!"); return false;};
 	// calculate normal of phi
 
 	std::vector<MultiIndex<2> > ind;
@@ -532,7 +532,7 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaG
 // assemble element using upwind
 template<typename TGridFunction>
 template <typename TElem>
-bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometry<dim>& geo, grid_type& grid,TGridFunction& uNew,const TGridFunction& uOld,aaGrad& aaGradient, aaSCV& aaVolume )
+bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometry<dim>& geo, grid_type& grid,TGridFunction& uNew,const TGridFunction& uOld,aaGrad& aaGradient, aaVol& aaVolume )
 {
 	//	get domain
 	domain_type& domain = *uNew.domain().get();
@@ -821,7 +821,7 @@ COMPUTE VOLUME OF CONTROL VOLUMES
 **************************/
 template <typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::
-calculate_vertex_vol(TGridFunction& u,aaSCV& aaScvVolume)
+calculate_vertex_vol(TGridFunction& u,aaVol& aaVolume)
 {
 	//	get domain
 		domain_type& domain = *u.domain().get();
@@ -866,7 +866,7 @@ calculate_vertex_vol(TGridFunction& u,aaSCV& aaScvVolume)
 					//	get scv for sh
 					const typename DimFV1Geometry<dim>::SCV& scv = geo.scv(i);
 
-					aaScvVolume[elem->vertex(i)] += scv.volume();
+					aaVolume[elem->vertex(i)] += scv.volume();
 				};
 			}
 		}
@@ -878,7 +878,7 @@ calculate_vertex_vol(TGridFunction& u,aaSCV& aaScvVolume)
 // compute gradient in vertices and volume of control volume
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::
-calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolume)
+calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaVol& aaVolume)
 {
 	//	domain type
 	//	typedef typename TGridFunction::domain_type domain_type;
@@ -910,7 +910,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 		size_t fct=0;
 
 		// initialize attachment value
-		SetAttachmentValues(aaScvVolume, grid.vertices_begin(), grid.vertices_end(), 0);
+		SetAttachmentValues(aaVolume, grid.vertices_begin(), grid.vertices_end(), 0);
 		SetAttachmentValues(aaGradient, grid.vertices_begin(), grid.vertices_end(), 0);
 
 		//	coord and vertex array
@@ -1001,7 +1001,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 
 				//	add both values to attachements
 					aaGradient[vVrt[i]] += globalGrad;
-					aaScvVolume[vVrt[i]] += vol;
+					aaVolume[vVrt[i]] += vol;
 				};
 			}
 		}
@@ -1017,13 +1017,13 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 	    {
 	    //	get vertex
 		    VertexBase* vrt = *iter;
-		    if (aaScvVolume[vrt]!=0){
-		        (aaGradient[vrt]) /= aaScvVolume[vrt];
+		    if (aaVolume[vrt]!=0){
+		        (aaGradient[vrt]) /= aaVolume[vrt];
 		    };
 		    //exact[0] = cos(coord[0]);// 6*coord[0];
 		    //exact[1] = -4*sin(coord[1]);//-4*coord[1];
 		    //number gError = sqrt( (exact[0]-aaGradient[vrt][0])*(exact[0]-aaGradient[vrt][0]) + (exact[1]-aaGradient[vrt][1])*(exact[1]-aaGradient[vrt][1]) );
-	        //UG_LOG(count << "[ " << coord[0] << "," << coord[1] << " ] vol= " << aaScvVolume[vrt] << " " << "grad= ["
+	        //UG_LOG(count << "[ " << coord[0] << "," << coord[1] << " ] vol= " << aaVolume[vrt] << " " << "grad= ["
 	        //		<< aaGradient[vrt][0] << "," << aaGradient[vrt][1] << "] exact grad = ["
 	        //		<< exact[0] << "," << exact[1] << "] error: " << gError <<  "\n");
 	        // count++;
@@ -1036,7 +1036,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolum
 // compute gradient in vertices and volume of control volume in region given by sign of level set function
 template<typename TGridFunction>
 	bool FV1LevelSetDisc<TGridFunction>::
-	calculate_vertex_grad_vol_sign(TGridFunction& u, aaGrad& aaGradient,aaSCV& aaScvVolume,TGridFunction& phi,int sign)
+	calculate_vertex_grad_vol_sign(TGridFunction& u, aaGrad& aaGradient,aaVol& aaVolume,TGridFunction& phi,int sign)
 	{
 		//	domain type
 		//	typedef typename TGridFunction::domain_type domain_type;
@@ -1068,7 +1068,7 @@ template<typename TGridFunction>
 		size_t fct=0;
 
 		// initialize attachment value
-		SetAttachmentValues(aaScvVolume, grid.vertices_begin(), grid.vertices_end(), 0);
+		SetAttachmentValues(aaVolume, grid.vertices_begin(), grid.vertices_end(), 0);
 		SetAttachmentValues(aaGradient, grid.vertices_begin(), grid.vertices_end(), 0);
 
 		//	coord and vertex array
@@ -1182,7 +1182,7 @@ template<typename TGridFunction>
 
 					//	add both values to attachements
 					aaGradient[vVrt[i]] += globalGrad;
-					aaScvVolume[vVrt[i]] += vol;
+					aaVolume[vVrt[i]] += vol;
 				};
 			}
 		}
@@ -1198,13 +1198,13 @@ template<typename TGridFunction>
 			{
 				//	get vertex
 				VertexBase* vrt = *iter;
-				if (aaScvVolume[vrt]!=0){
-					(aaGradient[vrt]) /= aaScvVolume[vrt];
+				if (aaVolume[vrt]!=0){
+					(aaGradient[vrt]) /= aaVolume[vrt];
 				};
 				//exact[0] = cos(coord[0]);// 6*coord[0];
 				//exact[1] = -4*sin(coord[1]);//-4*coord[1];
 				//number gError = sqrt( (exact[0]-aaGradient[vrt][0])*(exact[0]-aaGradient[vrt][0]) + (exact[1]-aaGradient[vrt][1])*(exact[1]-aaGradient[vrt][1]) );
-				//UG_LOG(count << "[ " << coord[0] << "," << coord[1] << " ] vol= " << aaScvVolume[vrt] << " " << "grad= ["
+				//UG_LOG(count << "[ " << coord[0] << "," << coord[1] << " ] vol= " << aaVolume[vrt] << " " << "grad= ["
 				//		<< aaGradient[vrt][0] << "," << aaGradient[vrt][1] << "] exact grad = ["
 				//		<< exact[0] << "," << exact[1] << "] error: " << gError <<  "\n");
 				// count++;
@@ -1356,10 +1356,10 @@ bool FV1LevelSetDisc<TGridFunction>::compute_error(TGridFunction& numsol)
 	grid.attach_to_vertices(aScvVolume);
 
 	//	get attachment accessor to access values
-	Grid::VertexAttachmentAccessor<ANumber> aaScvVolume(grid, aScvVolume);
+	Grid::VertexAttachmentAccessor<ANumber> aaVolume(grid, aScvVolume);
 
 	// initialize attachment value
-	SetAttachmentValues(aaScvVolume, grid.vertices_begin(), grid.vertices_end(), 0);
+	SetAttachmentValues(aaVolume, grid.vertices_begin(), grid.vertices_end(), 0);
 
     number l1Error=0;
 	number l2Error=0;
@@ -1367,14 +1367,14 @@ bool FV1LevelSetDisc<TGridFunction>::compute_error(TGridFunction& numsol)
 
 	bool bRes = true;
 	// calculate scv size
-	if (calculate_vertex_vol(numsol,aaScvVolume)==false){UG_LOG("ERROR: gradient computation failed in compute_error function!"); };
+	if (calculate_vertex_vol(numsol,aaVolume)==false){UG_LOG("ERROR: gradient computation failed in compute_error function!"); };
 
 	//UG_LOG("----------------------------\n");
 
 	typedef typename TGridFunction::template traits<VertexBase>::const_iterator VertexBaseConstIterator;
 	if(!bRes) {UG_LOG("Error while calculating CV Volume.\n"); return false;}
 	for (int si=0;si<numsol.num_subsets();++si){
-		// UG_LOG("*** " << si << "\n");
+		UG_LOG("*** " << si << "\n");
 		for(VertexBaseConstIterator iter = numsol.template begin<VertexBase>(si);
 									   iter != numsol.template end<VertexBase>(si); ++iter)
 		{
@@ -1409,11 +1409,11 @@ bool FV1LevelSetDisc<TGridFunction>::compute_error(TGridFunction& numsol)
 		
 			number differ = abs(BlockRef(numsol[ind[0][0]],ind[0][1])-exactVal);
 		
-			l1Error += aaScvVolume[vrt] * differ;
-			l2Error += aaScvVolume[vrt] * differ*differ;
+			l1Error += aaVolume[vrt] * differ;
+			l2Error += aaVolume[vrt] * differ*differ;
 
 			if (m_print==true){
-			    if (differ>0)
+			 //   if (differ>0)
 			    UG_LOG("coord=" << coord << " value=" << BlockRef(numsol[ind[0][0]],ind[0][1]) << " exact=" << exactVal << " error=" << differ << "\n");
 			};
 		
@@ -1770,11 +1770,11 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 	grid.attach_to_vertices(aGradient);
 
 	//	get attachment accessor to access values
-	Grid::VertexAttachmentAccessor<ANumber> aaScvVolume(grid, aScvVolume);
+	Grid::VertexAttachmentAccessor<ANumber> aaVolume(grid, aScvVolume);
 	Grid::VertexAttachmentAccessor<AGradient> aaGradient(grid, aGradient);
 
 	// initialize attachment value
-	SetAttachmentValues(aaScvVolume, grid.vertices_begin(), grid.vertices_end(), 0);
+	SetAttachmentValues(aaVolume, grid.vertices_begin(), grid.vertices_end(), 0);
 	SetAttachmentValues(aaGradient, grid.vertices_begin(), grid.vertices_end(), 0);
 
 
@@ -1812,7 +1812,7 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 	for (size_t step=0;step<m_nrOfSteps;step++)
 	{
 	    // calculate scv size and gradient
-	    if (calculate_vertex_grad_vol(uNew,aaGradient, aaScvVolume)==false){UG_LOG("ERROR: gradient computation failed!"); };
+	    if (calculate_vertex_grad_vol(uNew,aaGradient, aaVolume)==false){UG_LOG("ERROR: gradient computation failed!"); };
 	    // SetAttachmentValues(aaGradient, grid.vertices_begin(), grid.vertices_end(), 0); for debug set gradient to 0
 	    if (m_limiter==true){
 	    	limit_grad(uNew,aaGradient);
@@ -1851,7 +1851,7 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 			    ElemType* elem = *iter;
 			    //UG_LOG("element \n");
 			    // uNew = uOld
-			    assemble_element(elem, geo, *uNew.domain()->grid(),uNew,uOld,aaGradient,aaScvVolume);
+			    assemble_element(elem, geo, *uNew.domain()->grid(),uNew,uOld,aaGradient,aaVolume);
 		    };
 	    };
 		typedef typename TGridFunction::template traits<VertexBase>::const_iterator VertexBaseConstIterator;
