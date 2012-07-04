@@ -12,7 +12,7 @@
 
 #include <vector>
 #include "lib_disc/common/groups_util.h"
-#include "lib_disc/spatial_disc/ip_data/user_data.h"
+#include "lib_disc/spatial_disc/user_data/user_data.h"
 #include "lib_disc/function_spaces/approximation_space.h"
 #include "lib_disc/spatial_disc/disc_util/finite_volume_geometry.h"
 #include "lib_disc/spatial_disc/constraints/constraint_interface.h"
