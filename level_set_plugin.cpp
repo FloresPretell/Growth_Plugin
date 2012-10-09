@@ -66,7 +66,19 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.add_method("set_dirichlet_boundary",&T::set_dirichlet_boundary)
 			.add_method("set_outflow_boundary",&T::set_outflow_boundary)
 			.add_method("init_function", &T::init_function)
-			.add_method("set_vel_x", static_cast<void (T::*)(SmartPtr<UserData<number,dim> >)>(&T::set_vel_x))
+			.add_method("set_source", static_cast<void (T::*)(SmartPtr<UserData<number, dim> >)>(&T::set_source), "", "Source")
+			.add_method("set_source", static_cast<void (T::*)(number)>(&T::set_source), "", "Source")
+#ifdef UG_FOR_LUA
+			.add_method("set_source", static_cast<void (T::*)(const char*)>(&T::set_source), "", "Source")
+#endif
+			.add_method("set_velocity", static_cast<void (T::*)(SmartPtr<UserData<MathVector<dim>, dim> >)>(&T::set_velocity), "", "Velocity Field")
+			.add_method("set_velocity", static_cast<void (T::*)(number)>(&T::set_velocity), "", "Vel_x")
+			.add_method("set_velocity", static_cast<void (T::*)(number,number)>(&T::set_velocity), "", "Vel_x, Vel_y")
+			.add_method("set_velocity", static_cast<void (T::*)(number,number,number)>(&T::set_velocity), "", "Vel_x, Vel_y, Vel_z")
+#ifdef UG_FOR_LUA
+			.add_method("set_velocity", static_cast<void (T::*)(const char*)>(&T::set_velocity), "", "Velocity Field")
+#endif
+/*			.add_method("set_vel_x", static_cast<void (T::*)(SmartPtr<UserData<number,dim> >)>(&T::set_vel_x))
 			.add_method("set_vel_y", static_cast<void (T::*)(SmartPtr<UserData<number,dim> >)>(&T::set_vel_y))
 			.add_method("set_vel_z", static_cast<void (T::*)(SmartPtr<UserData<number,dim> >)>(&T::set_vel_z))
 			.add_method("set_source", static_cast<void (T::*)(SmartPtr<UserData<number,dim> >)>(&T::set_source))
@@ -81,10 +93,12 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.add_method("set_vel_z", static_cast<void (T::*)()>(&T::set_vel_z))
 			.add_method("set_source", static_cast<void (T::*)(function_type&)>(&T::set_source))
 			.add_method("set_source", static_cast<void (T::*)(number)>(&T::set_source))
-			.add_method("set_source", static_cast<void (T::*)()>(&T::set_source))
-			.add_method("set_dirichlet_data", static_cast<void (T::*)(number)>(&T::set_dirichlet_data))
-			.add_method("set_dirichlet_data", static_cast<void (T::*)(SmartPtr<UserData<number,dim> >)>(&T::set_dirichlet_data))
-			.add_method("set_dirichlet_data", static_cast<void (T::*)()>(&T::set_dirichlet_data))
+			.add_method("set_source", static_cast<void (T::*)()>(&T::set_source))*/
+			.add_method("set_dirichlet_data", static_cast<void (T::*)(SmartPtr<UserData<number, dim> >)>(&T::set_dirichlet_data), "", "Source")
+			.add_method("set_dirichlet_data", static_cast<void (T::*)(number)>(&T::set_dirichlet_data), "", "Source")
+#ifdef UG_FOR_LUA
+			.add_method("set_dirichlet_data", static_cast<void (T::*)(const char*)>(&T::set_dirichlet_data), "", "Source")
+#endif
 			.add_method("compute_normal",&T::compute_normal)
 			.add_method("compute_dnormal",&T::compute_dnormal)
 			.add_method("compute_ddnormal",&T::compute_ddnormal)

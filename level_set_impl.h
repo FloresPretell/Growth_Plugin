@@ -600,32 +600,10 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 		coVelocity[i]=0;
 	}
 	if (m_gamma!=0){
-        switch(m_velocity_type){
-            case HardcodedData:
-        	    for (size_t i=0;i < geo.num_scv();i++) analytic_velocity(coVelocity[i],m_time+0.5*m_dt,coCoord[i]);
-        	    break;
-            case FunctorData:
-        	    for (size_t i=0;i < noc;i++){
-        		    (*m_vel_x_fct)(coVelocity[i][0],coCoord[i],m_time+0.5*m_dt, 0);
-        	        if (dim>=2) (*m_vel_y_fct)(coVelocity[i][1],coCoord[i],m_time, 0);
-        	        if (dim>=3) (*m_vel_z_fct)(coVelocity[i][2],coCoord[i],m_time, 0);
-        	    }
-        	    break;
-            case VectorData:
-        	    for (size_t i=0;i < noc;i++){
-        		    uOld.inner_multi_indices(vVrt[i], 0, multInd);
-        		    coVelocity[i][0]=BlockRef((*m_vel_x_vec)[multInd[0][0]],multInd[0][1]);
-        		    if (dim>=2) coVelocity[i][1]=BlockRef((*m_vel_y_vec)[multInd[0][0]],multInd[0][1]);
-        		    if (dim>=3) coVelocity[i][2]=BlockRef((*m_vel_z_vec)[multInd[0][0]],multInd[0][1]);
-        	    }
-        	    break;
-            case ConstantData:
-        	    for (size_t i=0;i < noc;i++){
-        	        coVelocity[i][0] = m_constantv_x;
-        		    if (dim>=2) coVelocity[i][1] = m_constantv_y;
-        		    if (dim>=3) coVelocity[i][2] = m_constantv_z;
-        	    };
-        }
+		const int si = 0;
+		// see user_data.h : 410
+		(*m_imVelocity)(coVelocity, geo.scv_global_ips(), m_time, si, geo.num_sh());
+//		(*m_imVelocity)(coVelocity, geo.scv_global_ips(), m_time, si,coCoord, geo.num_sh());
         if (m_gamma!=1) for (size_t i=0;i < noc;i++) coVelocity[i]*=m_gamma;
 	}
     if (m_delta!=0){
@@ -652,54 +630,13 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 		}
 	} else
 	{
-		switch(m_velocity_type){
-			case HardcodedData:
-				for (size_t ip=0;ip < geo.num_scvf();ip++){
-					const typename DimFV1Geometry<dim>::SCVF& scvf = geo.scvf(ip);
-					MathVector<dim>	ipCoord = scvf.global_ip();
-					analytic_velocity(ipVelocity[ip],m_time,ipCoord);
-				}
-				break;
-			case FunctorData:
-				for (size_t ip=0;ip < geo.num_scvf();ip++){
-					const typename DimFV1Geometry<dim>::SCVF& scvf = geo.scvf(ip);
-					MathVector<dim>	ipCoord = scvf.global_ip();
-				    (*m_vel_x_fct)(ipVelocity[ip][0],ipCoord,m_time, 0);
-			        if (dim>=2) (*m_vel_y_fct)(ipVelocity[ip][1],ipCoord,m_time, 0);
-				    if (dim>=3) (*m_vel_z_fct)(ipVelocity[ip][2],ipCoord,m_time, 0);
-				};
-				break;
-			case VectorData:
-				UG_LOG("Exact velocity in ip can not be used when using vector valued velocity field. Set m_interpolate_v_in_ip=false.\n");
-				break;
-			case ConstantData:
-				for (size_t ip=0;ip < geo.num_scvf();ip++){
-				    ipVelocity[ip][0] = m_constantv_x;
-				    if (dim>=2) ipVelocity[ip][1] = m_constantv_y;
-				    if (dim>=3) ipVelocity[ip][2] = m_constantv_z;
-				};
-				break;
-		}
+		const int si = 0;
+		(*m_imVelocity)(coVelocity, geo.scv_global_ips(), m_time, si, geo.num_sh());;
 	};
     //  fill source vector
 	std::vector<number> coSource(noc);
-    switch (m_source_type){
-        case HardcodedData:
-          	for (size_t i=0;i<noc;i++) coSource[i] = analytic_source(m_time,coCoord[i]);
-       	    break;
-        case FunctorData:
-        	for (size_t i=0;i<noc;i++) (*m_source_fct)(coSource[i],coCoord[i],m_time, 0);
-        	break;
-        case VectorData:
-        	for (size_t i=0;i<noc;i++){
-        		uOld.inner_multi_indices(vVrt[i], 0, multInd);
-	    	    coSource[i] = BlockRef((*m_source_vec)[multInd[0][0]],multInd[0][1]);
-        	}
-        	break;
-        case ConstantData:
-        	for (size_t i=0;i<noc;i++) coSource[i] = m_source_constant;
-        	break;
-    }
+	const int si = 0;
+	(*m_imSource)(&coSource[0], geo.scv_global_ips(), m_time, si, geo.num_sh());
     // get finite volume geometry
 	// FV1Geometry<TElem,dim> geo;
 
@@ -787,12 +724,12 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
     				//flux = m_dt*(bipVelocity*bf.normal())*( bipU + 0.5*m_dt*(bipSource - (bipGrad*bipVelocity)) );
     				flux = m_dt*(bipVelocity*bf.normal())*uValue[nodeID];// first order approximation
     				uOld.inner_multi_indices(vVrt[nodeID], 0, multInd);
-    				BlockRef(uNew[multInd[0][0]],multInd[0][1])-=flux/aaVolume[ vVrt[nodeID] ];
+    				DoFRef(uNew, multInd[0])-=flux/aaVolume[ vVrt[nodeID] ];
     				//UG_LOG("coord=" << bf.global_ip( )<< "vel=" << bipVelocity << " n=" << bf.normal() << " flux=" << flux << " source flux=" << m_dt*(bipVelocity*bf.normal())*(uValue[nodeID] + 0.5*m_dt*(coSource[nodeID] - (grad[nodeID]*coVelocity[nodeID])))/aaVolume[ vVrt[nodeID] ] << "\n");
     				//UG_LOG("v*n=" << (bipVelocity*bf.normal()) << " uExtra=" << (uValue[nodeID] + 0.5*m_dt*(coSource[nodeID] - (grad[nodeID]*coVelocity[nodeID]))) << " volume=" << aaVolume[ vVrt[nodeID] ] << "\n");
     				if (m_divFree==false){
     				    //BlockRef(uNew[multInd[0][0]],multInd[0][1])+=m_dt*(bipVelocity*bf.normal())*(uValue[nodeID] + 0.5*m_dt*(coSource[nodeID] - (grad[nodeID]*coVelocity[nodeID])))/aaVolume[ vVrt[nodeID] ];
-    				    BlockRef(uNew[multInd[0][0]],multInd[0][1])+=m_dt*(bipVelocity*bf.normal())*(uValue[nodeID] )/aaVolume[ vVrt[nodeID] ];// first order approximation
+    				    DoFRef(uNew, multInd[0])+=m_dt*(bipVelocity*bf.normal())*(uValue[nodeID] )/aaVolume[ vVrt[nodeID] ];// first order approximation
     				    //BlockRef(uNew[multInd[0][0]],multInd[0][1])+=m_dt*(bipVelocity*bf.normal())*(uValue[nodeID] + 0.5*m_dt*(bipSource - (grad[nodeID]*coVelocity[nodeID])))/aaVolume[ vVrt[nodeID] ];
     				};
 		    	};
@@ -1233,16 +1170,14 @@ bool FV1LevelSetDisc<TGridFunction>::assign_dirichlet(TGridFunction& numsol){
 		for(size_t i = 0; i < m_dirichlet_sg.num_subsets(); ++i)
 		{
 	        const int si = m_dirichlet_sg[i];
-	 //       UG_LOG("Dirichlet boundary is: "<<si<< "\n");
+	        // UG_LOG("Dirichlet boundary is: "<<si<< "\n");
 			for(VertexBaseConstIterator iter = numsol.template begin<VertexBase>(si);
 										   iter != numsol.template end<VertexBase>(si); ++iter)
 			{
 			//	get vertex
 				VertexBase* vrt = *iter;
 				number exactVal;
-				MathVector<dim> coord;
 				position_accessor_type aaPos = domain.position_accessor();
-				coord = aaPos[vrt];
 
 			//	get vector holding all indices on the vertex
 				std::vector<MultiIndex<2> > ind;
@@ -1252,21 +1187,9 @@ bool FV1LevelSetDisc<TGridFunction>::assign_dirichlet(TGridFunction& numsol){
 			//	check indices
 				if(numInd != 1) {UG_LOG("ERROR: Wrong number of indices!"); return false;}
 
-				switch (m_dirichlet_data_type){
-				    case (HardcodedData):
-		                exactVal= analytic_solution(m_time,coord);
-				        break;
-				    case (FunctorData):
-				    	(*m_solution_fct)(exactVal,coord,m_time,si);
-				        break;
-				    case (ConstantData):
-				    	exactVal = m_dirichlet_constant;
-				        break;
-				    case (VectorData):
-				    	break;
-				}
+				(*m_imDirichlet)(&exactVal,&aaPos[vrt],m_time,si,1);
 				BlockRef(numsol[ind[0][0]],ind[0][1]) = exactVal;
-				//UG_LOG("coord " << coord << "\n");
+				//UG_LOG("coord " << coord[0] << "," << coord[1] << " <> " << BlockRef(numsol[ind[0][0]],ind[0][1]) << "\n");
 
 				//if ((coord[0]==-1)||(coord[0]==1)||(coord[1]==-1)||(coord[1]==1)){
 			    	//BlockRef(numsol[ind[0][0]],ind[0][1]) = exactVal;
@@ -1374,17 +1297,15 @@ bool FV1LevelSetDisc<TGridFunction>::compute_error(TGridFunction& numsol)
 	typedef typename TGridFunction::template traits<VertexBase>::const_iterator VertexBaseConstIterator;
 	if(!bRes) {UG_LOG("Error while calculating CV Volume.\n"); return false;}
 	for (int si=0;si<numsol.num_subsets();++si){
-		UG_LOG("*** " << si << "\n");
+		// UG_LOG("*** " << si << "\n");
 		for(VertexBaseConstIterator iter = numsol.template begin<VertexBase>(si);
 									   iter != numsol.template end<VertexBase>(si); ++iter)
 		{
 		//	get vertex
 			VertexBase* vrt = *iter;
 			number exactVal;
-			MathVector<dim> coord;
 			position_accessor_type aaPos = domain.position_accessor();
-			coord = aaPos[vrt];
-		
+
 		//	get vector holding all indices on the vertex
 			std::vector<MultiIndex<2> > ind;
 
@@ -1393,20 +1314,7 @@ bool FV1LevelSetDisc<TGridFunction>::compute_error(TGridFunction& numsol)
 		//	check indices
 			if(numInd != 1) {UG_LOG("ERROR: Wrong number of indices!"); return false;}
 
-			switch (m_dirichlet_data_type){
-			    case (HardcodedData):
-				     exactVal= analytic_solution(m_time,coord);
-				     break;
-				case (FunctorData):
-				   	(*m_solution_fct)(exactVal,coord,m_time,si);
-				    break;
-				case (ConstantData):
-				   	exactVal = m_dirichlet_constant;
-				    break;
-				case (VectorData):
-					break;
-			}
-		
+			(*m_imDirichlet)(&exactVal,&aaPos[vrt],m_time,si,1);
 			number differ = abs(BlockRef(numsol[ind[0][0]],ind[0][1])-exactVal);
 		
 			l1Error += aaVolume[vrt] * differ;
@@ -1414,7 +1322,7 @@ bool FV1LevelSetDisc<TGridFunction>::compute_error(TGridFunction& numsol)
 
 			if (m_print==true){
 			 //   if (differ>0)
-			    UG_LOG("coord=" << coord << " value=" << BlockRef(numsol[ind[0][0]],ind[0][1]) << " exact=" << exactVal << " error=" << differ << "\n");
+			    UG_LOG("coord=" << aaPos[vrt] << " value=" << BlockRef(numsol[ind[0][0]],ind[0][1]) << " exact=" << exactVal << " error=" << differ << "\n");
 			};
 		
 			if (differ > maxErr) maxErr = differ;
@@ -1858,52 +1766,16 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 		for (int si=0;si<uOld.num_subsets();++si){
 			if (m_dirichlet_sg.num_subsets()!=0) if (m_dirichlet_sg.contains(si)==true) continue;
 			if (m_inactive_sg.num_subsets()!=0) if (m_inactive_sg.contains(si)==true) continue;
-			switch (m_source_type){
-		    			        case HardcodedData:
-		    			            for(VertexBaseConstIterator iter = uNew.template begin<VertexBase>(si);
-		    			                             iter != uNew.template end<VertexBase>(si); ++iter)
-		    			            {
-		    			                VertexBase* vrt = *iter;
-		    			    		    coord = aaPos[vrt];
-		    			    		    uNew.inner_multi_indices(vrt, 0, ind);
-		    			    		    BlockRef(uNew[ind[0][0]],ind[0][1]) += m_dt*analytic_source(m_time+0.5*m_dt,coord);
-		    			    		}
-		    			            break;
-		    			        case FunctorData:
-		    			            for(VertexBaseConstIterator iter = uNew.template begin<VertexBase>(si);
-		    			                      iter != uNew.template end<VertexBase>(si); ++iter)
-		    			            {
-		    			    		    VertexBase* vrt = *iter;
-		    			    		    coord = aaPos[vrt];
-		    			    		    uNew.inner_multi_indices(vrt, 0, ind);
-		    			    		    number sourceValue;
-		    			    		    (*m_source_fct)(sourceValue,coord,m_time+0.5*m_dt, si);
-		    			    		    BlockRef(uNew[ind[0][0]],ind[0][1]) += m_dt*sourceValue;
-		    			    		}
-		    			    		break;
-		    			         case VectorData:
-		    			            for(VertexBaseConstIterator iter = uNew.template begin<VertexBase>(si);
-		    			    		    iter != uNew.template end<VertexBase>(si); ++iter)
-		    			    		{
-		    			    		    VertexBase* vrt = *iter;
-		    			    		    number sourceValue;
-		    			    		    uNew.inner_multi_indices(vrt, 0, ind);
-		    			    		    sourceValue = BlockRef((*m_source_vec)[ind[0][0]],ind[0][1]);
-		    			    		    BlockRef(uNew[ind[0][0]],ind[0][1]) += m_dt*sourceValue;
-		    			    		};
-		    			            break;
-		    			         case ConstantData:
-		    			            if (m_source_constant!=0){
-		    			    		    for(VertexBaseConstIterator iter = uNew.template begin<VertexBase>(si);
-		    			    		        iter != uNew.template end<VertexBase>(si); ++iter)
-		    			    		    {
-		    			    		        VertexBase* vrt = *iter;
-		    			    		        uNew.inner_multi_indices(vrt, 0, ind);
-		    			    		        BlockRef(uNew[ind[0][0]],ind[0][1]) += m_dt*m_source_constant;
-		    			    		    };
-		    			    		};
-		    			    		break;
-		    			    }
+			std::vector<number> sourceValue(1);
+			MathVector<dim>* sourceCo;
+			for(VertexBaseConstIterator iter = uNew.template begin<VertexBase>(si);
+					    			                      iter != uNew.template end<VertexBase>(si); ++iter){
+				VertexBase* vrt = *iter;
+				sourceCo[0]= aaPos[vrt];
+				(*m_imSource)(&sourceValue[0],sourceCo,m_time,si,1);
+				uNew.inner_multi_indices(vrt, 0, ind);
+				BlockRef(uNew[ind[0][0]],ind[0][1]) += m_dt*sourceValue[0];
+			};
 	    }
 	    m_time += m_dt;
 	    UG_LOG("m_dt " << m_dt << " m_time " << m_time << "\n");

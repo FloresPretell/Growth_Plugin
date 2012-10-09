@@ -12,11 +12,17 @@
 
 #include <vector>
 #include "lib_disc/common/groups_util.h"
+#include "lib_disc/spatial_disc/user_data/data_export.h"
+#include "lib_disc/spatial_disc/user_data/data_import.h"
+#include "lib_disc/spatial_disc/user_data/const_user_data.h"
 #include "lib_disc/spatial_disc/user_data/user_data.h"
 #include "lib_disc/function_spaces/approximation_space.h"
 #include "lib_disc/spatial_disc/disc_util/finite_volume_geometry.h"
 #include "lib_disc/spatial_disc/constraints/constraint_interface.h"
 #include <boost/function.hpp>
+#ifdef UG_FOR_LUA
+#include "bindings/lua/lua_user_data.h"
+#endif
 
 namespace ug{
 namespace LevelSet{
@@ -91,7 +97,7 @@ class FV1LevelSetDisc
       	  	m_inside_nodes_si(5),
       	  	m_outside_nodes_si(6),
       	  	m_onls_nodes_si(7)
-      	{}
+      	{ set_source(0.0); }
 
         void set_dt(number deltaT){ UG_LOG("Set dt="<<deltaT<<"\n"); m_dt=deltaT; };
 
@@ -116,30 +122,66 @@ class FV1LevelSetDisc
 	///	adds a post process to be used when stepping the level set function
 		void add_post_process(SmartPtr<IConstraint<algebra_type> > pp) {m_vPP.push_back(pp);}
 
-		void set_vel_x(){m_velocity_type=HardcodedData;};
-		void set_vel_y(){m_velocity_type=HardcodedData;};
-		void set_vel_z(){m_velocity_type=HardcodedData;};
+		void set_velocity(SmartPtr<UserData<MathVector<dim>, dim> > user) {m_imVelocity=user;}
 
-		void set_vel_x(SmartPtr<UserData<number,dim> > v){m_velocity_type=FunctorData;m_vel_x_fct = v;};
-		void set_vel_y(SmartPtr<UserData<number,dim> > v){m_vel_y_fct = v;};
-		void set_vel_z(SmartPtr<UserData<number,dim> > v){m_vel_z_fct = v;};
+		void set_velocity(number vel_x)
+		{
+			SmartPtr<ConstUserVector<dim> > vel(new ConstUserVector<dim>());
+			vel->set_entry(0, vel_x);
+			if (dim>1) vel->set_entry(1, vel_x);
+			if (dim>2) vel->set_entry(2, vel_x);
+			set_velocity(vel);
+		}
 
-		void set_vel_x(TGridFunction& v){m_velocity_type=VectorData;m_vel_x_vec = &v;};
-		void set_vel_y(TGridFunction& v){m_vel_y_vec = &v;};
-		void set_vel_z(TGridFunction& v){m_vel_z_vec = &v;};
+		void set_velocity(number vel_x, number vel_y)
+		{
+			SmartPtr<ConstUserVector<dim> > vel(new ConstUserVector<dim>());
+			vel->set_entry(0, vel_x);
+			vel->set_entry(1, vel_y);
+			if (dim>2){
+				UG_THROW("ConvectionDiffusion: Setting velocity vector of dimension 2"
+									" to a Discretization for world dim " << dim);
+			}
+			set_velocity(vel);
+		}
 
-		void set_vel_x(number v){m_velocity_type=ConstantData;m_constantv_x = v;};
-		void set_vel_y(number v){m_constantv_y = v;};
-		void set_vel_z(number v){m_constantv_z = v;};
+		void set_velocity(number vel_x, number vel_y, number vel_z)
+		{
+			SmartPtr<ConstUserVector<dim> > vel(new ConstUserVector<dim>());
+			vel->set_entry(0, vel_x);
+			vel->set_entry(1, vel_y);
+			vel->set_entry(2, vel_z);
+			if (dim<3){
+				UG_THROW("ConvectionDiffusion: Setting velocity vector of dimension 3"
+													" to a Discretization for world dim " << dim);
+			}
+			set_velocity(vel);
+		}
 
-		void set_source(){m_source_type=HardcodedData;};
-		void set_source(SmartPtr<UserData<number,dim> > s){m_source_type=FunctorData;m_source_fct= s;};
-		void set_source(TGridFunction& s){m_source_type=VectorData;m_source_vec = &s;};
-		void set_source(number s){m_source_type=ConstantData;m_source_constant=s;}
+#ifdef UG_FOR_LUA
+		void set_velocity(const char* fctName)
+		{
+			set_velocity(LuaUserDataFactory<MathVector<dim>,dim>::create(fctName));
+		}
+#endif
 
-		void set_dirichlet_data(){m_dirichlet_data_type=HardcodedData;};
-		void set_dirichlet_data(SmartPtr<UserData<number,dim> > s){m_dirichlet_data_type=FunctorData;m_solution_fct=s;}
-		void set_dirichlet_data(number d){m_dirichlet_data_type=ConstantData;m_dirichlet_constant=d;};
+		void set_source(SmartPtr<UserData<number,dim> > user){m_imSource = user;};
+		void set_source(number val){set_source(CreateSmartPtr(new ConstUserNumber<dim>(val)));}
+#ifdef UG_FOR_LUA
+		void set_source(const char* fctName)
+		{
+			set_source(LuaUserDataFactory<number,dim>::create(fctName));
+		}
+#endif
+
+		void set_dirichlet_data(SmartPtr<UserData<number,dim> > d){m_imDirichlet = d;};
+		void set_dirichlet_data(number val){set_dirichlet_data(CreateSmartPtr(new ConstUserNumber<dim>(val)));};
+#ifdef UG_FOR_LUA
+		void set_dirichlet_data(const char* fctName)
+		{
+			set_dirichlet_data(LuaUserDataFactory<number,dim>::create(fctName));
+		}
+#endif
 
 		bool fill_v_vec(TGridFunction& vel,int component);
 		
@@ -298,6 +340,13 @@ class FV1LevelSetDisc
 		int m_inside_nodes_si;
 		int m_outside_nodes_si;
 		int m_onls_nodes_si;
+
+		///	Data import for the Velocity field
+		SmartPtr<UserData<MathVector<dim>, dim> > m_imVelocity;
+		///	Data import for the right-hand side
+		SmartPtr<UserData<number,dim> > m_imSource;
+		///	Data import for the Dirichlet values
+		SmartPtr<UserData<number,dim> > m_imDirichlet;
 };
 
 } // end namespace LevelSet
