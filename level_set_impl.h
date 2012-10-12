@@ -327,6 +327,420 @@ bool FV1LevelSetDisc<TGridFunction>::compute_ddnormal(TGridFunction& ddnormal,TG
 	return true;
 };
 
+int bubblesort(std::vector<number> array,std::vector<int> list){
+    int i,j,mini,k;
+    int length=array.size();
+	number min;
+	for (i=0;i<length;i++) list[i]=i;
+	for (i=0;i<length-1;i++){
+		min = array[i];
+		mini= i;
+		for (j=i+1;j<length;j++){
+			if (array[j]<min){
+				mini = j;
+				min = array[j];
+			};
+		};
+		array[mini] = array[i];
+		k=list[i];
+		list[i]     = list[mini];
+		list[mini]  = k;
+		array[i]    = min;
+	};
+	return 0;
+};
+
+/* Next functions are self-explaining linear algebra functions
+   used below in function solveLS
+*/
+bool multMatVec(std::vector<number> avec, std::vector<number> b,std::vector<number> c,size_t m,size_t n){
+   size_t i;
+   size_t j;
+   size_t count=0;
+   for(i = 0; i < m; i = i + 1){
+	   c[i]=0.0;
+       for(j = 0; j < n; j = j + 1){
+            c[i] = c[i] + avec[count] * b[j];
+		    count++;
+	   }
+   }
+   return true;
+}
+
+/*
+* Solve linear system for n x n - matrix given as array
+* Remark: historic document because it was computed as exercise for
+* "Algorithmische Optimierung I", WS 04/05
+*/
+bool solveLS(std::vector<number> matField,/* matrix given as field */
+            std::vector<number> b, /* rhs */
+			std::vector<number> x){
+	size_t n=b.size();
+	number P[n][n];
+    std::vector<number> Pvec(n*n);
+    std::vector<number> b2(n);
+    number A[n][n];
+	number L[n][n];
+	number U[n][n];
+	number z[n];
+	size_t i,k,j,l;
+	bool boolean=false;
+	number d,max;
+    size_t count=0;
+    for (i=0;i<n;i++){
+        for (j=0;j<n;j++){
+            A[i][j]=matField[count];
+            if (i!=j)
+               P[i][j]=0;
+            else
+               P[i][j]=1;
+            L[i][j]=0;
+            U[i][j]=0;
+            count ++;
+        }
+    }
+	for (i=0;i<n;i++){
+		j=i;
+		// Suche groesstes Element in Spalten
+		max=abs(A[i][i]);
+		for (k=i+1;k<n;k++){
+			if (abs(A[k][i])>max){
+				j=k;
+				max=abs(A[k][i]);
+			};
+		};
+		if (max<1e-16){
+			// A nicht invertierbar
+			printf(".");
+		    return false;
+		};
+		if (i!=j){
+			// Vertauschen der Zeilen
+			if (boolean==false){
+				// beim ersten Durchlauf Vertauschen der Spalten der
+				// Permutationsmatrix und der Zeilen von A,L.
+				boolean=true;
+				for (k=0;k<n;k++){
+					d=P[k][i];
+				    P[k][i]=P[k][j];
+				    P[k][j]=d;
+					d=A[i][k];
+				    A[i][k]=A[j][k];
+				    A[j][k]=d;
+					d=L[i][k];
+				    L[i][k]=L[j][k];
+				    L[j][k]=d;
+				};
+			} else{
+				for (k=0;k<n;k++){
+				    // Vertauschen der Zeilen von P,A,L
+				    d=P[i][k];
+				    P[i][k]=P[j][k];
+				    P[j][k]=d;
+					d=A[i][k];
+				    A[i][k]=A[j][k];
+				    A[j][k]=d;
+					d=L[i][k];
+				    L[i][k]=L[j][k];
+				    L[j][k]=d;
+				};
+			};
+		};
+		// Elimination
+		L[i][i]=1;
+		for (k=i+1;k<n;k++){
+			L[k][i]=A[k][i]/A[i][i];
+			for (l=i+1;l<n;l++){
+				A[k][l]=A[k][l]-L[k][i]*A[i][l];
+			};
+		};
+	};
+	// U ist der obere Dreiecksteil von A
+	for (i=0;i<n;i++){
+		for (j=i;j<n;j++){
+			U[i][j]=A[i][j];
+		};
+	};
+	// A*x = b <-> P*A*x = P*b
+    count = 0;
+    for (i=0;i<n;i++){
+        for (j=0;j<n;j++){
+            Pvec[count]=P[i][j];
+			count++;
+        }
+    }
+	multMatVec(Pvec,b,b2,n,n);
+	// Loese zuerst L*z = P*b
+	for (i=0;i<n;i++){
+		number s=b2[i];
+		for (j=0;j<i;j++){
+			s=s-z[j]*L[i][j];
+		};
+		z[i]=s;
+	};
+	// Loese U*x = z
+	for (i=n-1;i>=0;i--){
+		number s=z[i];
+		for (j=n-1;j>i;j--){
+			s=s-x[j]*U[i][j];
+		};
+		x[i]=s/U[i][i];
+	};
+	return true;
+};
+
+/// averages positions by arithmetic mean
+/**
+ * Arithmetic Mean of Positions
+ * returns the arithmetic mean of positions
+ *
+ * \param[in]  vCornerCoords	positions
+ * \param[in]  num				number of positions
+ * \param[out] vOut				arithmetic mean of positions
+
+template <typename TPosition>
+void FV1LevelSetDisc<TGridFunction>::AverageCoord(TPosition& vOut, const TPosition* vCornerCoords, size_t num)
+{
+	vOut = vCornerCoords[0];
+	for(size_t j = 1; j < num; ++j)
+	{
+		vOut += vCornerCoords[j];
+	}
+	vOut *= 1./(number)num;
+} */
+
+/// averages positions by arithmetic mean
+/**
+ * Arithmetic Mean of Positions
+ * returns the arithmetic mean of positions
+ *
+ * \param[in]  vCornerCoords	positions
+ * \param[in]  num				number of positions
+ * \param[out] vOut				arithmetic mean of positions
+ */
+template <typename TPosition>
+void AverageCoords(TPosition& vOut, const std::vector<TPosition>& vCornerCoords, size_t num)
+{
+	vOut = vCornerCoords[0];
+	for(size_t j = 1; j < num; ++j)
+	{
+		vOut += vCornerCoords[j];
+	}
+	vOut *= 1./(number)num;
+}
+
+// computation of curvature
+template<typename TGridFunction>
+bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d(number& kappa,size_t elementnoc,const std::vector<MathVector<dim> >& co,std::vector<number> phi,size_t order){
+    std::vector<MathVector<dim> > interPoints;
+    size_t nOfPoints=co.size();
+    std::vector<number> distToBaseP(nOfPoints);
+    std::vector<int> sortedList(nOfPoints);
+    MathVector<dim> elemBasePoint;
+    // compute element base point
+    for (size_t i=0;i<elementnoc;i++){
+        if (phi[i]==0){
+            interPoints[interPoints.size()]=co[i];
+            continue;
+        };
+        for (size_t j=i+1;j<elementnoc;j++){
+            if (phi[i]*phi[j]<0){
+                interPoints[interPoints.size()]=co[i];
+            };
+        }
+    }
+    AverageCoords(elemBasePoint,interPoints,interPoints.size());
+    for (size_t i=0;i<nOfPoints;i++){
+        distToBaseP[i]=VecDistance(co[i],elemBasePoint);
+    };
+    // sort nodes by distance to base point
+    bubblesort(distToBaseP,sortedList);
+    size_t criticalnofinterp;
+    if (order==2) criticalnofinterp=5;
+    if (order==3) criticalnofinterp=7;
+    size_t count=0;
+    size_t nrOfInterPoints=0;
+    std::vector<number> mat;
+    size_t vlength=0.5*(order+1)*(order+2);
+    mat.resize(vlength*vlength);
+	std::vector<number> interphi;
+	std::vector<number> coeffs;
+	interphi.resize(vlength);
+	for (size_t i=criticalnofinterp*(vlength-1);i<vlength*vlength;i++){
+        mat[i] = (number)(0.8*i*i-0.4*i)/(i+1)+i*i-0.5+sin(0.3*i)+cos(0.75*i)+i*i*i-exp(0.1*i);
+    };
+	size_t matindex=0;
+	size_t nofinterp=0;
+    for (size_t j=0;j<nOfPoints;j++){
+        size_t i=sortedList[j];
+        for (size_t ii=0;ii<=order;ii++){
+        	for (size_t k=0;k<vlength;k++){
+        		mat[matindex]=std::pow((number)co[i][0],(int)(ii-k))*std::pow((number)co[i][1],(int)k);
+        		matindex++;
+        	};
+        };
+        interphi[nrOfInterPoints]=phi[i];
+        nrOfInterPoints++;
+        if (j>criticalnofinterp){
+			if (solveLS(mat,interphi,coeffs)){
+                count-=vlength;
+                continue;
+            };
+        };
+		nofinterp++;
+		if (nofinterp==vlength) break;
+    };
+	if (nofinterp<vlength){
+		UG_LOG("warning: not enough interpolations points for desired order "<< order << " (found " << nofinterp << ", needed " << vlength << ") Reduce order.\n");
+		if (order==1) return false;
+		if (computeElementCurvature2d(kappa,elementnoc,co,phi,order-1)==true) return true; else return false;
+	}
+	number dxphi,dyphi,dxxphi,dxyphi,dyyphi;
+	if (order==2){
+        dxphi=coeffs[1]+2*coeffs[3]*elemBasePoint[0]+coeffs[4]*elemBasePoint[1];
+        dyphi=coeffs[2]+coeffs[4]*elemBasePoint[0]+2*coeffs[5]*elemBasePoint[1];
+    };
+    if (order==3){
+		dxphi=coeffs[1]+2*coeffs[3]*elemBasePoint[0]+coeffs[4]*elemBasePoint[1]+3*coeffs[6]*elemBasePoint[0]*elemBasePoint[0]+2*coeffs[7]*elemBasePoint[0]*elemBasePoint[1]+coeffs[8]*elemBasePoint[1]*elemBasePoint[1];
+		dyphi=coeffs[2]+coeffs[4]*elemBasePoint[0]+2*coeffs[5]*elemBasePoint[1]+coeffs[7]*elemBasePoint[0]*elemBasePoint[0]+2*coeffs[8]*elemBasePoint[0]*elemBasePoint[1]+3*coeffs[9]*elemBasePoint[1]*elemBasePoint[1];
+    };
+    number gradnorm=sqrt(dxphi*dxphi+dyphi*dyphi);
+	// characteristic element length
+    number hh= min(VecDistance(co[0],co[1]),VecDistance(co[0],co[2]));
+    number coelemBasePoint[dim];
+    number sol[dim];
+    coelemBasePoint[0] = elemBasePoint[0] + 0.5*hh*dxphi/gradnorm;
+    coelemBasePoint[1] = elemBasePoint[1] + 0.5*hh*dyphi/gradnorm;
+    /* find intersection of line between elemBasePoint and coelemBaseP with zero level set */
+    number itgamma = 0;
+    number phival,phigamma;
+    size_t nrofiterations=0;
+    for (;nrofiterations<50;nrofiterations++){
+        number b = coelemBasePoint[0]-elemBasePoint[0];
+        number d = coelemBasePoint[1]-elemBasePoint[1];
+        sol[0] = elemBasePoint[0]+itgamma*(coelemBasePoint[0]-elemBasePoint[0]);
+        sol[1] = elemBasePoint[1]+itgamma*(coelemBasePoint[1]-elemBasePoint[1]);
+        if (order==2)
+            phival = coeffs[0]+coeffs[1]*sol[0]+coeffs[2]*sol[1]+coeffs[3]*sol[0]*sol[0]+coeffs[4]*sol[0]*sol[1]+coeffs[5]*sol[1]*sol[1];
+        if (order==3)
+            phival = coeffs[0]+coeffs[1]*sol[0]+coeffs[2]*sol[1]+coeffs[3]*sol[0]*sol[0]+coeffs[4]*sol[0]*sol[1]+coeffs[5]*sol[1]*sol[1]
+					+coeffs[6]*sol[0]*sol[0]*sol[0]+coeffs[7]*sol[0]*sol[0]*sol[1]+coeffs[8]*sol[0]*sol[1]*sol[1]+coeffs[9]*sol[1]*sol[1]*sol[1];
+        if (abs(phival)<1e-13) break;
+        phigamma = coeffs[1]*b+coeffs[2]*d+2*coeffs[3]*sol[0]*b+coeffs[4]*b*sol[1]+coeffs[4]*sol[0]*d+2*coeffs[5]*sol[1]*d+3*coeffs[6]*sol[0]*sol[0]*b
+					+2*coeffs[7]*sol[0]*sol[1]*b+coeffs[7]*sol[0]*sol[0]*d+coeffs[8]*b*sol[1]*sol[1]+2*coeffs[8]*sol[0]*sol[1]*d+3*coeffs[9]*sol[1]*sol[1]*d;
+        itgamma -= phival/phigamma;
+    };
+    if (nrofiterations==50){
+        UG_LOG("Diverging Newton method (err=" << phival << ")\n");
+        return false;
+    };
+    if (order==2){
+        dxphi=coeffs[1]+2*coeffs[3]*sol[0]+coeffs[4]*sol[1];
+        dyphi=coeffs[2]+coeffs[4]*sol[0]+2*coeffs[5]*sol[1];
+        dxxphi=2*coeffs[3];
+        dxyphi=coeffs[4];
+        dyyphi=2*coeffs[5];
+    };
+    if (order==3){
+		dxphi=coeffs[1]+2*coeffs[3]*sol[0]+coeffs[4]*sol[1]+3*coeffs[6]*sol[0]*sol[0]+2*coeffs[7]*sol[0]*sol[1]+coeffs[8]*sol[1]*sol[1];
+		dyphi=coeffs[2]+coeffs[4]*sol[0]+2*coeffs[5]*sol[1]+coeffs[7]*sol[0]*sol[0]+2*coeffs[8]*sol[0]*sol[1]+3*coeffs[9]*sol[1]*sol[1];
+        dxxphi=2*coeffs[3]+6*coeffs[6]*sol[0]+2*coeffs[7]*sol[1];
+        dxyphi=coeffs[4]+2*coeffs[7]*sol[0]+2*coeffs[8]*sol[1];
+        dyyphi=2*coeffs[5]+2*coeffs[8]*sol[0]+6*coeffs[9]*sol[1];
+    };
+    number t = sqrt(dxphi*dxphi+dyphi*dyphi);
+    kappa = - (dyyphi * dxphi * dxphi - 2 * dxyphi * dxphi * dyphi + dxxphi * dyphi * dyphi) / (t * t * t);
+    return true;
+}
+
+template<typename TGridFunction>
+bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFunction& u){
+	typedef typename TGridFunction::domain_type domain_type;
+	// get grid
+	typename domain_type::grid_type& grid = *u.domain()->grid();
+	typedef typename TGridFunction::template dim_traits<dim>::const_iterator ElemIterator;
+	typedef typename TGridFunction::template dim_traits<dim>::geometric_base_object ElemType;
+	std::vector<MultiIndex<2> > ind;
+	size_t order=2;
+	//	loop elements of dimension
+	for (int si=0;si<u.num_subsets();++si){
+		ElemIterator iter = u.template begin<ElemType>(si);
+		ElemIterator iterEnd = u.template end<ElemType>(si);
+		std::vector<MathVector<dim> > coord;
+		std::vector<number> phi;
+		std::vector<VertexBase*> nbrs;
+		std::vector<VertexBase*> nbrCandidates;
+		size_t depth=2;
+		std::vector<size_t> stageStart(depth+1);
+	for(  ;iter !=iterEnd; ++iter)
+	{
+	    //	get Elem
+		nbrs.resize(0);
+		ElemType* elem = *iter;
+		//	get position accessor
+		typedef typename domain_type::position_accessor_type position_accessor_type;
+		const position_accessor_type& aaPos = u.domain()->position_accessor();
+		size_t noc=elem->num_vertices();
+		size_t depth=2;
+		phi.resize(noc);
+		// check if zero level set is on element
+		bool onls=false;
+		bool nonzerophifound=false;
+		number nonzerophi;
+		for (size_t i=0;i<noc;i++){
+			nbrs[i]=elem->vertex(i);
+			u.inner_multi_indices(nbrs[i], 0, ind);
+			phi[i] = BlockRef(u[ind[0][0]],ind[0][1]);
+			if (nonzerophifound==false){
+				if (phi[i]!=0){
+					nonzerophifound=true;
+					nonzerophi=phi[i];
+				}
+			} else {
+				if (nonzerophi*phi[i]<0){
+					onls=true;
+					break;
+				}
+			}
+		};
+		if (onls==false) continue;
+		// collect neighbor nodes for higher order interpolation
+		stageStart[0]=0;
+		stageStart[1]=noc;
+		for (size_t stage=0;stage<depth;stage++){
+			for (size_t i=stageStart[stage];i<stageStart[stage+1];i++){
+				nbrCandidates.resize(0);
+				CollectNeighbors(nbrCandidates, grid, nbrs[i]);
+				for (size_t j=0;j<nbrCandidates.size();j++){
+					bool newNeighbor=true;
+					for (size_t k=0;k<nbrs.size();k++){
+						if (nbrCandidates[j]==nbrs[k]){
+							newNeighbor=false;
+							break;
+						}
+					};
+					if (newNeighbor==true){
+						nbrs.push_back(nbrCandidates[j]);
+					};
+				};
+			};
+			stageStart[stage+1]=nbrs.size();
+		};
+		phi.resize(nbrs.size());
+		for (size_t i=0;i<nbrs.size();i++){
+			coord[i] = aaPos[nbrs[i]];
+			if (i<noc) continue;
+			u.inner_multi_indices(nbrs[i], 0, ind);
+			phi[i] = BlockRef(u[ind[0][0]],ind[0][1]);
+		};
+		number kappa;
+		computeElementCurvature2d(kappa,noc,coord,phi,order);
+	};
+	};
+	return true;
+};
+
+
 // limit previously computed gradient so that the control-volume-wise linear interpolation function does not introduce new maxima or minima into the data 
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaGrad)

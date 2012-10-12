@@ -190,6 +190,9 @@ class FV1LevelSetDisc
 		bool compute_normal(TGridFunction& vx,TGridFunction& vy,TGridFunction& u);
 		bool compute_dnormal(TGridFunction& dnormal,TGridFunction& vx,TGridFunction& vy,TGridFunction& phi,TGridFunction& u);
 		bool compute_ddnormal(TGridFunction& ddnormal,TGridFunction& dnormal,TGridFunction& vx,TGridFunction& vy,TGridFunction& phi,TGridFunction& u);
+		
+		bool computeElementCurvature2d(number& kappa,size_t elementnoc,const std::vector<MathVector<dim> >& co,std::vector<number> phi,size_t order);
+		bool computeElementCurvatureOnGrid2d(TGridFunction& u);
 
       /// boundary condition subset handling
 		bool set_dirichlet_boundary(TGridFunction& uNew,const char* subsets){
