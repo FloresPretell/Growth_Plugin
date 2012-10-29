@@ -814,13 +814,13 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaG
 		for(VertexBaseConstIterator iter = uOld.template begin<VertexBase>(si) ;
 				iter !=uOld.template end<VertexBase>(si); ++iter)
 		{
-		    VertexBase* vrt = *iter;
+/*		    VertexBase* vrt = *iter;
 			MathVector<dim> coord;
 			coord = aaPos[vrt];
 			// read indices on vertex
 			//	get vector holding all indices on the vertex
 			uOld.inner_multi_indices(vrt, 0, ind);
-			//UG_LOG(coord << " min=" << aaMin[vrt] << " max=" << aaMax[vrt] << "\n");
+			//UG_LOG(coord << " min=" << aaMin[vrt] << " max=" << aaMax[vrt] << "\n");*/
 		}
 	}
 	for (int si=0;si<1;++si){
@@ -1000,7 +1000,7 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 	//UG_LOG("uValues " << uValue[0] << " " << uValue[1] << " " << uValue[2] << "\n");
 
 //  fill grad vector
-    MathVector<dim> grad[noc];
+    MathVector<dim> grad[maxNumCo];
 	for (size_t i=0;i < noc;i++){
 		// if (dd.template inner_multi_indices<VertexBase>(vVrt[i], 0, multInd) != 1) return false;
 		uOld.inner_multi_indices(vVrt[i], 0, multInd);
@@ -1009,15 +1009,39 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 	}
 	
 	//  fill corner velocity vector
-	MathVector<dim> coVelocity[noc];
+	MathVector<dim> coVelocity[maxNumCo];
 	for (size_t i=0;i<noc;++i){
 		coVelocity[i]=0;
 	}
 	if (m_gamma!=0){
 		const int si = 0;
-		// see user_data.h : 410
-		(*m_imVelocity)(coVelocity, geo.scv_global_ips(), m_time, si, geo.num_sh());
-//		(*m_imVelocity)(coVelocity, geo.scv_global_ips(), m_time, si,coCoord, geo.num_sh());
+		if (m_imVelocity->requires_grid_fct()){
+			//	create storage
+			LocalIndices localind;
+			LocalVector localu;
+
+			// 	get global indices
+			uNew.indices(elem, localind);
+
+			// 	adapt local algebra
+			localu.resize(localind);
+
+			// 	read local values of u
+			GetLocalVector(localu, uNew);
+
+			//	compute data
+	//		try{
+				(*m_imVelocity)(coVelocity, geo.scv_global_ips(), m_time, si,
+				localu, elem,
+				coCoord, geo.scv_local_ips(),
+				geo.num_sh());
+	//		}
+	//		UG_CATCH_THROW("assemble_element : Cannot evaluate velocity data.");
+		} else {
+			// see user_data.h : 410
+			(*m_imVelocity)(coVelocity, geo.scv_global_ips(), m_time, si, geo.num_sh());
+		}
+
         if (m_gamma!=1) for (size_t i=0;i < noc;i++) coVelocity[i]*=m_gamma;
 	}
     if (m_delta!=0){
@@ -1028,9 +1052,9 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
     	};
     };
 //  fill ipVel velocity vector
-	MathVector<dim> ipVelocity[geo.num_scvf()];
+	MathVector<dim> ipVelocity[maxNumCo];
 	//UG_LOG("num scvf " << geo.num_scvf() << "\n");
-	if ((m_interpolate_v_in_ip==true)||(m_delta!=0)){
+//	if ((m_interpolate_v_in_ip==true)||(m_delta!=0)){
 		for (size_t ip=0;ip < geo.num_scvf();ip++){
 			ipVelocity[ip] = 0;
 			const typename DimFV1Geometry<dim>::SCVF& scvf = geo.scvf(ip);
@@ -1042,11 +1066,11 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 				};
 			};
 		}
-	} else
-	{
-		const int si = 0;
-		(*m_imVelocity)(coVelocity, geo.scv_global_ips(), m_time, si, geo.num_sh());;
-	};
+//	} else
+	//{
+		//const int si = 0;
+		//(*m_imVelocity)(coVelocity, geo.scv_global_ips(), m_time, si, geo.num_sh());;
+	//};
     //  fill source vector
 	std::vector<number> coSource(noc);
 	const int si = 0;

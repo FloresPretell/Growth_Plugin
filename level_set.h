@@ -344,6 +344,8 @@ class FV1LevelSetDisc
 		int m_outside_nodes_si;
 		int m_onls_nodes_si;
 
+		static const size_t maxNumCo = 20;
+
 		///	Data import for the Velocity field
 		SmartPtr<UserData<MathVector<dim>, dim> > m_imVelocity;
 		///	Data import for the right-hand side
