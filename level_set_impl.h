@@ -534,6 +534,7 @@ template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d(number& kappa,size_t elementnoc,const std::vector<MathVector<dim> >& co,std::vector<number> phi,size_t order){
     std::vector<MathVector<dim> > interPoints;
     size_t nOfPoints=co.size();
+    interPoints.resize(co.size());
     std::vector<number> distToBaseP(nOfPoints);
     std::vector<int> sortedList(nOfPoints);
     MathVector<dim> elemBasePoint;
@@ -566,6 +567,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d(number& kappa,siz
 	std::vector<number> interphi;
 	std::vector<number> coeffs;
 	interphi.resize(vlength);
+	coeffs.resize(vlength);
 	for (size_t i=criticalnofinterp*(vlength-1);i<vlength*vlength;i++){
         mat[i] = (number)(0.8*i*i-0.4*i)/(i+1)+i*i-0.5+sin(0.3*i)+cos(0.75*i)+i*i*i-exp(0.1*i);
     };
@@ -596,6 +598,8 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d(number& kappa,siz
 		if (computeElementCurvature2d(kappa,elementnoc,co,phi,order-1)==true) return true; else return false;
 	}
 	number dxphi,dyphi,dxxphi,dxyphi,dyyphi;
+	UG_LOG("elBasePoint = " << elemBasePoint << "\n");
+	UG_LOG("coeff.size =" << coeffs.size() << "\n");
 	if (order==2){
         dxphi=coeffs[1]+2*coeffs[3]*elemBasePoint[0]+coeffs[4]*elemBasePoint[1];
         dyphi=coeffs[2]+coeffs[4]*elemBasePoint[0]+2*coeffs[5]*elemBasePoint[1];
@@ -675,20 +679,22 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 	for(  ;iter !=iterEnd; ++iter)
 	{
 	    //	get Elem
-		nbrs.resize(0);
 		ElemType* elem = *iter;
 		//	get position accessor
 		typedef typename domain_type::position_accessor_type position_accessor_type;
 		const position_accessor_type& aaPos = u.domain()->position_accessor();
 		size_t noc=elem->num_vertices();
+		nbrs.resize(noc);
 		size_t depth=2;
 		phi.resize(noc);
 		// check if zero level set is on element
 		bool onls=false;
 		bool nonzerophifound=false;
 		number nonzerophi;
+		UG_LOG("noc = " << noc << "\n");
 		for (size_t i=0;i<noc;i++){
 			nbrs[i]=elem->vertex(i);
+			UG_LOG("*" << i << " " << aaPos[nbrs[i]] << "\n");
 			u.inner_multi_indices(nbrs[i], 0, ind);
 			phi[i] = BlockRef(u[ind[0][0]],ind[0][1]);
 			if (nonzerophifound==false){
@@ -699,7 +705,6 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 			} else {
 				if (nonzerophi*phi[i]<0){
 					onls=true;
-					break;
 				}
 			}
 		};
@@ -721,20 +726,29 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 					};
 					if (newNeighbor==true){
 						nbrs.push_back(nbrCandidates[j]);
+						// UG_LOG("new size : " << nbrs.size() << "\n");
+						UG_LOG(nbrs.size()-1 << " " << aaPos[nbrs[nbrs.size()-1]] << "\n");
 					};
 				};
 			};
 			stageStart[stage+1]=nbrs.size();
 		};
 		phi.resize(nbrs.size());
+		coord.resize(nbrs.size());
+		UG_LOG("### " << aaPos[nbrs[0]] << "\n");
 		for (size_t i=0;i<nbrs.size();i++){
+			UG_LOG(i << "\n");
+//			UG_LOG("--- " << aaPos[nbrs[i]] << "\n");
 			coord[i] = aaPos[nbrs[i]];
+			UG_LOG("co[i]" << coord[i] << "\n");
 			if (i<noc) continue;
 			u.inner_multi_indices(nbrs[i], 0, ind);
-			phi[i] = BlockRef(u[ind[0][0]],ind[0][1]);
+			phi[i] = DoFRef(u,ind[0]);
 		};
 		number kappa;
 		computeElementCurvature2d(kappa,noc,coord,phi,order);
+		//u.inner_multi_indices(elem, 1, ind);
+		//DoFRef(u,ind[1]) = kappa;
 	};
 	};
 	return true;
