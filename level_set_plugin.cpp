@@ -1,4 +1,3 @@
-// created by Christian Wehner
 /**
  * LevelSet plugin
  *
@@ -9,6 +8,9 @@
 #include "bridge/util_domain_algebra_dependent.h"
 
 #include "level_set.h"
+#include "level_set_user_data.h"
+
+#include "lib_disc/operator/non_linear_operator/newton_solver/newton.h"
 
 using namespace std;
 using namespace ug::bridge;
@@ -127,7 +129,29 @@ static void DomainAlgebra(Registry& reg, string grp)
 		reg.add_class_to_group(name, "FV1LevelSetDisc", tag);
 	}
 
-}
+	// level set user data
+	{
+		string name = string("LevelSetUserData").append(suffix);
+		typedef LevelSetUserData<function_type> T;
+		typedef UserData<number, dim> TBase;
+		typedef INewtonUpdate TBase2;
+		reg.add_class_<T, TBase,TBase2>(name, grp)
+			.template add_constructor<void (*)(SmartPtr<ApproximationSpace<TDomain> >,SmartPtr<function_type>)>("Approximation space, grid function")
+	//		.add_method("set_inside_values", static_cast<void (T::*)(SmartPtr<UserData<number, dim> >)>(&T::set_kinematic_viscosity), "", "KinematicViscosity")
+		//	.add_method("set_inside_values", static_cast<void (T::*)(number)>(&T::set_kinematic_viscosity), "", "KinematicViscosity")
+//		#ifdef UG_FOR_LUA
+	//		.add_method("set_inside_values", static_cast<void (T::*)(const char*)>(&T::set_kinematic_viscosity), "", "KinematicViscosity")
+//		#endif
+	//		.add_method("set_outside_values", static_cast<void (T::*)(SmartPtr<UserData<number, dim> >)>(&T::set_kinematic_viscosity), "", "KinematicViscosity")
+		//	.add_method("set_outside_values", static_cast<void (T::*)(number)>(&T::set_kinematic_viscosity), "", "KinematicViscosity")
+//		#ifdef UG_FOR_LUA
+	//		.add_method("set_outside_values", static_cast<void (T::*)(const char*)>(&T::set_kinematic_viscosity), "", "KinematicViscosity")
+//		#endif
+		.set_construct_as_smart_pointer(true);
+		reg.add_class_to_group(name, "LevelSetUserData", tag);
+	}
+
+}// end Domain algebra
 
 }; // end Functionality
 } // end namespace LevelSet
