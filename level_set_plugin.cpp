@@ -137,16 +137,17 @@ static void DomainAlgebra(Registry& reg, string grp)
 		typedef INewtonUpdate TBase2;
 		reg.add_class_<T, TBase,TBase2>(name, grp)
 			.template add_constructor<void (*)(SmartPtr<ApproximationSpace<TDomain> >,SmartPtr<function_type>)>("Approximation space, grid function")
-	//		.add_method("set_inside_values", static_cast<void (T::*)(SmartPtr<UserData<number, dim> >)>(&T::set_kinematic_viscosity), "", "KinematicViscosity")
-		//	.add_method("set_inside_values", static_cast<void (T::*)(number)>(&T::set_kinematic_viscosity), "", "KinematicViscosity")
-//		#ifdef UG_FOR_LUA
-	//		.add_method("set_inside_values", static_cast<void (T::*)(const char*)>(&T::set_kinematic_viscosity), "", "KinematicViscosity")
-//		#endif
-	//		.add_method("set_outside_values", static_cast<void (T::*)(SmartPtr<UserData<number, dim> >)>(&T::set_kinematic_viscosity), "", "KinematicViscosity")
-		//	.add_method("set_outside_values", static_cast<void (T::*)(number)>(&T::set_kinematic_viscosity), "", "KinematicViscosity")
-//		#ifdef UG_FOR_LUA
-	//		.add_method("set_outside_values", static_cast<void (T::*)(const char*)>(&T::set_kinematic_viscosity), "", "KinematicViscosity")
-//		#endif
+			.add_method("set_inside_data", static_cast<void (T::*)(SmartPtr<UserData<number, dim> >)>(&T::set_inside_data), "", "Inside data")
+			.add_method("set_inside_data", static_cast<void (T::*)(number)>(&T::set_inside_data), "", "Inside data")
+		#ifdef UG_FOR_LUA
+			.add_method("set_inside_data", static_cast<void (T::*)(const char*)>(&T::set_inside_data), "", "Inside data")
+		#endif
+			.add_method("set_outside_data", static_cast<void (T::*)(SmartPtr<UserData<number, dim> >)>(&T::set_outside_data), "", "Outside data")
+			.add_method("set_outside_data", static_cast<void (T::*)(number)>(&T::set_outside_data), "", "Outside data")
+		#ifdef UG_FOR_LUA
+			.add_method("set_outside_data", static_cast<void (T::*)(const char*)>(&T::set_outside_data), "", "Outside data")
+		#endif
+			.add_method("set_eval_type", static_cast<void (T::*)(int)>(&T::set_eval_type), "", "Evaluation type")
 		.set_construct_as_smart_pointer(true);
 		reg.add_class_to_group(name, "LevelSetUserData", tag);
 	}
