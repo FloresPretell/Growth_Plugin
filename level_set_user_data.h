@@ -566,6 +566,7 @@ class CRTwoPhaseSource
 			for (int i=0;i<dim;i++){
 				f->set_entry(i, f_x);
 			}
+			set_source(f);
 		}
 
 		void set_source(number f_x, number f_y)
@@ -642,6 +643,7 @@ class CRTwoPhaseSource
 			m_spApproxSpace = approxSpace;
 			set_gravitation(980);
 			set_source(0.0);
+			set_density(1);
 		}
 
 		virtual ~CRTwoPhaseSource(){};
@@ -851,6 +853,8 @@ class CRTwoPhaseSource
 		   		     }
 		   		 };
 		   	   }
+		   	   	   	   	   //for (size_t i=0;i<nip;i++)
+		   	   	   	   	   //UG_LOG(vValue[i] << "\n");
 	   	    }; // evaluate
 
 		void update(){}
