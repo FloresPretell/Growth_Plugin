@@ -152,6 +152,32 @@ static void DomainAlgebra(Registry& reg, string grp)
 		reg.add_class_to_group(name, "LevelSetUserData", tag);
 	}
 
+	// level set user data
+		{
+			string name = string("CRTwoPhaseSource").append(suffix);
+			typedef CRTwoPhaseSource<function_type> T;
+			typedef UserData<MathVector<dim>, dim> TBase;
+			typedef INewtonUpdate TBase2;
+			reg.add_class_<T, TBase,TBase2>(name, grp)
+				.template add_constructor<void (*)(SmartPtr<ApproximationSpace<TDomain> >,SmartPtr<function_type>)>("Approximation space, grid function")
+				.add_method("set_density", static_cast<void (T::*)(SmartPtr<UserData<number, dim> >)>(&T::set_density), "", "Set density")
+				.add_method("set_density", static_cast<void (T::*)(number)>(&T::set_density), "", "Set density")
+			#ifdef UG_FOR_LUA
+				.add_method("set_density", static_cast<void (T::*)(const char*)>(&T::set_density), "", "Set density")
+			#endif
+				.add_method("set_source", static_cast<void (T::*)(SmartPtr<UserData<MathVector<dim>, dim> >)>(&T::set_source), "", "Source")
+				.add_method("set_source", static_cast<void (T::*)(number)>(&T::set_source), "", "F_x")
+				.add_method("set_source", static_cast<void (T::*)(number,number)>(&T::set_source), "", "F_x, F_y")
+				.add_method("set_source", static_cast<void (T::*)(number,number,number)>(&T::set_source), "", "F_x, F_y, F_z")
+			#ifdef UG_FOR_LUA
+				.add_method("set_source", static_cast<void (T::*)(const char*)>(&T::set_source), "", "Source Vector")
+			#endif
+				.add_method("set_sigma", static_cast<void (T::*)(number)>(&T::set_sigma), "", "Set sigma")
+				.add_method("set_gravitation", static_cast<void (T::*)(number)>(&T::set_sigma), "", "Set gravitation constant")
+				.set_construct_as_smart_pointer(true);
+			reg.add_class_to_group(name, "CRTwoPhaseSource", tag);
+		}
+
 }// end Domain algebra
 
 }; // end Functionality

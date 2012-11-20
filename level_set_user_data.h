@@ -467,7 +467,397 @@ class LevelSetUserData
 		static const size_t max_number_of_ips = 20;
 };
 
+template<typename TElem,typename TGrid>
+void collect_finest_level_children(std::vector<TElem*>& childElemVector,TElem* elem,TGrid* grid){
+	size_t numChildren = grid->template num_children<TElem>(elem);
+	if (numChildren==0){
+		childElemVector.push_back(elem);
+	} else {
+		for (size_t i=0;i<numChildren;i++){
+			TElem* childElem = grid->template get_child<TElem>(elem,i);
+			size_t nc=grid->template num_children<TElem>(childElem);
+			if (nc==0){
+				childElemVector.push_back(childElem);
+			} else {
+				collect_finest_level_children<TElem,TGrid>(childElemVector,childElem,grid);
+			};
+		};
+	}
+};
 
+template<typename TElem,typename TPos,int dim>
+void computeElemBarycenter(MathVector<dim>& bary,TElem* elem,TPos posA){
+	bary = 0;
+	size_t noc=elem->num_vertices();
+	for (size_t i=0;i<noc;i++){
+		bary+=posA[elem->vertex(i)];
+	}
+	bary/=noc;
+}
+
+template <typename TGridFunction>
+class CRTwoPhaseSource
+	: public LevelSetUserDataBase<MathVector<TGridFunction::dim>, TGridFunction::dim,
+		  	  CRTwoPhaseSource<TGridFunction> >, virtual public INewtonUpdate
+{
+	///	domain type
+		typedef typename TGridFunction::domain_type domain_type;
+
+	///	algebra type
+		typedef typename TGridFunction::algebra_type algebra_type;
+
+	/// position accessor type
+		typedef typename domain_type::position_accessor_type position_accessor_type;
+
+	///	world dimension
+		static const int dim = domain_type::dim;
+
+	///	grid type
+		typedef typename domain_type::grid_type grid_type;
+
+	/// element type
+		typedef typename TGridFunction::template dim_traits<dim>::geometric_base_object elem_type;
+
+	private:
+	// level set grid function
+		SmartPtr<TGridFunction> m_phi;
+
+	//	approximation space for level and surface grid
+		SmartPtr<ApproximationSpace<domain_type> > m_spApproxSpace;
+
+	//  grid
+		grid_type* m_grid;
+
+/*	//	component of function
+		size_t m_fct;
+
+	//	local finite element id
+		LFEID m_lfeID;               */
+	private:
+
+	// gravitational constant
+		number m_gravitational_constant;
+
+	// surface tension factor
+		number m_sigma;
+
+	///	Data import for source
+		SmartPtr<UserData<MathVector<dim>,dim> > m_imSource;
+
+	public:
+		void set_gravitation(number gravityconst){
+			m_gravitational_constant = gravityconst;
+		}
+
+		void set_sigma(number sigma){
+			m_sigma = sigma;
+		}
+
+		/////////// Source
+
+		void set_source(SmartPtr<UserData<MathVector<dim>, dim> > data)
+		{
+			m_imSource = data;
+		}
+
+		void set_source(number f_x)
+		{
+			SmartPtr<ConstUserVector<dim> > f(new ConstUserVector<dim>());
+			for (int i=0;i<dim;i++){
+				f->set_entry(i, f_x);
+			}
+		}
+
+		void set_source(number f_x, number f_y)
+		{
+			if (dim!=2){
+				UG_THROW("NavierStokes: Setting source vector of dimension 2"
+							" to a Discretization for world dim " << dim);
+			} else {
+				SmartPtr<ConstUserVector<dim> > f(new ConstUserVector<dim>());
+							f->set_entry(0, f_x);
+							f->set_entry(1, f_y);
+							set_source(f);
+			}
+		}
+
+		void set_source(number f_x, number f_y, number f_z)
+		{
+			if (dim<3){
+				UG_THROW("NavierStokes: Setting source vector of dimension 3"
+							" to a Discretization for world dim " << dim);
+			}
+			else
+							{
+								SmartPtr<ConstUserVector<dim> > f(new ConstUserVector<dim>());
+											f->set_entry(0, f_x);
+											f->set_entry(1, f_y);
+											f->set_entry(2, f_z);
+											set_source(f);
+							}
+		}
+
+		#ifdef UG_FOR_LUA
+		void set_source(const char* fctName)
+		{
+			set_source(LuaUserDataFactory<MathVector<dim>, dim>::create(fctName));
+		}
+		#endif
+
+	public:
+		void set_density(SmartPtr<UserData<number, dim> > user){
+			m_imDensity = user;
+		}
+		void set_density(number val){
+			set_density(CreateSmartPtr(new ConstUserNumber<dim>(val)));
+		}
+	#ifdef UG_FOR_LUA
+		void set_density(const char* fctName){
+			set_density(LuaUserDataFactory<number, dim>::create(fctName));
+		}
+	#endif
+
+	private:
+	///	density import for inside and outside density
+		SmartPtr<UserData<number,dim> > m_imDensity;
+
+	public:
+	/// constructor
+		CRTwoPhaseSource(SmartPtr<ApproximationSpace<domain_type> > approxSpace,SmartPtr<TGridFunction> spGridFct){
+			m_phi = spGridFct;
+			for (int si=0;si<m_phi->num_subsets();++si){
+				if (m_phi->num_fct(si)<2){
+					UG_THROW("No curvature component in approximation space.");
+				}
+				if (m_phi->local_finite_element_id(0) != LFEID(LFEID::LAGRANGE, 1)){
+					UG_THROW("First component in approximation space must be of Lagrange 1 type.");
+				}
+				if (m_phi->local_finite_element_id(1) != LFEID(LFEID::PIECEWISE_CONSTANT,0)){
+					UG_THROW("Second component in approximation space must be of piecewise constant type.");
+				}
+			};
+			domain_type& domain = *m_phi->domain().get();
+			grid_type& grid = *domain.grid();
+			m_grid = &grid;
+			m_spApproxSpace = approxSpace;
+			set_gravitation(980);
+			set_source(0.0);
+		}
+
+		virtual ~CRTwoPhaseSource(){};
+
+	   template <int refDim>
+	        inline void evaluate(MathVector<dim> vValue[],
+	                             const MathVector<dim> vGlobIP[],
+	                             number time, int si,
+	                             LocalVector& u,
+	                             GeometricObject* elem,
+	                             const MathVector<dim> vCornerCoords[],
+	                             const MathVector<refDim> vLocIP[],
+	                             const size_t nip,
+	                             const MathMatrix<refDim, dim>* vJT = NULL) const
+	       {
+		   	   // evaluate source data
+		   	   (*m_imSource)(vValue,
+		   		                                vGlobIP,
+		   		                                time, si,
+		   		                                u,
+		   		                                elem,
+		   		                                vCornerCoords,
+		   		                                vLocIP,
+		   		                                nip,
+		   		                                vJT);
+		   	   	// find corner values of level set function on finest level
+		   	    UG_ASSERT(dynamic_cast<elem_type*>(elem) != NULL, "Unsupported element type");
+		   	    elem_type* element = static_cast<elem_type*>(elem);
+
+		   	    const size_t numVertices = element->num_vertices();
+		   		std::vector<VertexBase*> childVertex(numVertices);
+		   		std::vector<number> phi(numVertices);
+
+		   		// find child vertices by injection
+		   		for(size_t i = 0; i < numVertices; ++i){
+		   		    childVertex[i] = element->vertex(i);
+		   		};
+
+		   		bool onfinestlevel;
+		   		// find out level, then get child vertices on finest level
+		   		size_t numChildren = m_grid->template num_children<elem_type>(element);
+		   		if (numChildren!=0){
+		   		    size_t lowerLevel=0;
+		   		    elem_type* childElem = m_grid->template get_child<elem_type>(element,0);
+		   		    numChildren = m_grid->template num_children<elem_type>(childElem);
+		   		    lowerLevel++;
+		   			while (numChildren>0){
+		   				childElem = m_grid->template get_child<elem_type>(childElem,0);
+		   			    numChildren = m_grid->template num_children<elem_type>(childElem);
+		   			    lowerLevel++;
+		   			};
+		   			for (size_t i=0;i<nip;i++){
+		   			    for (size_t j=0;j<lowerLevel;j++){
+		   			    	childVertex[i]=m_grid->template get_child<VertexBase>(childVertex[i],0);
+		   			    }
+		   			}
+		   		} else onfinestlevel=true;
+
+		   		//    create Multiindex
+		   		std::vector<MultiIndex<2> > ind;
+		   		for (size_t i=0;i<numVertices;i++){
+		   			m_phi->multi_indices(childVertex[i], 0, ind);
+		   			phi[i]=DoFRef(*m_phi, ind[0]);
+		   		};
+		   		bool onls=false;
+		   		bool inside=false;
+		   		for (size_t i=0;i<numVertices;i++){
+		   		    if (phi[i]==0){
+		   		         continue;
+		   		    };
+		   		    if (phi[i]<0) inside=true;
+		   		    for (size_t j=i+1;j<numVertices;j++){
+		   		    	if (phi[i]*phi[j]<0){
+		   			        onls = true;
+		   			        break;
+		   			    };
+		   			 }
+		   		    if (onls==true) break;
+		   		}
+		   		if (onls==true){
+		   		 	//	reference object id
+		   			ReferenceObjectID roid = elem->reference_object_id();
+
+		   			//	memory for shapes
+		   			std::vector<number> vShape;
+
+		   			//    get domain of grid function
+		   			const domain_type& domain = *m_phi->domain().get();
+
+		   			//    get position accessor
+		   			typedef typename domain_type::position_accessor_type position_accessor_type;
+		   			const position_accessor_type& posAcc = domain.position_accessor();
+
+		   			position_accessor_type aaPos = m_phi->domain()->position_accessor();
+
+		   			//    coord and vertex array
+		   			MathVector<dim> coCoord[domain_traits<dim>::MaxNumVerticesOfElem];
+		   	        VertexBase* vVrt[domain_traits<dim>::MaxNumVerticesOfElem];
+		   			elem_type* evaluationElem;
+		   			MathVector<dim> surftensSource[max_number_of_ips];
+		   			for (size_t i=0;i<nip;i++){
+		   				surftensSource[i]=0;
+		   			}
+		   			if (onfinestlevel==true){
+		   				evaluationElem = element;
+		   			} else {
+		   				// compute barycenter
+		   				MathVector<dim> coarseElementBary;
+		   				computeElemBarycenter<elem_type,position_accessor_type,dim>(coarseElementBary,element,aaPos);
+		   				// collect child elements
+		   				std::vector<elem_type*> childElems;
+		   				collect_finest_level_children<elem_type,grid_type>(childElems,element,m_grid);
+		   				evaluationElem = childElems[0];
+		   				number dist=1e+9;
+		   				for (size_t ce=0;ce<childElems.size();ce++){
+		   					MathVector<dim> bary;
+		   					elem_type* currentElem = childElems[ce];
+		   					size_t elnoc = currentElem->num_vertices();
+		   					bool currentElemOnLS=false;
+		   					std::vector<number> currentPhi(elnoc);
+		   					for (size_t j=0;j<elnoc;j++){
+		   						m_phi->multi_indices(currentElem->vertex(j),0,ind);
+		   						currentPhi[j]=DoFRef(*m_phi,ind[0]);
+		   					}
+		   					for (size_t i=0;i<numVertices;i++){
+		   						if (currentPhi[i]==0){
+		   						    continue;
+		   						};
+		   						for (size_t j=i+1;j<numVertices;j++){
+		   							  if (currentPhi[i]*currentPhi[j]<0){
+		   								  currentElemOnLS = true;
+		   							      break;
+		   							  }
+					   			}
+		   						if (currentElemOnLS==true) break;
+					   		}
+		   					if (currentElemOnLS==false) continue;
+		   					computeElemBarycenter<elem_type,position_accessor_type,dim>(bary,currentElem,aaPos);
+		   					number localdist  = VecDistance(bary,coarseElementBary);
+		   					if (localdist<dist){
+		   						dist = localdist;
+		   						evaluationElem = childElems[ce];
+		   					}
+		   				}
+		   			}
+		   			m_phi->multi_indices(evaluationElem,1, ind);
+		   			// evaluate curvature
+		   			number element_curvature=DoFRef(*m_phi, ind[0]);
+		   			// scale with surface tension factor
+		   			element_curvature*=m_sigma;
+		   			DimCRFVGeometry<dim> geo;
+		   			const size_t eeNumVertices = evaluationElem->num_vertices();
+		   			for(size_t i = 0; i < eeNumVertices; ++i){
+		   				vVrt[i] = evaluationElem->vertex(i);
+		   				coCoord[i] = posAcc[vVrt[i]];
+		   			};
+		   			// evaluate finite volume geometry
+		   			geo.update(elem, &(coCoord[0]), domain.subset_handler().get());
+		   			std::vector<number> phiSideValue(geo.num_sh());
+		   			// compute interpolated lsf values in cr dofs
+		   			for (size_t i=0;i<geo.num_scv();i++){
+		   			     // compute lsf value in ip (from Lagrange-1 shape function) and set value according to position (inside or outside)
+		   			     const LocalShapeFunctionSet<dim>& rTrialSpace =
+		   			 		LocalShapeFunctionSetProvider::get<dim>(roid, LFEID(LFEID::LAGRANGE, 1));
+
+		   			     //  evaluate shapes at ip
+		   				 rTrialSpace.shapes(vShape, geo.scv(i).local_ip());
+
+		   				 //    get multiindices of element
+		   				 std::vector<MultiIndex<2> > ind;
+		   				 m_phi->multi_indices(elem, 0, ind);
+
+		   				 //     compute lsf at integration point
+		   				 phiSideValue[i] = 0.0;
+		   				 for(size_t sh = 0; sh < vShape.size(); ++sh)
+		   				 {
+		   					 phiSideValue[i] += phi[sh] * vShape[sh];
+		   				 }
+		   			}
+		   			size_t nscvf = geo.num_scvf();
+		   			for (size_t ip=0;ip<nscvf;ip++){
+		   				const typename DimCRFVGeometry<dim>::SCVF& scvf = geo.scvf(ip);
+		   				number phiFrom = phiSideValue[scvf.from()];
+		   				number phiTo = phiSideValue[scvf.to()];
+		   				if (phiTo>0)   for (int d=0;d<dim;d++) surftensSource[scvf.from()][d] -= scvf.normal()[d] * element_curvature;
+		   				if (phiFrom>0) for (int d=0;d<dim;d++) surftensSource[scvf.to()][d] += scvf.normal()[d] * element_curvature;
+		   			}
+		   			for (size_t i=0;i<nip;i++){
+		   				surftensSource[i]/=geo.scv(i).volume();
+		   				vValue[i] += surftensSource[i];
+		   			}
+		   		}
+		   	   if (m_gravitational_constant!=0){
+		   		 number densityValue[max_number_of_ips];
+		   		 (*m_imDensity)(densityValue,
+		   				   		                                vGlobIP,
+		   				   		                                time, si,
+		   				   		                                u,
+		   				   		                                elem,
+		   				   		                                vCornerCoords,
+		   				   		                                vLocIP,
+		   				   		                                nip,
+		   				   		                                vJT);
+		   		 for (int d=0;d<dim;d++){
+		   		     for (size_t i=0;i<nip;i++){
+		   				vValue[i][d] += m_gravitational_constant * densityValue[i];
+		   		     }
+		   		 };
+		   	   }
+	   	    }; // evaluate
+
+		void update(){}
+
+		private:
+			static const size_t max_number_of_ips = 20;
+};
 
 
 }; // end namespace levelset

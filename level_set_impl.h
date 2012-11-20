@@ -691,6 +691,15 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 	for (int si=0;si<u.num_subsets();++si){
 		ElemIterator iter = u.template begin<ElemType>(si);
 		ElemIterator iterEnd = u.template end<ElemType>(si);
+		if (u.num_fct(si)<2){
+			UG_THROW("No curvature component in approximation space.");
+		}
+		if (u.local_finite_element_id(0) != LFEID(LFEID::LAGRANGE, 1)){
+			UG_THROW("First component in approximation space must be of Lagrange 1 type.");
+		}
+		if (u.local_finite_element_id(1) != LFEID(LFEID::PIECEWISE_CONSTANT,0)){
+			UG_THROW("Second component in approximation space must be of piecewise constant type.");
+		}
 		std::vector<MathVector<dim> > coord;
 		std::vector<number> phi;
 		std::vector<VertexBase*> nbrs;
@@ -712,7 +721,6 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 		//debug		UG_LOG("noc = " << noc << "\n");
 		for (size_t i=0;i<noc;i++){
 			nbrs[i]=elem->vertex(i);
-//debug			UG_LOG("*" << i << " " << aaPos[nbrs[i]] << "\n");
 			u.inner_multi_indices(nbrs[i], 0, ind);
 			phi[i] = BlockRef(u[ind[0][0]],ind[0][1]);
 			if (nonzerophifound==false){
@@ -771,6 +779,8 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 		};
 		number kappa;
 		computeElementCurvature2d(kappa,noc,coord,phi,order);
+		u.multi_indices(elem,1,ind);
+		DoFRef(u,ind[0]) = kappa;
 		if (abs(kappa+exactcurv)>maxnormerr){
 			maxnormerr =abs(kappa+exactcurv);
 		}
