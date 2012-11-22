@@ -685,7 +685,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 	const position_accessor_type& aaPos = u.domain()->position_accessor();
 	std::vector<MultiIndex<2> > ind;
 	size_t order=3;
-	number exactcurv = 1.0/0.3;
+	number exactcurv = 1.0/0.2;
 	number maxnormerr = 0;
 	//	loop elements of dimension
 	for (int si=0;si<u.num_subsets();++si){
@@ -1114,7 +1114,7 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 			   // UG_LOG("co " << co << "\n");
 				for (int j=0;j<dim;j++){
 				    ipVelocity[ip][j] += scvf.shape(co)*coVelocity[co][j];
-				    //UG_LOG("ip " << ip << " shape " << co << "[" << j << "]=" << scvf.shape(co) << " co velocity " << j << "=" << coVelocity[co][j]<<"\n");
+				    // UG_LOG("ip " << ip << " shape " << co << "[" << j << "]=" << scvf.shape(co) << " co velocity " << j << "=" << coVelocity[co][j]<<"\n");
 				};
 			};
 		}

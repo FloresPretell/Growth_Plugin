@@ -723,6 +723,23 @@ class CRTwoPhaseSource
 		   			 }
 		   		    if (onls==true) break;
 		   		}
+		   		if (m_gravitational_constant!=0){
+		   			 	 	 number densityValue[max_number_of_ips];
+		   			   		 (*m_imDensity)(densityValue,
+		   			   				   		                                vGlobIP,
+		   			   				   		                                time, si,
+		   			   				   		                                u,
+		   			   				   		                                elem,
+		   			   				   		                                vCornerCoords,
+		   			   				   		                                vLocIP,
+		   			   				   		                                nip,
+		   			   				   		                                vJT);
+		   		   	for (int d=0;d<dim;d++){
+		   		   	     for (size_t i=0;i<nip;i++){
+		   		   				vValue[i][d] += m_gravitational_constant * densityValue[i];
+		   			     }
+		   			};
+		   		}
 		   		if (onls==true){
 		   		 	//	reference object id
 		   			ReferenceObjectID roid = elem->reference_object_id();
@@ -828,33 +845,17 @@ class CRTwoPhaseSource
 		   				const typename DimCRFVGeometry<dim>::SCVF& scvf = geo.scvf(ip);
 		   				number phiFrom = phiSideValue[scvf.from()];
 		   				number phiTo = phiSideValue[scvf.to()];
-		   				if (phiTo>0)   for (int d=0;d<dim;d++) surftensSource[scvf.from()][d] -= scvf.normal()[d] * element_curvature;
-		   				if (phiFrom>0) for (int d=0;d<dim;d++) surftensSource[scvf.to()][d] += scvf.normal()[d] * element_curvature;
+		   				if (phiFrom<0)   for (int d=0;d<dim;d++) surftensSource[scvf.from()][d] += scvf.normal()[d] * element_curvature;
+		   				if (phiTo<0) for (int d=0;d<dim;d++) surftensSource[scvf.to()][d] -= scvf.normal()[d] * element_curvature;
 		   			}
-		   			for (size_t i=0;i<nip;i++){
+		   			for (size_t i=0;i<geo.num_scv();i++){
 		   				surftensSource[i]/=geo.scv(i).volume();
 		   				vValue[i] += surftensSource[i];
 		   			}
 		   		}
-		   	   if (m_gravitational_constant!=0){
-		   		 number densityValue[max_number_of_ips];
-		   		 (*m_imDensity)(densityValue,
-		   				   		                                vGlobIP,
-		   				   		                                time, si,
-		   				   		                                u,
-		   				   		                                elem,
-		   				   		                                vCornerCoords,
-		   				   		                                vLocIP,
-		   				   		                                nip,
-		   				   		                                vJT);
-		   		 for (int d=0;d<dim;d++){
-		   		     for (size_t i=0;i<nip;i++){
-		   				vValue[i][d] += m_gravitational_constant * densityValue[i];
-		   		     }
-		   		 };
-		   	   }
-		   	   	   	   	   //for (size_t i=0;i<nip;i++)
-		   	   	   	   	   //UG_LOG(vValue[i] << "\n");
+/*		   	   	for (size_t i=0;i<nip;i++){
+		   	   	   UG_LOG(vGlobIP[i] << "  " << vValue[i] << "\n");
+		   	   	};*/
 	   	    }; // evaluate
 
 		void update(){}
