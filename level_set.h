@@ -90,6 +90,7 @@ class FV1LevelSetDisc
 		    m_source_type(HardcodedData),
 		    m_velocity_type(HardcodedData),
       	    m_dirichlet_data_type(HardcodedData),
+      	    m_exactcurvatureknown(false),
       	    m_interpolate_v_in_ip(true),
       	    m_inside_elements_si(2),
       	  	m_outside_elements_si(3),
@@ -311,6 +312,7 @@ class FV1LevelSetDisc
 	    bool m_externalVelocity;
 		bool m_analyticalSource;
     	bool m_divFree;
+    	bool m_exactcurvatureknown;
      	size_t m_nrOfSteps;
 		number m_maxCFL;
 		bool m_print;

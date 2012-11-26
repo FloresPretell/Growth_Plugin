@@ -172,9 +172,9 @@ bool FV1LevelSetDisc<TGridFunction>::compute_normal(TGridFunction& vx,TGridFunct
 	};
     // SetAttachmentValues(aaGradient, grid.vertices_begin(), grid.vertices_end(), 0); for debug set gradient to 0
 	for (int si=0;si<u.num_subsets();++si){
-	    if (m_dirichlet_sg.num_subsets()!=0) if (m_dirichlet_sg.contains(si)==true) continue;
-	    if (m_neumann_sg.num_subsets()!=0) if (m_neumann_sg.contains(si)==true) continue;
-	    if (m_inactive_sg.num_subsets()!=0) if (m_inactive_sg.contains(si)==true) continue;
+	    if (m_dirichlet_sg.size()!=0) if (m_dirichlet_sg.contains(si)==true) continue;
+	    if (m_neumann_sg.size()!=0) if (m_neumann_sg.contains(si)==true) continue;
+	    if (m_inactive_sg.size()!=0) if (m_inactive_sg.contains(si)==true) continue;
         VertexBaseConstIterator iter = u.template begin<VertexBase>(si);
 		VertexBaseConstIterator iterEnd = u.template end<VertexBase>(si);
 		for (;iter != iterEnd; ++iter){
@@ -645,7 +645,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d(number& kappa,siz
         if (order==3)
             phival = coeffs[0]+coeffs[1]*sol[0]+coeffs[2]*sol[1]+coeffs[3]*sol[0]*sol[0]+coeffs[4]*sol[0]*sol[1]+coeffs[5]*sol[1]*sol[1]
 					+coeffs[6]*sol[0]*sol[0]*sol[0]+coeffs[7]*sol[0]*sol[0]*sol[1]+coeffs[8]*sol[0]*sol[1]*sol[1]+coeffs[9]*sol[1]*sol[1]*sol[1];
-        if (abs(phival)<1e-13) break;
+        if (abs(phival)<1e-12) break;
         phigamma = coeffs[1]*b+coeffs[2]*d+2*coeffs[3]*sol[0]*b+coeffs[4]*b*sol[1]+coeffs[4]*sol[0]*d+2*coeffs[5]*sol[1]*d+3*coeffs[6]*sol[0]*sol[0]*b
 					+2*coeffs[7]*sol[0]*sol[1]*b+coeffs[7]*sol[0]*sol[0]*d+coeffs[8]*b*sol[1]*sol[1]+2*coeffs[8]*sol[0]*sol[1]*d+3*coeffs[9]*sol[1]*sol[1]*d;
         itgamma -= phival/phigamma;
@@ -704,7 +704,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 		std::vector<number> phi;
 		std::vector<VertexBase*> nbrs;
 		std::vector<VertexBase*> nbrCandidates;
-		size_t depth=order-1;
+		size_t depth=order;
 		std::vector<size_t> stageStart(depth+2);
 	for(  ;iter !=iterEnd; ++iter)
 	{
@@ -781,14 +781,15 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 		computeElementCurvature2d(kappa,noc,coord,phi,order);
 		u.multi_indices(elem,1,ind);
 		DoFRef(u,ind[0]) = kappa;
-		if (abs(kappa+exactcurv)>maxnormerr){
-			maxnormerr =abs(kappa+exactcurv);
-		}
+		if (m_exactcurvatureknown==true)
+			if (abs(kappa+exactcurv)>maxnormerr){
+				maxnormerr =abs(kappa+exactcurv);
+			}
 		//u.inner_multi_indices(elem, 1, ind);
 		//DoFRef(u,ind[1]) = kappa;
 	};
 	};
-	UG_LOG("curvature maximum error " << maxnormerr << "\n");
+	if (m_exactcurvatureknown==true) UG_LOG("curvature maximum error " << maxnormerr << "\n");
 	return true;
 };
 
@@ -1347,9 +1348,9 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaVol& aaVolume)
 	//	sum up all contributions of the sub control volumes to one vertex in an attachment
 		for(int si = 0; si < domain.subset_handler()->num_subsets(); ++si)
 		{
-	        if (m_dirichlet_sg.num_subsets()!=0) if (m_dirichlet_sg.contains(si)==true) continue;
-	        if (m_neumann_sg.num_subsets()!=0) if (m_neumann_sg.contains(si)==true) continue;
-	        if (m_inactive_sg.num_subsets()!=0) if (m_inactive_sg.contains(si)==true) continue;
+	        if (m_dirichlet_sg.size()!=0) if (m_dirichlet_sg.contains(si)==true) continue;
+	        if (m_neumann_sg.size()!=0) if (m_neumann_sg.contains(si)==true) continue;
+	        if (m_inactive_sg.size()!=0) if (m_inactive_sg.contains(si)==true) continue;
 		//	get iterators
 			ElemIterator iter = u.template begin<ElemType>(si);
 			ElemIterator iterEnd = u.template end<ElemType>(si);
@@ -1505,9 +1506,9 @@ template<typename TGridFunction>
 		//	sum up all contributions of the sub control volumes to one vertex in an attachment
 		for(int si = 0; si < domain.subset_handler()->num_subsets(); ++si)
 		{
-	        if (m_dirichlet_sg.num_subsets()!=0) if (m_dirichlet_sg.contains(si)==true) continue;
-	        if (m_neumann_sg.num_subsets()!=0) if (m_neumann_sg.contains(si)==true) continue;
-	        if (m_inactive_sg.num_subsets()!=0) if (m_inactive_sg.contains(si)==true) continue;
+	        if (m_dirichlet_sg.size()!=0) if (m_dirichlet_sg.contains(si)==true) continue;
+	        if (m_neumann_sg.size()!=0) if (m_neumann_sg.contains(si)==true) continue;
+	        if (m_inactive_sg.size()!=0) if (m_inactive_sg.contains(si)==true) continue;
 			//	get iterators
 			ElemIterator iter = u.template begin<ElemType>(si);
 			ElemIterator iterEnd = u.template end<ElemType>(si);
@@ -1657,7 +1658,7 @@ bool FV1LevelSetDisc<TGridFunction>::assign_dirichlet(TGridFunction& numsol){
 	//	UG_LOG("nr dir ss" << m_dirichlet_sg.num_subsets() << "\n");
 
 		typedef typename TGridFunction::template traits<VertexBase>::const_iterator VertexBaseConstIterator;
-		for(size_t i = 0; i < m_dirichlet_sg.num_subsets(); ++i)
+		for(size_t i = 0; i < m_dirichlet_sg.size(); ++i)
 		{
 	        const int si = m_dirichlet_sg[i];
 	        // UG_LOG("Dirichlet boundary is: "<<si<< "\n");
@@ -1991,8 +1992,8 @@ bool FV1LevelSetDisc<TGridFunction>::update_ls_subsets(TGridFunction& phi){
 	m_inactive_sg.set_subset_handler(domain.subset_handler());
     for (int si=0;si<domain.subset_handler()->num_subsets();++si){
     	UG_LOG("******************* si " << si << " **********************\n");
-		if (m_dirichlet_sg.num_subsets()!=0) if (m_dirichlet_sg.contains(si)==true) continue;
-        if (m_neumann_sg.num_subsets()!=0) if (m_neumann_sg.contains(si)==true) continue;
+		if (m_dirichlet_sg.size()!=0) if (m_dirichlet_sg.contains(si)==true) continue;
+        if (m_neumann_sg.size()!=0) if (m_neumann_sg.contains(si)==true) continue;
 		ElemIterator iter = phi.template begin<ElemType>(si);
      	ElemIterator iterEnd = phi.template end<ElemType>(si);
      	//	loop elements of dimension
@@ -2037,8 +2038,8 @@ bool FV1LevelSetDisc<TGridFunction>::update_ls_subsets(TGridFunction& phi){
 			for (int i=0;i<noc;i++){
 				if (phiCo[i]==0){
     			    int oldindex = domain.subset_handler()->get_subset_index(vVrt[i]);
-	            	if (m_dirichlet_sg.num_subsets()!=0) if (m_dirichlet_sg.contains(oldindex)==true) continue;
-		            if (m_neumann_sg.num_subsets()!=0) if (m_neumann_sg.contains(oldindex)==true) continue;
+	            	if (m_dirichlet_sg.size()!=0) if (m_dirichlet_sg.contains(oldindex)==true) continue;
+		            if (m_neumann_sg.size()!=0) if (m_neumann_sg.contains(oldindex)==true) continue;
                     domain.subset_handler()->assign_subset(vVrt[i],m_onls_nodes_si);
  				};
 			};
@@ -2071,8 +2072,8 @@ bool FV1LevelSetDisc<TGridFunction>::update_ls_subsets(TGridFunction& phi){
 			    //UG_LOG("// nr of subsets: " << phi.num_subsets() << " " << m_onls_elements_si << "\n");
 			    for (int i=0;i<noc;i++){
    					int oldindex = domain.subset_handler()->get_subset_index(vVrt[i]);
-	    		    if (m_dirichlet_sg.num_subsets()!=0) if (m_dirichlet_sg.contains(oldindex)==true) continue;
-       	            if (m_neumann_sg.num_subsets()!=0) if (m_neumann_sg.contains(oldindex)==true) continue;
+	    		    if (m_dirichlet_sg.size()!=0) if (m_dirichlet_sg.contains(oldindex)==true) continue;
+       	            if (m_neumann_sg.size()!=0) if (m_neumann_sg.contains(oldindex)==true) continue;
 				    if (phiCo[i]<0){
 					    domain.subset_handler()->assign_subset(vVrt[i],m_inside_nodes_si);
 					    UG_LOG("node is inside \n");
@@ -2218,9 +2219,9 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 	    // UG_LOG("num_subsets: " << uOld.num_subsets() << "\n");
 	    for (int si=0;si<uOld.num_subsets();++si){
 	        //UG_LOG("si " << si << "\n");
-	        if (m_dirichlet_sg.num_subsets()!=0) if (m_dirichlet_sg.contains(si)==true) continue;
-	        if (m_neumann_sg.num_subsets()!=0) if (m_neumann_sg.contains(si)==true) continue;
-	        if (m_inactive_sg.num_subsets()!=0) if (m_inactive_sg.contains(si)==true) continue;
+	        if (m_dirichlet_sg.size()!=0) if (m_dirichlet_sg.contains(si)==true) continue;
+	        if (m_neumann_sg.size()!=0) if (m_neumann_sg.contains(si)==true) continue;
+	        if (m_inactive_sg.size()!=0) if (m_inactive_sg.contains(si)==true) continue;
 	        //UG_LOG("... \n");
 		    //UG_LOG("***************************************************\n");
 	        //UG_LOG("***********************" << si << "**************************\n");
@@ -2234,7 +2235,7 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 		    // flag given neumann bnd subsets at the geometry, such that the
 		    //	geometry produces boundaryfaces (BF) for all sides of the
 		    //	element, that is in one of the subsets
-		    for(size_t i = 0; i < m_neumann_sg.num_subsets(); ++i)
+		    for(size_t i = 0; i < m_neumann_sg.size(); ++i)
 		    {
 		        const int bndSi = m_neumann_sg[i];
 //		        UG_LOG("Neumann boundary is: "<<bndSi<< "\n");
@@ -2254,8 +2255,8 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 	    };
 		typedef typename TGridFunction::template traits<VertexBase>::const_iterator VertexBaseConstIterator;
 		for (int si=0;si<uOld.num_subsets();++si){
-			if (m_dirichlet_sg.num_subsets()!=0) if (m_dirichlet_sg.contains(si)==true) continue;
-			if (m_inactive_sg.num_subsets()!=0) if (m_inactive_sg.contains(si)==true) continue;
+			if (m_dirichlet_sg.size()!=0) if (m_dirichlet_sg.contains(si)==true) continue;
+			if (m_inactive_sg.size()!=0) if (m_inactive_sg.contains(si)==true) continue;
 			std::vector<number> sourceValue(1);
 			MathVector<dim>* sourceCo;
 			for(VertexBaseConstIterator iter = uNew.template begin<VertexBase>(si);
@@ -2272,7 +2273,7 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 	    m_timestep_nr++;
 	    assign_dirichlet(uNew);
 	    // overwrite inactive nodes with old solution
-	    for(size_t i = 0; i < m_inactive_sg.num_subsets(); ++i)
+	    for(size_t i = 0; i < m_inactive_sg.size(); ++i)
 	    {
 	    	 const int si = m_inactive_sg[i];
 	    	 UG_LOG("inactive si: " << si << "\n");
