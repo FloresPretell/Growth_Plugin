@@ -650,7 +650,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d(number& kappa,siz
 					+2*coeffs[7]*sol[0]*sol[1]*b+coeffs[7]*sol[0]*sol[0]*d+coeffs[8]*b*sol[1]*sol[1]+2*coeffs[8]*sol[0]*sol[1]*d+3*coeffs[9]*sol[1]*sol[1]*d;
         itgamma -= phival/phigamma;
     };
-    if (nrofiterations==50){
+    if (nrofiterations==80){
         UG_THROW("Diverging Newton method in curvature computation (error=" << phival << ")\n");
         return false;
     };
@@ -670,6 +670,8 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d(number& kappa,siz
     };
     number t = sqrt(dxphi*dxphi+dyphi*dyphi);
     kappa = - (dyyphi * dxphi * dxphi - 2 * dxyphi * dxphi * dyphi + dxxphi * dyphi * dyphi) / (t * t * t);
+//	kappa = -3.333333333333333333333333333333333333333;
+//	kappa = -5;
     //debugUG_THROW("Grid Level Type not in ['top' | 'surf'].");
     return true;
 }
@@ -685,7 +687,6 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 	const position_accessor_type& aaPos = u.domain()->position_accessor();
 	std::vector<MultiIndex<2> > ind;
 	size_t order=3;
-	number exactcurv = 1.0/0.2;
 	number maxnormerr = 0;
 	//	loop elements of dimension
 	for (int si=0;si<u.num_subsets();++si){
@@ -782,8 +783,8 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 		u.multi_indices(elem,1,ind);
 		DoFRef(u,ind[0]) = kappa;
 		if (m_exactcurvatureknown==true)
-			if (abs(kappa+exactcurv)>maxnormerr){
-				maxnormerr =abs(kappa+exactcurv);
+			if (abs(kappa+m_exactcurv)>maxnormerr){
+				maxnormerr =abs(kappa+m_exactcurv);
 			}
 		//u.inner_multi_indices(elem, 1, ind);
 		//DoFRef(u,ind[1]) = kappa;

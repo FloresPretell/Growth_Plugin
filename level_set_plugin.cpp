@@ -125,7 +125,8 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.add_method("overwrite",static_cast<bool (T::*)(function_type&,function_type&,function_type&,int)>(&T::overwrite))
 			.add_method("overwrite",static_cast<bool (T::*)(function_type&,number,function_type&,int)>(&T::overwrite))
 			.add_method("compute_error", &T::compute_error)
-			.add_method("compute_curvature", &T::computeElementCurvatureOnGrid2d);
+			.add_method("compute_curvature", &T::computeElementCurvatureOnGrid2d)
+			.add_method("exact_curvature", static_cast<void (T::*)(number)>(&T::exact_curvature), "", "Exact curvature");
 		reg.add_class_to_group(name, "FV1LevelSetDisc", tag);
 	}
 
@@ -152,7 +153,34 @@ static void DomainAlgebra(Registry& reg, string grp)
 		reg.add_class_to_group(name, "LevelSetUserData", tag);
 	}
 
-	// level set user data
+	// level set user vector data
+	{
+			string name = string("LevelSetUserVectorData").append(suffix);
+			typedef LevelSetUserVectorData<function_type> T;
+			typedef UserData<MathVector<dim>, dim> TBase;
+			typedef INewtonUpdate TBase2;
+			reg.add_class_<T, TBase,TBase2>(name, grp)
+				.template add_constructor<void (*)(SmartPtr<ApproximationSpace<TDomain> >,SmartPtr<function_type>)>("Approximation space, grid function")
+				.add_method("set_inside", static_cast<void (T::*)(SmartPtr<UserData<MathVector<dim>, dim> >)>(&T::set_inside_data), "", "Source")
+				.add_method("set_inside", static_cast<void (T::*)(number)>(&T::set_inside_data), "", "F_x")
+				.add_method("set_inside", static_cast<void (T::*)(number,number)>(&T::set_inside_data), "", "F_x, F_y")
+				.add_method("set_inside", static_cast<void (T::*)(number,number,number)>(&T::set_inside_data), "", "F_x, F_y, F_z")
+			#ifdef UG_FOR_LUA
+				.add_method("set_inside", static_cast<void (T::*)(const char*)>(&T::set_inside_data), "", "Source Vector")
+			#endif
+				.add_method("set_outside", static_cast<void (T::*)(SmartPtr<UserData<MathVector<dim>, dim> >)>(&T::set_outside_data), "", "Source")
+				.add_method("set_outside", static_cast<void (T::*)(number)>(&T::set_outside_data), "", "F_x")
+				.add_method("set_outside", static_cast<void (T::*)(number,number)>(&T::set_outside_data), "", "F_x, F_y")
+				.add_method("set_outside", static_cast<void (T::*)(number,number,number)>(&T::set_outside_data), "", "F_x, F_y, F_z")
+			#ifdef UG_FOR_LUA
+				.add_method("set_outside", static_cast<void (T::*)(const char*)>(&T::set_outside_data), "", "Source Vector")
+			#endif
+				.add_method("set_eval_type", static_cast<void (T::*)(int)>(&T::set_eval_type), "", "Evaluation type")
+			.set_construct_as_smart_pointer(true);
+			reg.add_class_to_group(name, "LevelSetUserVectorData", tag);
+		}
+
+	// two phase flow source data
 		{
 			string name = string("CRTwoPhaseSource").append(suffix);
 			typedef CRTwoPhaseSource<function_type> T;

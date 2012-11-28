@@ -90,7 +90,6 @@ class FV1LevelSetDisc
 		    m_source_type(HardcodedData),
 		    m_velocity_type(HardcodedData),
       	    m_dirichlet_data_type(HardcodedData),
-      	    m_exactcurvatureknown(false),
       	    m_interpolate_v_in_ip(true),
       	    m_inside_elements_si(2),
       	  	m_outside_elements_si(3),
@@ -98,7 +97,10 @@ class FV1LevelSetDisc
       	  	m_inside_nodes_si(5),
       	  	m_outside_nodes_si(6),
       	  	m_onls_nodes_si(7)
-      	{ set_source(0.0); }
+      	{
+     		m_exactcurvatureknown=false;
+     		set_source(0.0);
+      	}
 
         void set_dt(number deltaT){ UG_LOG("Set dt="<<deltaT<<"\n"); m_dt=deltaT; };
 
@@ -212,6 +214,11 @@ class FV1LevelSetDisc
 			return true;
 		}
 
+	   void exact_curvature(number kappa){
+		   m_exactcurvatureknown = true;
+		   m_exactcurv = kappa;
+	   }
+
 /// subset handling methods:
 
 	   bool init_ls_subsets(TGridFunction& phi);
@@ -316,6 +323,7 @@ class FV1LevelSetDisc
      	size_t m_nrOfSteps;
 		number m_maxCFL;
 		bool m_print;
+		number m_exactcurv;
 		size_t m_timestep_nr;
 		size_t m_limiter;
 		SubsetGroup m_neumann_sg;
