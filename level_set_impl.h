@@ -409,7 +409,9 @@ bool solveLS(const std::vector<number>& matField,/* matrix given as field */
 				max=abs(A[k][i]);
 			};
 		};
-		if (max<1e-15){
+		//debug
+		//UG_LOG(max << "\n");
+		if (max<1e-14){
 			// A nicht invertierbar
 			// printf(".\n");
 		    return false;
@@ -569,7 +571,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d(number& kappa,siz
     if (order==3) criticalnofinterp=7;
     size_t nrOfInterPoints=0;
     std::vector<number> mat;
-    size_t vlength=0.5*(order+1)*(order+2);
+    size_t vlength=(size_t)round(0.5*(order+1)*(order+2));
     mat.resize(vlength*vlength);
 	std::vector<number> interphi;
 	std::vector<number> coeffs;
@@ -603,6 +605,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d(number& kappa,siz
                 continue;
             };
         };
+        //debugUG_LOG("co(" << nrOfInterPoints+1 << ",:)=[" << co[i][0] << "," << co[i][1] << "];" << " phi(" << nrOfInterPoints+1 << ")=" << phi[i] << ";\n");
         nrOfInterPoints++;
 		if (nrOfInterPoints==vlength) break;
     };
@@ -670,8 +673,9 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d(number& kappa,siz
     };
     number t = sqrt(dxphi*dxphi+dyphi*dyphi);
     kappa = - (dyyphi * dxphi * dxphi - 2 * dxyphi * dxphi * dyphi + dxxphi * dyphi * dyphi) / (t * t * t);
-//	kappa = -3.333333333333333333333333333333333333333;
-//	kappa = -5;
+//  UG_LOG("kappa=" << kappa << "\n");
+//	kappa = -3.333333333333333333333333333333333333333;// for debug
+//	kappa = -5;// for debug
     //debugUG_THROW("Grid Level Type not in ['top' | 'surf'].");
     return true;
 }
@@ -773,10 +777,12 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 			//debug			UG_LOG(i << "\n");
 //			UG_LOG("--- " << aaPos[nbrs[i]] << "\n");
 			coord[i] = aaPos[nbrs[i]];
-			//debugUG_LOG("co[i]" << coord[i] << "\n");
+			//debugUG_LOG("co0(" << i+1 << ",:)=[" << coord[i][0] << "," << coord[i][1] << "];\n");
 			if (i<noc) continue;
 			u.inner_multi_indices(nbrs[i], 0, ind);
 			phi[i] = DoFRef(u,ind[0]);
+			//debug
+//			UG_LOG("phi[i]=" << phi[i] << "\n");
 		};
 		number kappa;
 		computeElementCurvature2d(kappa,noc,coord,phi,order);
