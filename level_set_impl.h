@@ -372,9 +372,9 @@ bool multMatVec(const std::vector<number>& avec, const std::vector<number>& b,st
 * Remark: historic document because it was computed as exercise for
 * "Algorithmische Optimierung I", WS 04/05
 */
-bool solveLS(const std::vector<number>& matField,/* matrix given as field */
-            const std::vector<number>& b, /* rhs */
-			std::vector<number>& x){
+bool solveLS(std::vector<number>& x,/* solution */
+		const std::vector<number>& matField,/* matrix given as field */
+            const std::vector<number>& b /* rhs */){
 	size_t n=b.size();
 	number P[n][n];
     std::vector<number> Pvec(n*n);
@@ -492,6 +492,35 @@ bool solveLS(const std::vector<number>& matField,/* matrix given as field */
 	return true;
 };
 
+
+template<size_t n>
+bool solveLS(MathVector<n>& x,const MathMatrix<n,n>& M,const MathVector<n>& b){
+	std::vector<number> xvec(n);
+	std::vector<number> bvec(n);
+	std::vector<number> Mvec(n*n);
+	for (size_t i=0;i<n;i++){
+		bvec[i]=b[i];
+		for (size_t j=0;j<n;j++){
+			Mvec[n*i+j] = M[i][j];
+		};
+	}
+	if (solveLS(xvec,Mvec,bvec)==false) return false;
+	for (size_t i=0;i<n;i++) x[i] = xvec[i];
+	return true;
+}
+
+template<size_t m,size_t n>
+bool leastSquares(MathVector<n>& x,const MathMatrix<m,n>& M,const MathVector<m>& b){
+	if(m<n){
+		UG_THROW("Least squares method not suitable for m x n matrix with m<n.\n");
+	}
+	MathMatrix<n,n> M2;
+	MathVector<n> b2;
+	MatMultiplyMTM(M2,M);
+	TransposedMatVecMult(b2,M,b);
+	return solveLS(x,M2,b2);
+}
+
 /// averages positions by arithmetic mean
 /**
  * Arithmetic Mean of Positions
@@ -565,6 +594,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d(number& kappa,siz
     // sort nodes by distance to base point
     distToBaseP.resize(nOfPoints);
     sortedList.resize(nOfPoints);
+    UG_LOG(nOfPoints << "\n");
     bubblesort(distToBaseP,sortedList);
     size_t criticalnofinterp;
     if (order==2) criticalnofinterp=5;
@@ -600,7 +630,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d(number& kappa,siz
         //debugUG_LOG("------------------------------------------- " << j << "\n");
         if (j>=criticalnofinterp){
         	//debugUG_LOG("********************\n");
-			if (solveLS(mat,interphi,coeffs)==false){
+			if (solveLS(coeffs,mat,interphi)==false){
                 matindex-=vlength;
                 continue;
             };
@@ -797,6 +827,20 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 	};
 	};
 	if (m_exactcurvatureknown==true) UG_LOG("curvature maximum error " << maxnormerr << "\n");
+ /*   MathMatrix<3, 2> M;
+    M[0][0] = 0.1;
+    M[0][1] = 0.2;
+    M[1][0] = -0.3;
+    M[1][1] = -0.7;
+    M[2][0] = 0.8;
+    M[2][1] = -0.5;
+    MathVector<3> b;
+    MathVector<2> x;
+    b[0] = -0.4;
+    b[1] = 0.8;
+    b[2] = 0.3;
+    leastSquares(x,M,b);
+    UG_LOG(x << "\n"); */
 	return true;
 };
 
@@ -1662,7 +1706,7 @@ bool FV1LevelSetDisc<TGridFunction>::assign_dirichlet(TGridFunction& numsol){
 
 	//	UG_LOG("dirichlet\n");
 
-	//	UG_LOG("nr dir ss" << m_dirichlet_sg.num_subsets() << "\n");
+		// UG_LOG("nr dir ss " << m_dirichlet_sg.size() << "\n");
 
 		typedef typename TGridFunction::template traits<VertexBase>::const_iterator VertexBaseConstIterator;
 		for(size_t i = 0; i < m_dirichlet_sg.size(); ++i)
@@ -1687,7 +1731,9 @@ bool FV1LevelSetDisc<TGridFunction>::assign_dirichlet(TGridFunction& numsol){
 
 				(*m_imDirichlet)(&exactVal,&aaPos[vrt],m_time,si,1);
 				BlockRef(numsol[ind[0][0]],ind[0][1]) = exactVal;
-				//UG_LOG("coord " << coord[0] << "," << coord[1] << " <> " << BlockRef(numsol[ind[0][0]],ind[0][1]) << "\n");
+
+				// MathVector<dim> coord = aaPos[vrt];
+				// UG_LOG("coord " << coord[0] << "," << coord[1] << " <> " << BlockRef(numsol[ind[0][0]],ind[0][1]) << "\n");
 
 				//if ((coord[0]==-1)||(coord[0]==1)||(coord[1]==-1)||(coord[1]==1)){
 			    	//BlockRef(numsol[ind[0][0]],ind[0][1]) = exactVal;
@@ -1807,7 +1853,7 @@ bool FV1LevelSetDisc<TGridFunction>::compute_error(TGridFunction& numsol)
 		//	get vector holding all indices on the vertex
 			std::vector<MultiIndex<2> > ind;
 
-			const size_t numInd = numsol.inner_multi_indices(vrt, 0, ind);
+			const size_t numInd = numsol.multi_indices(vrt, 0, ind);
 
 		//	check indices
 			if(numInd != 1) {UG_LOG("ERROR: Wrong number of indices!"); return false;}
