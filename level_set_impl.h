@@ -521,6 +521,32 @@ bool leastSquares(MathVector<n>& x,const MathMatrix<m,n>& M,const MathVector<m>&
 	return solveLS(x,M2,b2);
 }
 
+bool leastSquares(std::vector<number>& x,const std::vector<number>& mField,const std::vector<number>& b){
+	size_t m = b.size();
+	size_t n = x.size();
+	if (mField.size()!=m*n){
+		n = mField.size()/b.size();
+	}
+	std::vector<number> tmmField(n*n);
+	std::vector<number> tmb(n);
+	number z;
+	// compute A^t * A
+	for (size_t i=0;i<n;i++){
+		for (size_t j=i;j<n;j++){
+			z=0;
+			for (size_t k=0;k<m;k++){
+				z+=mField[n*k+i]*mField[n*k+j];
+			}
+			tmmField[j*n+i]=z;
+			if (j!=i) tmmField[i*n+j]=z;
+		}
+		tmb[i]=0;
+		for (size_t k=0;k<m;k++) tmb[i]+= mField[n*k+i]*b[k];
+	}
+	return solveLS(x,tmmField,tmb);
+}
+
+
 /// averages positions by arithmetic mean
 /**
  * Arithmetic Mean of Positions
@@ -582,7 +608,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d(number& kappa,siz
             if (phi[i]*phi[j]<0){
                 interPoints[interpointssize]=co[i];
                 interpointssize++;
-            };
+            }
         }
     }
     AverageCoords(elemBasePoint,interPoints,interpointssize);
@@ -594,7 +620,6 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d(number& kappa,siz
     // sort nodes by distance to base point
     distToBaseP.resize(nOfPoints);
     sortedList.resize(nOfPoints);
-    UG_LOG(nOfPoints << "\n");
     bubblesort(distToBaseP,sortedList);
     size_t criticalnofinterp;
     if (order==2) criticalnofinterp=5;
@@ -710,6 +735,127 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d(number& kappa,siz
     return true;
 }
 
+// computation of curvature
+template<typename TGridFunction>
+bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d2(number& kappa,size_t elementnoc,const std::vector<MathVector<dim> >& co,std::vector<number> phi,size_t order,number nodefactor){
+	if (order<2) return false;
+    std::vector<MathVector<dim> > interPoints;
+    size_t nOfPoints=co.size();
+    interPoints.resize(elementnoc);
+    std::vector<number> distToBaseP(nOfPoints);
+    std::vector<int> sortedList(nOfPoints);
+    MathVector<dim> elemBasePoint;
+    size_t interpointssize = 0;
+    // compute element base point
+    for (size_t i=0;i<elementnoc;i++){
+        if (phi[i]==0){
+            interPoints[interpointssize]=co[i];
+            interpointssize++;
+            continue;
+        };
+        for (size_t j=i+1;j<elementnoc;j++){
+            if (phi[i]*phi[j]<0){
+                interPoints[interpointssize]=co[i];
+                interpointssize++;
+            }
+        }
+    }
+    AverageCoords(elemBasePoint,interPoints,interpointssize);
+    //debugUG_LOG("base point: " << elemBasePoint << "\n");
+    for (size_t i=0;i<nOfPoints;i++){
+        distToBaseP[i]=VecDistance(co[i],elemBasePoint);
+        //debugUG_LOG("dTBp[" << i << "]=" << distToBaseP[i] << "\n");
+    };
+    // sort nodes by distance to base point
+    distToBaseP.resize(nOfPoints);
+    sortedList.resize(nOfPoints);
+    bubblesort(distToBaseP,sortedList);
+    size_t vlength=(size_t)round(0.5*(order+1)*(order+2));
+	size_t nrOfInterPoints = round(vlength*nodefactor);
+	size_t totalNrOfInterpoints = co.size();
+	if (totalNrOfInterpoints<nrOfInterPoints){
+		UG_LOG("Warning: not enough nodes for desired order " << order << " and least squares factor " << nodefactor << ". Needed " << nrOfInterPoints << " nodes, given " << totalNrOfInterpoints << " nodes. Reduce order to " << order-1 << ".\n");
+		return computeElementCurvature2d2(kappa,elementnoc,co,phi,order,nodefactor);
+	};
+	std::vector<number> interM(vlength*nrOfInterPoints);
+	std::vector<number> coeffs(vlength);
+	std::vector<number> interRhs(nrOfInterPoints);
+	size_t matindex = 0;
+    for (size_t j=0;j<nrOfInterPoints;j++){
+        size_t i=sortedList[j];
+		// interpolation rhs
+		interRhs[j] = phi[i];
+		// interpolation matrix
+        for (size_t ii=0;ii<=order;ii++){
+        	for (size_t k=0;k<=ii;k++){
+        		interM[matindex]=std::pow((number)co[i][0],(int)(ii-k))*std::pow((number)co[i][1],(int)k);
+        		matindex++;
+        	};
+        };
+    };
+	if (leastSquares(coeffs,interM,interRhs)==false){
+		UG_LOG("Warning: not enough nodes for desired order " << order << " and least squares factor " << nodefactor << ". Needed " << nrOfInterPoints << " nodes, given " << totalNrOfInterpoints << " nodes. Reduce order to " << order-1 << ".\n");
+		return computeElementCurvature2d2(kappa,elementnoc,co,phi,order,nodefactor);
+	};
+	number dxphi,dyphi,dxxphi,dxyphi,dyyphi;
+	if (order==2){
+        dxphi=coeffs[1]+2*coeffs[3]*elemBasePoint[0]+coeffs[4]*elemBasePoint[1];
+        dyphi=coeffs[2]+coeffs[4]*elemBasePoint[0]+2*coeffs[5]*elemBasePoint[1];
+    };
+    if (order==3){
+		dxphi=coeffs[1]+2*coeffs[3]*elemBasePoint[0]+coeffs[4]*elemBasePoint[1]+3*coeffs[6]*elemBasePoint[0]*elemBasePoint[0]+2*coeffs[7]*elemBasePoint[0]*elemBasePoint[1]+coeffs[8]*elemBasePoint[1]*elemBasePoint[1];
+		dyphi=coeffs[2]+coeffs[4]*elemBasePoint[0]+2*coeffs[5]*elemBasePoint[1]+coeffs[7]*elemBasePoint[0]*elemBasePoint[0]+2*coeffs[8]*elemBasePoint[0]*elemBasePoint[1]+3*coeffs[9]*elemBasePoint[1]*elemBasePoint[1];
+    };
+    number gradnorm=sqrt(dxphi*dxphi+dyphi*dyphi);
+	// characteristic element length
+    number hh= min(VecDistance(co[0],co[1]),VecDistance(co[0],co[2]));
+    number coelemBasePoint[dim];
+    number sol[dim];
+    coelemBasePoint[0] = elemBasePoint[0] + 0.5*hh*dxphi/gradnorm;
+    coelemBasePoint[1] = elemBasePoint[1] + 0.5*hh*dyphi/gradnorm;
+    /* find intersection of line between elemBasePoint and coelemBaseP with zero level set */
+    number itgamma = 0;
+    number phival,phigamma;
+    size_t nrofiterations=0;
+    for (;nrofiterations<50;nrofiterations++){
+        number b = coelemBasePoint[0]-elemBasePoint[0];
+        number d = coelemBasePoint[1]-elemBasePoint[1];
+        sol[0] = elemBasePoint[0]+itgamma*(coelemBasePoint[0]-elemBasePoint[0]);
+        sol[1] = elemBasePoint[1]+itgamma*(coelemBasePoint[1]-elemBasePoint[1]);
+        if (order==2)
+            phival = coeffs[0]+coeffs[1]*sol[0]+coeffs[2]*sol[1]+coeffs[3]*sol[0]*sol[0]+coeffs[4]*sol[0]*sol[1]+coeffs[5]*sol[1]*sol[1];
+        if (order==3)
+            phival = coeffs[0]+coeffs[1]*sol[0]+coeffs[2]*sol[1]+coeffs[3]*sol[0]*sol[0]+coeffs[4]*sol[0]*sol[1]+coeffs[5]*sol[1]*sol[1]
+					+coeffs[6]*sol[0]*sol[0]*sol[0]+coeffs[7]*sol[0]*sol[0]*sol[1]+coeffs[8]*sol[0]*sol[1]*sol[1]+coeffs[9]*sol[1]*sol[1]*sol[1];
+        if (abs(phival)<1e-12) break;
+        phigamma = coeffs[1]*b+coeffs[2]*d+2*coeffs[3]*sol[0]*b+coeffs[4]*b*sol[1]+coeffs[4]*sol[0]*d+2*coeffs[5]*sol[1]*d+3*coeffs[6]*sol[0]*sol[0]*b
+					+2*coeffs[7]*sol[0]*sol[1]*b+coeffs[7]*sol[0]*sol[0]*d+coeffs[8]*b*sol[1]*sol[1]+2*coeffs[8]*sol[0]*sol[1]*d+3*coeffs[9]*sol[1]*sol[1]*d;
+        itgamma -= phival/phigamma;
+    };
+    if (nrofiterations==80){
+        UG_THROW("Diverging Newton method in curvature computation (error=" << phival << ")\n");
+        return false;
+    };
+    if (order==2){
+        dxphi=coeffs[1]+2*coeffs[3]*sol[0]+coeffs[4]*sol[1];
+        dyphi=coeffs[2]+coeffs[4]*sol[0]+2*coeffs[5]*sol[1];
+        dxxphi=2*coeffs[3];
+        dxyphi=coeffs[4];
+        dyyphi=2*coeffs[5];
+    };
+    if (order==3){
+		dxphi=coeffs[1]+2*coeffs[3]*sol[0]+coeffs[4]*sol[1]+3*coeffs[6]*sol[0]*sol[0]+2*coeffs[7]*sol[0]*sol[1]+coeffs[8]*sol[1]*sol[1];
+		dyphi=coeffs[2]+coeffs[4]*sol[0]+2*coeffs[5]*sol[1]+coeffs[7]*sol[0]*sol[0]+2*coeffs[8]*sol[0]*sol[1]+3*coeffs[9]*sol[1]*sol[1];
+        dxxphi=2*coeffs[3]+6*coeffs[6]*sol[0]+2*coeffs[7]*sol[1];
+        dxyphi=coeffs[4]+2*coeffs[7]*sol[0]+2*coeffs[8]*sol[1];
+        dyyphi=2*coeffs[5]+2*coeffs[8]*sol[0]+6*coeffs[9]*sol[1];
+    };
+    number t = sqrt(dxphi*dxphi+dyphi*dyphi);
+    kappa = - (dyyphi * dxphi * dxphi - 2 * dxyphi * dxphi * dyphi + dxxphi * dyphi * dyphi) / (t * t * t);
+    return true;
+}
+
+
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFunction& u){
 	typedef typename TGridFunction::domain_type domain_type;
@@ -815,7 +961,8 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 //			UG_LOG("phi[i]=" << phi[i] << "\n");
 		};
 		number kappa;
-		computeElementCurvature2d(kappa,noc,coord,phi,order);
+//		computeElementCurvature2d(kappa,noc,coord,phi,order);
+		computeElementCurvature2d2(kappa,noc,coord,phi,3,1.5);
 		u.multi_indices(elem,1,ind);
 		DoFRef(u,ind[0]) = kappa;
 		if (m_exactcurvatureknown==true)
@@ -827,7 +974,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 	};
 	};
 	if (m_exactcurvatureknown==true) UG_LOG("curvature maximum error " << maxnormerr << "\n");
- /*   MathMatrix<3, 2> M;
+/*    MathMatrix<3, 2> M;
     M[0][0] = 0.1;
     M[0][1] = 0.2;
     M[1][0] = -0.3;
@@ -840,7 +987,21 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
     b[1] = 0.8;
     b[2] = 0.3;
     leastSquares(x,M,b);
-    UG_LOG(x << "\n"); */
+    UG_LOG(x << "\n");
+    std::vector<number> Mv(6);
+    Mv[0] = 0.1;
+    Mv[1] = 0.2;
+    Mv[2] = -0.3;
+    Mv[3] = -0.7;
+    Mv[4] = 0.8;
+    Mv[5] = -0.5;
+    std::vector<number> bv(3);
+    bv[0]=b[0];
+    bv[1]=b[1];
+    bv[2]=b[2];
+    std::vector<number> xv(2);
+    leastSquares(xv,Mv,bv);
+    UG_LOG(xv[0] << " " << xv[1] << "\n");*/
 	return true;
 };
 
