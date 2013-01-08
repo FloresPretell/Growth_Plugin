@@ -770,12 +770,13 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d2(number& kappa,si
     distToBaseP.resize(nOfPoints);
     sortedList.resize(nOfPoints);
     bubblesort(distToBaseP,sortedList);
+//	for (size_t i=0;i<nOfPoints;i++) sortedList[i]=i;
     size_t vlength=(size_t)round(0.5*(order+1)*(order+2));
 	size_t nrOfInterPoints = round(vlength*nodefactor);
 	size_t totalNrOfInterpoints = co.size();
 	if (totalNrOfInterpoints<nrOfInterPoints){
 		UG_LOG("Warning: not enough nodes for desired order " << order << " and least squares factor " << nodefactor << ". Needed " << nrOfInterPoints << " nodes, given " << totalNrOfInterpoints << " nodes. Reduce order to " << order-1 << ".\n");
-		return computeElementCurvature2d2(kappa,elementnoc,co,phi,order,nodefactor);
+		return computeElementCurvature2d2(kappa,elementnoc,co,phi,order-1,nodefactor);
 	};
 	std::vector<number> interM(vlength*nrOfInterPoints);
 	std::vector<number> coeffs(vlength);
@@ -794,8 +795,16 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d2(number& kappa,si
         };
     };
 	if (leastSquares(coeffs,interM,interRhs)==false){
-		UG_LOG("Warning: not enough nodes for desired order " << order << " and least squares factor " << nodefactor << ". Needed " << nrOfInterPoints << " nodes, given " << totalNrOfInterpoints << " nodes. Reduce order to " << order-1 << ".\n");
-		return computeElementCurvature2d2(kappa,elementnoc,co,phi,order,nodefactor);
+		UG_LOG("Least squares problem had no regular solution. Reduce order to " << order-1 << ".\n");
+/*		for (size_t i=0;i<interM.size();i++){
+			UG_LOG(interM[i] << " ");
+		}
+		UG_LOG("-----------\n");
+		for (size_t i=0;i<nrOfInterPoints;i++){
+			UG_LOG(interRhs[i] << " ");
+		}
+		UG_LOG("\n");*/
+		return computeElementCurvature2d2(kappa,elementnoc,co,phi,order-1,nodefactor);
 	};
 	number dxphi,dyphi,dxxphi,dxyphi,dyyphi;
 	if (order==2){
@@ -857,7 +866,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d2(number& kappa,si
 
 
 template<typename TGridFunction>
-bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFunction& u){
+bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFunction& u,size_t order,number leastSquaresFactor){
 	typedef typename TGridFunction::domain_type domain_type;
 	// get grid
 	typename domain_type::grid_type& grid = *u.domain()->grid();
@@ -866,7 +875,6 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 	typedef typename domain_type::position_accessor_type position_accessor_type;
 	const position_accessor_type& aaPos = u.domain()->position_accessor();
 	std::vector<MultiIndex<2> > ind;
-	size_t order=3;
 	number maxnormerr = 0;
 	//	loop elements of dimension
 	for (int si=0;si<u.num_subsets();++si){
@@ -961,8 +969,8 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 //			UG_LOG("phi[i]=" << phi[i] << "\n");
 		};
 		number kappa;
-//		computeElementCurvature2d(kappa,noc,coord,phi,order);
-		computeElementCurvature2d2(kappa,noc,coord,phi,3,1.5);
+		computeElementCurvature2d(kappa,noc,coord,phi,order);
+//		computeElementCurvature2d2(kappa,noc,coord,phi,order,leastSquaresFactor);
 		u.multi_indices(elem,1,ind);
 		DoFRef(u,ind[0]) = kappa;
 		if (m_exactcurvatureknown==true)
@@ -974,38 +982,144 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 	};
 	};
 	if (m_exactcurvatureknown==true) UG_LOG("curvature maximum error " << maxnormerr << "\n");
-/*    MathMatrix<3, 2> M;
-    M[0][0] = 0.1;
-    M[0][1] = 0.2;
-    M[1][0] = -0.3;
-    M[1][1] = -0.7;
-    M[2][0] = 0.8;
-    M[2][1] = -0.5;
-    MathVector<3> b;
-    MathVector<2> x;
-    b[0] = -0.4;
-    b[1] = 0.8;
-    b[2] = 0.3;
-    leastSquares(x,M,b);
-    UG_LOG(x << "\n");
-    std::vector<number> Mv(6);
-    Mv[0] = 0.1;
-    Mv[1] = 0.2;
-    Mv[2] = -0.3;
-    Mv[3] = -0.7;
-    Mv[4] = 0.8;
-    Mv[5] = -0.5;
-    std::vector<number> bv(3);
-    bv[0]=b[0];
-    bv[1]=b[1];
-    bv[2]=b[2];
-    std::vector<number> xv(2);
-    leastSquares(xv,Mv,bv);
-    UG_LOG(xv[0] << " " << xv[1] << "\n");*/
 	return true;
 };
 
-
+template<typename TGridFunction>
+bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureFromSides(TGridFunction& u,size_t order,number leastSquaresFactor){
+	typedef typename TGridFunction::domain_type domain_type;
+	typedef typename domain_type::grid_type grid_type;
+	// get grid
+	typename domain_type::grid_type& grid = *u.domain()->grid();
+	typedef typename TGridFunction::template dim_traits<dim>::geometric_base_object elem_type;
+	typedef typename TGridFunction::template dim_traits<dim>::const_iterator elem_iterator;
+	typedef typename elem_type::side side_type;
+	typedef typename TGridFunction::template traits<side_type>::const_iterator side_iterator;
+	typedef typename domain_type::position_accessor_type position_accessor_type;
+	const position_accessor_type& aaPos = u.domain()->position_accessor();
+	std::vector<MultiIndex<2> > ind;
+	typedef typename Grid::AttachmentAccessor<side_type,ANumber > aSideNumber;
+	aSideNumber acEdgeCurvature;
+	ANumber aEdgeCurvature;
+	grid.template attach_to<side_type>(aEdgeCurvature);
+	acEdgeCurvature.access(grid,aEdgeCurvature);
+	static number undefined = 1953853528.340591483532;
+	SetAttachmentValues(acEdgeCurvature, grid.template begin<side_type>(), grid.template end<side_type>(), undefined);
+	number maxnormerr = 0;
+	//	loop elements of dimension
+	for (int si=0;si<u.num_subsets();++si){
+		side_iterator iter = u.template begin<side_type>(si);
+		side_iterator iterEnd = u.template end<side_type>(si);
+		if (u.num_fct(si)<2){
+			UG_THROW("No curvature component in approximation space.");
+		}
+		if (u.local_finite_element_id(0) != LFEID(LFEID::LAGRANGE, 1)){
+			UG_THROW("First component in approximation space must be of Lagrange 1 type.");
+		}
+		if (u.local_finite_element_id(1) != LFEID(LFEID::PIECEWISE_CONSTANT,0)){
+			UG_THROW("Second component in approximation space must be of piecewise constant type.");
+		}
+		std::vector<MathVector<dim> > coord;
+		std::vector<number> phi;
+		std::vector<VertexBase*> nbrs;
+		std::vector<VertexBase*> nbrCandidates;
+		size_t depth=order;
+		std::vector<size_t> stageStart(depth+2);
+		for(  ;iter !=iterEnd; ++iter)
+		{
+			//	get Elem
+			side_type* elem = *iter;
+			//	get position accessor
+			size_t noc=elem->num_vertices();
+			nbrs.resize(noc);
+			phi.resize(noc);
+			// check if zero level set is on element
+			bool onls=false;
+			bool nonzerophifound=false;
+			number nonzerophi;
+			for (size_t i=0;i<noc;i++){
+				nbrs[i]=elem->vertex(i);
+				u.inner_multi_indices(nbrs[i], 0, ind);
+				phi[i] = BlockRef(u[ind[0][0]],ind[0][1]);
+				if (nonzerophifound==false){
+					if (phi[i]!=0){
+						nonzerophifound=true;
+						nonzerophi=phi[i];
+					}
+				} else {
+					if (nonzerophi*phi[i]<0){
+						onls=true;
+					}
+				}
+			};
+			if (onls==false) continue;
+			// collect neighbor nodes for higher order interpolation
+			stageStart[0]=0;
+			for (size_t i=1;i<depth+2;i++){
+				stageStart[i]=noc;
+			}
+			for (size_t stage=0;stage<depth;stage++){
+				for (size_t i=stageStart[stage];i<stageStart[stage+1];i++){
+					CollectNeighbors(nbrCandidates, grid, nbrs[i]);
+					for (size_t j=0;j<nbrCandidates.size();j++){
+						bool newNeighbor=true;
+						for (size_t k=0;k<nbrs.size();k++){
+							if (nbrCandidates[j]==nbrs[k]){
+								newNeighbor=false;
+								break;
+							}
+						};
+						if (newNeighbor==true){
+							nbrs.push_back(nbrCandidates[j]);
+						};
+					};
+				};
+				stageStart[stage+2]=nbrs.size();
+			};
+			phi.resize(nbrs.size());
+			coord.resize(nbrs.size());
+			for (size_t i=0;i<nbrs.size();i++){
+				coord[i] = aaPos[nbrs[i]];
+				if (i<noc) continue;
+				u.inner_multi_indices(nbrs[i], 0, ind);
+				phi[i] = DoFRef(u,ind[0]);
+			};
+			number kappa;
+//			if (computeElementCurvature2d2(kappa,noc,coord,phi,order,leastSquaresFactor)==false) UG_THROW("curvature calculation failed.\n");
+			computeElementCurvature2d(kappa,noc,coord,phi,order);
+			acEdgeCurvature[elem] = kappa;
+		}
+		elem_iterator elemIter = u.template begin<elem_type>(si);
+		elem_iterator elemIterEnd = u.template end<elem_type>(si);
+		for(  ;elemIter !=elemIterEnd; ++elemIter)
+		{
+			//	get Elem
+			elem_type* elem = *elemIter;
+			typename grid_type::template traits<side_type>::secure_container sides;
+			grid.associated_elements(sides, elem );
+			bool onls = false;
+			number ecurvature = 0;
+			size_t nInterSides = 0;
+			for (size_t i=0;i<sides.size();i++){
+				if (acEdgeCurvature[sides[i]]!= undefined){
+					onls = true;
+					ecurvature+=acEdgeCurvature[sides[i]];
+					nInterSides++;
+				}
+			}
+			if (onls==false) continue;
+			number kappa = (number)ecurvature/nInterSides;
+			u.multi_indices(elem,1,ind);
+			DoFRef(u,ind[0]) = kappa;
+			if (m_exactcurvatureknown==true)
+				if (abs(kappa+m_exactcurv)>maxnormerr){
+					maxnormerr =abs(kappa+m_exactcurv);
+				}
+		}
+	};
+	if (m_exactcurvatureknown==true) UG_LOG("curvature maximum error " << maxnormerr << "\n");
+	return true;
+};
 // limit previously computed gradient so that the control-volume-wise linear interpolation function does not introduce new maxima or minima into the data 
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaGrad)

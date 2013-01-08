@@ -126,6 +126,7 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.add_method("overwrite",static_cast<bool (T::*)(function_type&,number,function_type&,int)>(&T::overwrite))
 			.add_method("compute_error", &T::compute_error)
 			.add_method("compute_curvature", &T::computeElementCurvatureOnGrid2d)
+			.add_method("compute_curvature_from_sides", &T::computeElementCurvatureFromSides)
 			.add_method("exact_curvature", static_cast<void (T::*)(number)>(&T::exact_curvature), "", "Exact curvature");
 		reg.add_class_to_group(name, "FV1LevelSetDisc", tag);
 	}
