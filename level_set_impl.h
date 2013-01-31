@@ -97,7 +97,7 @@ bool FV1LevelSetDisc<TGridFunction>::fill_v_vec(TGridFunction& vel,int component
 	typedef typename TGridFunction::template traits<VertexBase>::const_iterator VertexBaseConstIterator;
 
 	if (component>dim){
-		throw(UGError("fill_v_vec: component > dim."));
+		UG_THROW("fill_v_vec: component > dim.");
 	}
 
 	position_accessor_type aaPos = vel.domain()->position_accessor();
