@@ -17,6 +17,7 @@
 #include "lib_disc/local_finite_element/local_shape_function_set.h"
 #include "lib_disc/spatial_disc/user_data/user_data.h"
 #include "lib_disc/reference_element/reference_mapping_provider.h"
+#include "lib_disc/operator/non_linear_operator/newton_solver/newton_update_interface.h"
 #include "lib_disc/common/subset_group.h"
 #include "lib_disc/common/function_group.h"
 #include "lib_disc/common/groups_util.h"

@@ -10,7 +10,7 @@
 #include "level_set.h"
 #include "level_set_user_data.h"
 
-#include "lib_disc/operator/non_linear_operator/newton_solver/newton.h"
+#include "lib_disc/operator/non_linear_operator/newton_solver/newton_update_interface.h"
 
 using namespace std;
 using namespace ug::bridge;
