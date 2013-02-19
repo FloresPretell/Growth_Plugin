@@ -944,11 +944,6 @@ class CRTwoPhaseSource
 	//  grid
 		grid_type* m_grid;
 
-/*	//	component of function
-		size_t m_fct;
-
-	//	local finite element id
-		LFEID m_lfeID;               */
 	private:
 
 	// gravitational constant
@@ -1076,6 +1071,7 @@ class CRTwoPhaseSource
 	                             const MathMatrix<refDim, dim>* vJT = NULL) const
 	       {
 		   	   // evaluate source data
+//		   	   for (size_t i=0;i<nip;i++) vValue[i]=0;
 		   	   (*m_imSource)(vValue,
 		   		                                vGlobIP,
 		   		                                time, si,
@@ -1127,11 +1123,13 @@ class CRTwoPhaseSource
 		   		bool onls=false;
 		   		bool inside=false;
 		   		for (size_t i=0;i<numVertices;i++){
+		   			//debug UG_LOG("phi(" << i+1 << ")=" << phi[i] << "\n");
 		   		    if (phi[i]==0){
 		   		         continue;
 		   		    };
 		   		    if (phi[i]<0) inside=true;
 		   		    for (size_t j=i+1;j<numVertices;j++){
+		   		    	//debug UG_LOG(" phi(" << j+1 << ")=" << phi[j] << "\n");
 		   		    	if (phi[i]*phi[j]<0){
 		   			        onls = true;
 		   			        break;
@@ -1154,7 +1152,7 @@ class CRTwoPhaseSource
 		   		   	     for (size_t i=0;i<nip;i++){
 		   		   				vValue[i][d] += m_gravitational_constant * densityValue[i];
 		   			     }
-		   			};
+		   			}
 		   		}
 		   		if (onls==true){
 		   		 	//	reference object id
@@ -1233,6 +1231,7 @@ class CRTwoPhaseSource
 		   			for(size_t i = 0; i < eeNumVertices; ++i){
 		   				vVrt[i] = evaluationElem->vertex(i);
 		   				coCoord[i] = posAcc[vVrt[i]];
+		   				// UG_LOG("co(" << i+1 << ",:)=[" << coCoord[i][0] << "," << coCoord[i][1] << "];\n");
 		   			};
 		   			// evaluate finite volume geometry
 		   			geo.update(elem, &(coCoord[0]), domain.subset_handler().get());
@@ -1257,6 +1256,9 @@ class CRTwoPhaseSource
 		   					 phiSideValue[i] += phi[sh] * vShape[sh];
 		   				 }
 		   			}
+		   			//for (size_t i=0;i<geo.num_scv();i++){//debug
+		   				//debug  UG_LOG("phi(" << i << ")=" << phiSideValue[i] << "\n");//debug
+		   			//}//debug
 		   			size_t nscvf = geo.num_scvf();
 		   			for (size_t ip=0;ip<nscvf;ip++){
 		   				const typename DimCRFVGeometry<dim>::SCVF& scvf = geo.scvf(ip);
@@ -1269,10 +1271,11 @@ class CRTwoPhaseSource
 		   				surftensSource[i]/=geo.scv(i).volume();
 		   				vValue[i] += surftensSource[i];
 		   			}
+		   			//for (size_t i=0;i<nip;i++){
+		   			//	UG_LOG("rhs(" << i << ")=" << vValue[i] << "\n");//debug
+		   			//};
+		   			//UG_LOG("##############\n");//debug
 		   		}
-		 /*  	   	for (size_t i=0;i<nip;i++){
-		   	   	   UG_LOG(vGlobIP[i] << "  " << vValue[i] << "\n");
-		   	   	};*/
 	   	    }; // evaluate
 
 		void update(){}

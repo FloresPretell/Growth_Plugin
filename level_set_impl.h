@@ -227,7 +227,6 @@ bool FV1LevelSetDisc<TGridFunction>::compute_dnormal(TGridFunction& dnormal,TGri
 
 	MathVector<dim> coord;
 
-
 	//	get vector holding all indices on the vertex
 	std::vector<MultiIndex<2> > ind;
 	//	read indices on vertex
