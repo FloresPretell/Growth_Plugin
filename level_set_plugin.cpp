@@ -43,7 +43,7 @@ static void DomainAlgebra(Registry& reg, string grp)
 	typedef typename TAlgebra::vector_type vector_type;
 	typedef typename TAlgebra::matrix_type matrix_type;
 	typedef ApproximationSpace<TDomain> approximation_space_type;
-	typedef GridFunction<TDomain, SurfaceDoFDistribution, TAlgebra> function_type;
+	typedef GridFunction<TDomain, TAlgebra> function_type;
 	static const int dim = TDomain::dim;
 
 // 	FV1LevelSetDisc
