@@ -1121,13 +1121,13 @@ class CRTwoPhaseSource
 		   			phi[i]=DoFRef(*m_phi, ind[0]);
 		   		};
 		   		bool onls=false;
-		   		bool inside=false;
+		   		//bool inside=false; // inside seems to be unused (a.vogel)
 		   		for (size_t i=0;i<numVertices;i++){
 		   			//debug UG_LOG("phi(" << i+1 << ")=" << phi[i] << "\n");
 		   		    if (phi[i]==0){
 		   		         continue;
 		   		    };
-		   		    if (phi[i]<0) inside=true;
+		   		    //if (phi[i]<0) inside=true;
 		   		    for (size_t j=i+1;j<numVertices;j++){
 		   		    	//debug UG_LOG(" phi(" << j+1 << ")=" << phi[j] << "\n");
 		   		    	if (phi[i]*phi[j]<0){

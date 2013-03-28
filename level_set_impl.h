@@ -2587,7 +2587,7 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 			if (m_dirichlet_sg.size()!=0) if (m_dirichlet_sg.contains(si)==true) continue;
 			if (m_inactive_sg.size()!=0) if (m_inactive_sg.contains(si)==true) continue;
 			std::vector<number> sourceValue(1);
-			MathVector<dim>* sourceCo;
+			MathVector<dim> sourceCo[1];
 			for(VertexBaseConstIterator iter = uNew.template begin<VertexBase>(si);
 					    			                      iter != uNew.template end<VertexBase>(si); ++iter){
 				VertexBase* vrt = *iter;
