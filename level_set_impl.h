@@ -14,6 +14,8 @@
 #include "lib_disc/reference_element/reference_element.h"
 #include "lib_grid/algorithms/attachment_util.h"
 
+#include <algorithm>
+
 namespace ug{
 namespace LevelSet{
 
@@ -683,7 +685,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d(number& kappa,siz
     };
     number gradnorm=sqrt(dxphi*dxphi+dyphi*dyphi);
 	// characteristic element length
-    number hh= min(VecDistance(co[0],co[1]),VecDistance(co[0],co[2]));
+    number hh= std::min(VecDistance(co[0],co[1]),VecDistance(co[0],co[2]));
     number coelemBasePoint[dim];
     number sol[dim];
     coelemBasePoint[0] = elemBasePoint[0] + 0.5*hh*dxphi/gradnorm;
@@ -1340,10 +1342,10 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 
 	//	hard code function (fct=0)
 	//\todo: generalize
-	size_t fct=0;
+//	size_t fct=0;
 
 	//	id of shape functions used
-	LFEID id = uOld.local_finite_element_id(fct);
+//	LFEID id = uOld.local_finite_element_id(fct);
 
 	//	get position accessor
 	typedef typename domain_type::position_accessor_type position_accessor_type;
