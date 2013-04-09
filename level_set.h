@@ -125,7 +125,7 @@ class FV1LevelSetDisc
 	///	adds a post process to be used when stepping the level set function
 		void add_post_process(SmartPtr<IConstraint<algebra_type> > pp) {m_vPP.push_back(pp);}
 
-		void set_velocity(SmartPtr<UserData<MathVector<dim>, dim> > user) {m_imVelocity=user;}
+		void set_velocity(SmartPtr<CplUserData<MathVector<dim>, dim> > user) {m_imVelocity=user;}
 
 		void set_velocity(number vel_x)
 		{
@@ -168,7 +168,7 @@ class FV1LevelSetDisc
 		}
 #endif
 
-		void set_source(SmartPtr<UserData<number,dim> > user){m_imSource = user;};
+		void set_source(SmartPtr<CplUserData<number,dim> > user){m_imSource = user;};
 		void set_source(number val){set_source(CreateSmartPtr(new ConstUserNumber<dim>(val)));}
 #ifdef UG_FOR_LUA
 		void set_source(const char* fctName)
@@ -177,7 +177,7 @@ class FV1LevelSetDisc
 		}
 #endif
 
-		void set_dirichlet_data(SmartPtr<UserData<number,dim> > d){m_imDirichlet = d;};
+		void set_dirichlet_data(SmartPtr<CplUserData<number,dim> > d){m_imDirichlet = d;};
 		void set_dirichlet_data(number val){set_dirichlet_data(CreateSmartPtr(new ConstUserNumber<dim>(val)));};
 #ifdef UG_FOR_LUA
 		void set_dirichlet_data(const char* fctName)
@@ -331,11 +331,11 @@ class FV1LevelSetDisc
 		SubsetGroup m_neumann_sg;
 		SubsetGroup m_dirichlet_sg;
 		SubsetGroup m_inactive_sg;
-		SmartPtr<UserData<number,dim> > m_vel_x_fct;
-		SmartPtr<UserData<number,dim> > m_vel_y_fct;
-		SmartPtr<UserData<number,dim> > m_vel_z_fct;
-		SmartPtr<UserData<number,dim> > m_source_fct;
-		SmartPtr<UserData<number,dim> > m_solution_fct;
+		SmartPtr<CplUserData<number,dim> > m_vel_x_fct;
+		SmartPtr<CplUserData<number,dim> > m_vel_y_fct;
+		SmartPtr<CplUserData<number,dim> > m_vel_z_fct;
+		SmartPtr<CplUserData<number,dim> > m_source_fct;
+		SmartPtr<CplUserData<number,dim> > m_solution_fct;
 		TGridFunction* m_vel_x_vec;
 		TGridFunction* m_vel_y_vec;
 		TGridFunction* m_vel_z_vec;
@@ -359,11 +359,11 @@ class FV1LevelSetDisc
 		static const size_t maxNumCo = 20;
 
 		///	Data import for the Velocity field
-		SmartPtr<UserData<MathVector<dim>, dim> > m_imVelocity;
+		SmartPtr<CplUserData<MathVector<dim>, dim> > m_imVelocity;
 		///	Data import for the right-hand side
-		SmartPtr<UserData<number,dim> > m_imSource;
+		SmartPtr<CplUserData<number,dim> > m_imSource;
 		///	Data import for the Dirichlet values
-		SmartPtr<UserData<number,dim> > m_imDirichlet;
+		SmartPtr<CplUserData<number,dim> > m_imDirichlet;
 };
 
 } // end namespace LevelSet

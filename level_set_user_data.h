@@ -29,7 +29,7 @@ namespace LevelSet{
 
 template <typename TData, int dim, typename TImpl>
 class LevelSetUserDataBase
-	: 	public UserData<TData,dim>
+	: 	public CplUserData<TData,dim>
 {
 	public:
 		////////////////
@@ -140,6 +140,12 @@ class LevelSetUserDataBase
 												this->num_ip(s));
 		}
 
+	///	returns if provided data is continuous over geometric object boundaries
+		virtual bool continuous() const {return false;}
+
+	///	returns if grid function is needed for evaluation
+		virtual bool requires_grid_fct() const {return true;}
+
 	protected:
 	///	access to implementation
 		TImpl& getImpl() {return static_cast<TImpl&>(*this);}
@@ -205,7 +211,7 @@ class LevelSetUserData
 		LFEID m_lfeID;               */
 
 	public:
-		void set_inside_data(SmartPtr<UserData<number, dim> > user){
+		void set_inside_data(SmartPtr<CplUserData<number, dim> > user){
 			m_imInsideData = user;
 		}
 		void set_inside_data(number val){
@@ -216,7 +222,7 @@ class LevelSetUserData
 			set_inside_data(LuaUserDataFactory<number, dim>::create(fctName));
 		}
 	#endif
-		void set_outside_data(SmartPtr<UserData<number, dim> > user){
+		void set_outside_data(SmartPtr<CplUserData<number, dim> > user){
 			m_imOutsideData = user;
 		}
 		void set_outside_data(number val){
@@ -230,8 +236,8 @@ class LevelSetUserData
 
 	private:
 		///	Data import for inside and outside data
-		SmartPtr<UserData<number,dim> > m_imInsideData;
-		SmartPtr<UserData<number,dim> > m_imOutsideData;
+		SmartPtr<CplUserData<number,dim> > m_imInsideData;
+		SmartPtr<CplUserData<number,dim> > m_imOutsideData;
 
 	public:
 	/// constructor
@@ -532,7 +538,7 @@ class LevelSetUserVectorData
 			LFEID m_lfeID;               */
 
 		public:
-			void set_inside_data(SmartPtr<UserData<MathVector<dim>, dim> > data)
+			void set_inside_data(SmartPtr<CplUserData<MathVector<dim>, dim> > data)
 			{
 				m_imInsideData = data;
 			}
@@ -582,7 +588,7 @@ class LevelSetUserVectorData
 			}
 			#endif
 
-			void set_outside_data(SmartPtr<UserData<MathVector<dim>, dim> > data)
+			void set_outside_data(SmartPtr<CplUserData<MathVector<dim>, dim> > data)
 			{
 				m_imOutsideData = data;
 			}
@@ -634,8 +640,8 @@ class LevelSetUserVectorData
 
 		private:
 			///	Data import for inside and outside data
-			SmartPtr<UserData<MathVector<dim>,dim> > m_imInsideData;
-			SmartPtr<UserData<MathVector<dim>,dim> > m_imOutsideData;
+			SmartPtr<CplUserData<MathVector<dim>,dim> > m_imInsideData;
+			SmartPtr<CplUserData<MathVector<dim>,dim> > m_imOutsideData;
 
 		public:
 		/// constructor
@@ -954,7 +960,7 @@ class CRTwoPhaseSource
 		number m_sigma;
 
 	///	Data import for source
-		SmartPtr<UserData<MathVector<dim>,dim> > m_imSource;
+		SmartPtr<CplUserData<MathVector<dim>,dim> > m_imSource;
 
 	public:
 		void set_gravitation(number gravityconst){
@@ -967,7 +973,7 @@ class CRTwoPhaseSource
 
 		/////////// Source
 
-		void set_source(SmartPtr<UserData<MathVector<dim>, dim> > data)
+		void set_source(SmartPtr<CplUserData<MathVector<dim>, dim> > data)
 		{
 			m_imSource = data;
 		}
@@ -1018,7 +1024,7 @@ class CRTwoPhaseSource
 		#endif
 
 	public:
-		void set_density(SmartPtr<UserData<number, dim> > user){
+		void set_density(SmartPtr<CplUserData<number, dim> > user){
 			m_imDensity = user;
 		}
 		void set_density(number val){
@@ -1032,7 +1038,7 @@ class CRTwoPhaseSource
 
 	private:
 	///	density import for inside and outside density
-		SmartPtr<UserData<number,dim> > m_imDensity;
+		SmartPtr<CplUserData<number,dim> > m_imDensity;
 
 	public:
 	/// constructor

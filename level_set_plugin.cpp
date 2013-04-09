@@ -68,22 +68,22 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.add_method("set_dirichlet_boundary",&T::set_dirichlet_boundary)
 			.add_method("set_outflow_boundary",&T::set_outflow_boundary)
 			.add_method("init_function", &T::init_function)
-			.add_method("set_source", static_cast<void (T::*)(SmartPtr<UserData<number, dim> >)>(&T::set_source), "", "Source")
+			.add_method("set_source", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim> >)>(&T::set_source), "", "Source")
 			.add_method("set_source", static_cast<void (T::*)(number)>(&T::set_source), "", "Source")
 #ifdef UG_FOR_LUA
 			.add_method("set_source", static_cast<void (T::*)(const char*)>(&T::set_source), "", "Source")
 #endif
-			.add_method("set_velocity", static_cast<void (T::*)(SmartPtr<UserData<MathVector<dim>, dim> >)>(&T::set_velocity), "", "Velocity Field")
+			.add_method("set_velocity", static_cast<void (T::*)(SmartPtr<CplUserData<MathVector<dim>, dim> >)>(&T::set_velocity), "", "Velocity Field")
 			.add_method("set_velocity", static_cast<void (T::*)(number)>(&T::set_velocity), "", "Vel_x")
 			.add_method("set_velocity", static_cast<void (T::*)(number,number)>(&T::set_velocity), "", "Vel_x, Vel_y")
 			.add_method("set_velocity", static_cast<void (T::*)(number,number,number)>(&T::set_velocity), "", "Vel_x, Vel_y, Vel_z")
 #ifdef UG_FOR_LUA
 			.add_method("set_velocity", static_cast<void (T::*)(const char*)>(&T::set_velocity), "", "Velocity Field")
 #endif
-/*			.add_method("set_vel_x", static_cast<void (T::*)(SmartPtr<UserData<number,dim> >)>(&T::set_vel_x))
-			.add_method("set_vel_y", static_cast<void (T::*)(SmartPtr<UserData<number,dim> >)>(&T::set_vel_y))
-			.add_method("set_vel_z", static_cast<void (T::*)(SmartPtr<UserData<number,dim> >)>(&T::set_vel_z))
-			.add_method("set_source", static_cast<void (T::*)(SmartPtr<UserData<number,dim> >)>(&T::set_source))
+/*			.add_method("set_vel_x", static_cast<void (T::*)(SmartPtr<CplUserData<number,dim> >)>(&T::set_vel_x))
+			.add_method("set_vel_y", static_cast<void (T::*)(SmartPtr<CplUserData<number,dim> >)>(&T::set_vel_y))
+			.add_method("set_vel_z", static_cast<void (T::*)(SmartPtr<CplUserData<number,dim> >)>(&T::set_vel_z))
+			.add_method("set_source", static_cast<void (T::*)(SmartPtr<CplUserData<number,dim> >)>(&T::set_source))
 			.add_method("set_vel_x", static_cast<void (T::*)(function_type&)>(&T::set_vel_x))
 			.add_method("set_vel_y", static_cast<void (T::*)(function_type&)>(&T::set_vel_y))
 			.add_method("set_vel_z", static_cast<void (T::*)(function_type&)>(&T::set_vel_z))
@@ -96,7 +96,7 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.add_method("set_source", static_cast<void (T::*)(function_type&)>(&T::set_source))
 			.add_method("set_source", static_cast<void (T::*)(number)>(&T::set_source))
 			.add_method("set_source", static_cast<void (T::*)()>(&T::set_source))*/
-			.add_method("set_dirichlet_data", static_cast<void (T::*)(SmartPtr<UserData<number, dim> >)>(&T::set_dirichlet_data), "", "Source")
+			.add_method("set_dirichlet_data", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim> >)>(&T::set_dirichlet_data), "", "Source")
 			.add_method("set_dirichlet_data", static_cast<void (T::*)(number)>(&T::set_dirichlet_data), "", "Source")
 #ifdef UG_FOR_LUA
 			.add_method("set_dirichlet_data", static_cast<void (T::*)(const char*)>(&T::set_dirichlet_data), "", "Source")
@@ -135,16 +135,16 @@ static void DomainAlgebra(Registry& reg, string grp)
 	{
 		string name = string("LevelSetUserData").append(suffix);
 		typedef LevelSetUserData<function_type> T;
-		typedef UserData<number, dim> TBase;
+		typedef CplUserData<number, dim> TBase;
 		typedef INewtonUpdate TBase2;
 		reg.add_class_<T, TBase,TBase2>(name, grp)
 			.template add_constructor<void (*)(SmartPtr<ApproximationSpace<TDomain> >,SmartPtr<function_type>)>("Approximation space, grid function")
-			.add_method("set_inside", static_cast<void (T::*)(SmartPtr<UserData<number, dim> >)>(&T::set_inside_data), "", "Inside data")
+			.add_method("set_inside", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim> >)>(&T::set_inside_data), "", "Inside data")
 			.add_method("set_inside", static_cast<void (T::*)(number)>(&T::set_inside_data), "", "Inside data")
 		#ifdef UG_FOR_LUA
 			.add_method("set_inside", static_cast<void (T::*)(const char*)>(&T::set_inside_data), "", "Inside data")
 		#endif
-			.add_method("set_outside", static_cast<void (T::*)(SmartPtr<UserData<number, dim> >)>(&T::set_outside_data), "", "Outside data")
+			.add_method("set_outside", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim> >)>(&T::set_outside_data), "", "Outside data")
 			.add_method("set_outside", static_cast<void (T::*)(number)>(&T::set_outside_data), "", "Outside data")
 		#ifdef UG_FOR_LUA
 			.add_method("set_outside", static_cast<void (T::*)(const char*)>(&T::set_outside_data), "", "Outside data")
@@ -158,18 +158,18 @@ static void DomainAlgebra(Registry& reg, string grp)
 	{
 			string name = string("LevelSetUserVectorData").append(suffix);
 			typedef LevelSetUserVectorData<function_type> T;
-			typedef UserData<MathVector<dim>, dim> TBase;
+			typedef CplUserData<MathVector<dim>, dim> TBase;
 			typedef INewtonUpdate TBase2;
 			reg.add_class_<T, TBase,TBase2>(name, grp)
 				.template add_constructor<void (*)(SmartPtr<ApproximationSpace<TDomain> >,SmartPtr<function_type>)>("Approximation space, grid function")
-				.add_method("set_inside", static_cast<void (T::*)(SmartPtr<UserData<MathVector<dim>, dim> >)>(&T::set_inside_data), "", "Source")
+				.add_method("set_inside", static_cast<void (T::*)(SmartPtr<CplUserData<MathVector<dim>, dim> >)>(&T::set_inside_data), "", "Source")
 				.add_method("set_inside", static_cast<void (T::*)(number)>(&T::set_inside_data), "", "F_x")
 				.add_method("set_inside", static_cast<void (T::*)(number,number)>(&T::set_inside_data), "", "F_x, F_y")
 				.add_method("set_inside", static_cast<void (T::*)(number,number,number)>(&T::set_inside_data), "", "F_x, F_y, F_z")
 			#ifdef UG_FOR_LUA
 				.add_method("set_inside", static_cast<void (T::*)(const char*)>(&T::set_inside_data), "", "Source Vector")
 			#endif
-				.add_method("set_outside", static_cast<void (T::*)(SmartPtr<UserData<MathVector<dim>, dim> >)>(&T::set_outside_data), "", "Source")
+				.add_method("set_outside", static_cast<void (T::*)(SmartPtr<CplUserData<MathVector<dim>, dim> >)>(&T::set_outside_data), "", "Source")
 				.add_method("set_outside", static_cast<void (T::*)(number)>(&T::set_outside_data), "", "F_x")
 				.add_method("set_outside", static_cast<void (T::*)(number,number)>(&T::set_outside_data), "", "F_x, F_y")
 				.add_method("set_outside", static_cast<void (T::*)(number,number,number)>(&T::set_outside_data), "", "F_x, F_y, F_z")
@@ -185,16 +185,16 @@ static void DomainAlgebra(Registry& reg, string grp)
 		{
 			string name = string("CRTwoPhaseSource").append(suffix);
 			typedef CRTwoPhaseSource<function_type> T;
-			typedef UserData<MathVector<dim>, dim> TBase;
+			typedef CplUserData<MathVector<dim>, dim> TBase;
 			typedef INewtonUpdate TBase2;
 			reg.add_class_<T, TBase,TBase2>(name, grp)
 				.template add_constructor<void (*)(SmartPtr<ApproximationSpace<TDomain> >,SmartPtr<function_type>)>("Approximation space, grid function")
-				.add_method("set_density", static_cast<void (T::*)(SmartPtr<UserData<number, dim> >)>(&T::set_density), "", "Set density")
+				.add_method("set_density", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim> >)>(&T::set_density), "", "Set density")
 				.add_method("set_density", static_cast<void (T::*)(number)>(&T::set_density), "", "Set density")
 			#ifdef UG_FOR_LUA
 				.add_method("set_density", static_cast<void (T::*)(const char*)>(&T::set_density), "", "Set density")
 			#endif
-				.add_method("set_source", static_cast<void (T::*)(SmartPtr<UserData<MathVector<dim>, dim> >)>(&T::set_source), "", "Source")
+				.add_method("set_source", static_cast<void (T::*)(SmartPtr<CplUserData<MathVector<dim>, dim> >)>(&T::set_source), "", "Source")
 				.add_method("set_source", static_cast<void (T::*)(number)>(&T::set_source), "", "F_x")
 				.add_method("set_source", static_cast<void (T::*)(number,number)>(&T::set_source), "", "F_x, F_y")
 				.add_method("set_source", static_cast<void (T::*)(number,number,number)>(&T::set_source), "", "F_x, F_y, F_z")
