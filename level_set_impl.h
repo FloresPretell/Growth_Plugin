@@ -234,7 +234,7 @@ bool FV1LevelSetDisc<TGridFunction>::compute_dnormal(TGridFunction& dnormal,TGri
 	//	read indices on vertex
 	typedef typename domain_type::position_accessor_type position_accessor_type;
 	position_accessor_type aaPos = u.domain()->position_accessor();
-///UG_LOG("-------------\n");
+//UG_LOG("-------------\n");
 	// calculate scv size and gradient of u
     if (calculate_vertex_grad_vol_sign(u,aaGradient, aaVolume,phi,-1)==false){UG_LOG("ERROR: gradient computation failed!"); return false;};
 	if (m_limiter==true){
@@ -246,16 +246,16 @@ bool FV1LevelSetDisc<TGridFunction>::compute_dnormal(TGridFunction& dnormal,TGri
 	for (int si=0;si<u.num_subsets();++si){
 		VertexBaseConstIterator iter = u.template begin<VertexBase>(si);
 	    VertexBaseConstIterator iterEnd = u.template end<VertexBase>(si);
-////	    UG_LOG("START INDEX" << si << "\n");
+//	    UG_LOG("START INDEX" << si << "\n");
 		for (;iter != iterEnd; ++iter){
 			VertexBase* vrt = *iter;
 			u.inner_multi_indices(vrt, 0, ind);
 			coord = aaPos[vrt];
 			BlockRef(dnormal[ind[0][0]],ind[0][1]) = BlockRef(vx[ind[0][0]],ind[0][1]) * aaGradient[vrt][0] + BlockRef(vy[ind[0][0]],ind[0][1]) * aaGradient[vrt][1];
-///			if (BlockRef(phi[ind[0][0]],ind[0][1])<0)
-///			    UG_LOG("coord=(" << coord[0] << "," << coord[1] << ") exact=" << coord[0]/sqrt(coord[0]*coord[0]+coord[1]*coord[1]) << " dnormal=" << BlockRef(dnormal[ind[0][0]],ind[0][1]) << "\n" << " v=(" << BlockRef(vx[ind[0][0]],ind[0][1]) << "," << BlockRef(vy[ind[0][0]],ind[0][1]) << ") " << " grad=(" << aaGradient[vrt][0] << "," << aaGradient[vrt][1] << ")" << "\n");
+//			if (BlockRef(phi[ind[0][0]],ind[0][1])<0)
+//			    UG_LOG("coord=(" << coord[0] << "," << coord[1] << ") exact=" << coord[0]/sqrt(coord[0]*coord[0]+coord[1]*coord[1]) << " dnormal=" << BlockRef(dnormal[ind[0][0]],ind[0][1]) << "\n" << " v=(" << BlockRef(vx[ind[0][0]],ind[0][1]) << "," << BlockRef(vy[ind[0][0]],ind[0][1]) << ") " << " grad=(" << aaGradient[vrt][0] << "," << aaGradient[vrt][1] << ")" << "\n");
 	    }
-///		UG_LOG("#\n");
+//		UG_LOG("#\n");
 	};
 	return true;
 };
@@ -548,8 +548,8 @@ bool leastSquares(std::vector<number>& x,const std::vector<number>& mField,const
 }
 
 
-/// averages positions by arithmetic mean
-/**
+// averages positions by arithmetic mean
+/*
  * Arithmetic Mean of Positions
  * returns the arithmetic mean of positions
  *
