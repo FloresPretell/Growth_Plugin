@@ -1412,9 +1412,9 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 			//	compute data
 	//		try{
 				(*m_imVelocity)(coVelocity, geo.scv_global_ips(), m_time, si,
-				localu, elem,
+				elem,
 				coCoord, geo.scv_local_ips(),
-				geo.num_sh());
+				geo.num_sh(), &localu);
 	//		}
 	//		UG_CATCH_THROW("assemble_element : Cannot evaluate velocity data.");
 		} else {
