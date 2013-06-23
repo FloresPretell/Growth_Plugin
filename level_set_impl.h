@@ -884,10 +884,10 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 		if (u.num_fct(si)<2){
 			UG_THROW("No curvature component in approximation space.");
 		}
-		if (u.local_finite_element_id(0) != LFEID(LFEID::LAGRANGE, 1)){
+		if (u.local_finite_element_id(0) != LFEID(LFEID::LAGRANGE, dim, 1)){
 			UG_THROW("First component in approximation space must be of Lagrange 1 type.");
 		}
-		if (u.local_finite_element_id(1) != LFEID(LFEID::PIECEWISE_CONSTANT,0)){
+		if (u.local_finite_element_id(1) != LFEID(LFEID::PIECEWISE_CONSTANT,dim,0)){
 			UG_THROW("Second component in approximation space must be of piecewise constant type.");
 		}
 		std::vector<MathVector<dim> > coord;
@@ -1014,10 +1014,10 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureFromSides(TGridFunct
 		if (u.num_fct(si)<2){
 			UG_THROW("No curvature component in approximation space.");
 		}
-		if (u.local_finite_element_id(0) != LFEID(LFEID::LAGRANGE, 1)){
+		if (u.local_finite_element_id(0) != LFEID(LFEID::LAGRANGE, dim, 1)){
 			UG_THROW("First component in approximation space must be of Lagrange 1 type.");
 		}
-		if (u.local_finite_element_id(1) != LFEID(LFEID::PIECEWISE_CONSTANT,0)){
+		if (u.local_finite_element_id(1) != LFEID(LFEID::PIECEWISE_CONSTANT,dim,0)){
 			UG_THROW("Second component in approximation space must be of piecewise constant type.");
 		}
 		std::vector<MathVector<dim> > coord;
