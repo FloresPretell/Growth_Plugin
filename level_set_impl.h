@@ -9,7 +9,7 @@
 #define LEVEL_SET_UTIL_IMPL_H_
 
 #include "level_set.h"
-#include "lib_disc/local_finite_element/local_shape_function_set.h"
+#include "lib_disc/local_finite_element/local_finite_element_provider.h"
 #include "lib_disc/spatial_disc/disc_util/fv1_geom.h"
 #include "lib_disc/reference_element/reference_element.h"
 #include "lib_grid/algorithms/attachment_util.h"

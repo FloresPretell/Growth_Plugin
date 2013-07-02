@@ -14,7 +14,7 @@
 #include "lib_disc/common/function_group.h"
 #include "lib_disc/common/groups_util.h"
 #include "lib_disc/quadrature/quadrature.h"
-#include "lib_disc/local_finite_element/local_shape_function_set.h"
+#include "lib_disc/local_finite_element/local_finite_element_provider.h"
 #include "lib_disc/spatial_disc/user_data/user_data.h"
 #include "lib_disc/reference_element/reference_mapping_provider.h"
 #include "lib_disc/operator/non_linear_operator/newton_solver/newton_update_interface.h"
@@ -304,7 +304,7 @@ class LevelSetUserData
 
 				// compute lsf value in ip (from Lagrange-1 shape function) and set value according to position (inside or outside)
 				const LocalShapeFunctionSet<refDim>& rTrialSpace =
-						LocalShapeFunctionSetProvider::get<refDim>(roid, LFEID(LFEID::LAGRANGE, dim, 1));
+						LocalFiniteElementProvider::get<refDim>(roid, LFEID(LFEID::LAGRANGE, dim, 1));
 
 				//  evaluate shapes at ip
 				rTrialSpace.shapes(vShape, vLocIP[ip]);
@@ -358,7 +358,7 @@ class LevelSetUserData
 			for (size_t i=0;i<geo.num_scv();i++){
 				// compute lsf value in ip (from Lagrange-1 shape function) and set value according to position (inside or outside)
 				const LocalShapeFunctionSet<dim>& rTrialSpace =
-						LocalShapeFunctionSetProvider::get<dim>(roid, LFEID(LFEID::LAGRANGE, dim, 1));
+						LocalFiniteElementProvider::get<dim>(roid, LFEID(LFEID::LAGRANGE, dim, 1));
 
 				//  evaluate shapes at ip
 				rTrialSpace.shapes(vShape, geo.scv(i).local_ip());
@@ -708,7 +708,7 @@ class LevelSetUserVectorData
 
 				// compute lsf value in ip (from Lagrange-1 shape function) and set value according to position (inside or outside)
 				const LocalShapeFunctionSet<refDim>& rTrialSpace =
-						LocalShapeFunctionSetProvider::get<refDim>(roid, LFEID(LFEID::LAGRANGE, dim, 1));
+						LocalFiniteElementProvider::get<refDim>(roid, LFEID(LFEID::LAGRANGE, dim, 1));
 
 				//  evaluate shapes at ip
 				rTrialSpace.shapes(vShape, vLocIP[ip]);
@@ -762,7 +762,7 @@ class LevelSetUserVectorData
 			for (size_t i=0;i<geo.num_scv();i++){
 				// compute lsf value in ip (from Lagrange-1 shape function) and set value according to position (inside or outside)
 				const LocalShapeFunctionSet<dim>& rTrialSpace =
-						LocalShapeFunctionSetProvider::get<dim>(roid, LFEID(LFEID::LAGRANGE, dim, 1));
+						LocalFiniteElementProvider::get<dim>(roid, LFEID(LFEID::LAGRANGE, dim, 1));
 
 				//  evaluate shapes at ip
 				rTrialSpace.shapes(vShape, geo.scv(i).local_ip());
@@ -1179,7 +1179,7 @@ class CRTwoPhaseSource
 			for (size_t i=0;i<geo.num_scv();i++){
 				// compute lsf value in ip (from Lagrange-1 shape function) and set value according to position (inside or outside)
 				const LocalShapeFunctionSet<dim>& rTrialSpace =
-						LocalShapeFunctionSetProvider::get<dim>(roid, LFEID(LFEID::LAGRANGE, dim,1));
+						LocalFiniteElementProvider::get<dim>(roid, LFEID(LFEID::LAGRANGE, dim,1));
 
 				//  evaluate shapes at ip
 				rTrialSpace.shapes(vShape, geo.scv(i).local_ip());
