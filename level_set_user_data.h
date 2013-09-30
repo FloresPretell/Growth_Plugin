@@ -230,7 +230,7 @@ class LevelSetUserData
 			}
 		}
 		//    create Multiindex
-		std::vector<MultiIndex<2> > ind;
+		std::vector<DoFIndex> ind;
 		for (size_t i=0;i<numVertices;i++){
 			m_phi->multi_indices(childVertex[i], 0, ind);
 			phi[i]=DoFRef(*m_phi, ind[0]);
@@ -310,7 +310,7 @@ class LevelSetUserData
 				rTrialSpace.shapes(vShape, vLocIP[ip]);
 
 				//    get multiindices of element
-				std::vector<MultiIndex<2> > ind;
+				std::vector<DoFIndex> ind;
 				m_phi->multi_indices(elem, 0, ind);
 
 				//     compute lsf at integration point
@@ -364,7 +364,7 @@ class LevelSetUserData
 				rTrialSpace.shapes(vShape, geo.scv(i).local_ip());
 
 				//    get multiindices of element
-				std::vector<MultiIndex<2> > ind;
+				std::vector<DoFIndex> ind;
 				m_phi->multi_indices(elem, 0, ind);
 
 				//     compute lsf at integration point
@@ -634,7 +634,7 @@ class LevelSetUserVectorData
 			}
 		}
 		//    create Multiindex
-		std::vector<MultiIndex<2> > ind;
+		std::vector<DoFIndex> ind;
 		for (size_t i=0;i<numVertices;i++){
 			m_phi->multi_indices(childVertex[i], 0, ind);
 			phi[i]=DoFRef(*m_phi, ind[0]);
@@ -714,7 +714,7 @@ class LevelSetUserVectorData
 				rTrialSpace.shapes(vShape, vLocIP[ip]);
 
 				//    get multiindices of element
-				std::vector<MultiIndex<2> > ind;
+				std::vector<DoFIndex> ind;
 				m_phi->multi_indices(elem, 0, ind);
 
 				//     compute lsf at integration point
@@ -768,7 +768,7 @@ class LevelSetUserVectorData
 				rTrialSpace.shapes(vShape, geo.scv(i).local_ip());
 
 				//    get multiindices of element
-				std::vector<MultiIndex<2> > ind;
+				std::vector<DoFIndex> ind;
 				m_phi->multi_indices(elem, 0, ind);
 
 				//     compute lsf at integration point
@@ -1054,7 +1054,7 @@ class CRTwoPhaseSource
 		} else onfinestlevel=true;
 
 		//    create Multiindex
-		std::vector<MultiIndex<2> > ind;
+		std::vector<DoFIndex> ind;
 		for (size_t i=0;i<numVertices;i++){
 			m_phi->multi_indices(childVertex[i], 0, ind);
 			phi[i]=DoFRef(*m_phi, ind[0]);
@@ -1185,7 +1185,7 @@ class CRTwoPhaseSource
 				rTrialSpace.shapes(vShape, geo.scv(i).local_ip());
 
 				//    get multiindices of element
-				std::vector<MultiIndex<2> > ind;
+				std::vector<DoFIndex> ind;
 				m_phi->multi_indices(elem, 0, ind);
 
 				//     compute lsf at integration point

@@ -115,11 +115,11 @@ bool FV1LevelSetDisc<TGridFunction>::fill_v_vec(TGridFunction& vel,int component
 			coord = aaPos[vrt];
 
 		//	get vector holding all indices on the vertex
-			std::vector<MultiIndex<2> > ind;
+			std::vector<DoFIndex> ind;
 
 			vel.inner_multi_indices(vrt, 0, ind);
 			analytic_velocity(vnode,m_time,coord);
-			BlockRef(vel[ind[0][0]],ind[0][1]) = vnode[component];
+			DoFRef(vel, ind[0]) = vnode[component];
 	     }
 	};
 	return true;
@@ -164,7 +164,7 @@ bool FV1LevelSetDisc<TGridFunction>::compute_normal(TGridFunction& vx,TGridFunct
     position_accessor_type aaPos = u.domain()->position_accessor();
 
     //	get vector holding all indices on the vertex
-	std::vector<MultiIndex<2> > ind;
+	std::vector<DoFIndex> ind;
 
     //	read indices on vertex
     // calculate scv size and gradient
@@ -184,11 +184,11 @@ bool FV1LevelSetDisc<TGridFunction>::compute_normal(TGridFunction& vx,TGridFunct
 			u.inner_multi_indices(vrt, 0, ind);
 			number vnorm = VecLength(aaGradient[vrt]);
 			if (vnorm>1e-15){
-	    		BlockRef(vx[ind[0][0]],ind[0][1]) = aaGradient[vrt][0]/vnorm;
-		    	BlockRef(vy[ind[0][0]],ind[0][1]) = aaGradient[vrt][1]/vnorm;
+	    		DoFRef(vx, ind[0]) = aaGradient[vrt][0]/vnorm;
+	    		DoFRef(vy, ind[0]) = aaGradient[vrt][1]/vnorm;
 			} else {
-			    BlockRef(vx[ind[0][0]],ind[0][1]) = 0;
-    			BlockRef(vy[ind[0][0]],ind[0][1]) = 0;
+				DoFRef(vx, ind[0]) = 0;
+				DoFRef(vy, ind[0]) = 0;
 			};
 		};
     };
@@ -230,7 +230,7 @@ bool FV1LevelSetDisc<TGridFunction>::compute_dnormal(TGridFunction& dnormal,TGri
 	MathVector<dim> coord;
 
 	//	get vector holding all indices on the vertex
-	std::vector<MultiIndex<2> > ind;
+	std::vector<DoFIndex> ind;
 	//	read indices on vertex
 	typedef typename domain_type::position_accessor_type position_accessor_type;
 	position_accessor_type aaPos = u.domain()->position_accessor();
@@ -251,8 +251,8 @@ bool FV1LevelSetDisc<TGridFunction>::compute_dnormal(TGridFunction& dnormal,TGri
 			VertexBase* vrt = *iter;
 			u.inner_multi_indices(vrt, 0, ind);
 			coord = aaPos[vrt];
-			BlockRef(dnormal[ind[0][0]],ind[0][1]) = BlockRef(vx[ind[0][0]],ind[0][1]) * aaGradient[vrt][0] + BlockRef(vy[ind[0][0]],ind[0][1]) * aaGradient[vrt][1];
-//			if (BlockRef(phi[ind[0][0]],ind[0][1])<0)
+			DoFRef(dnormal, ind[0]) = DoFRef(vx, ind[0]) * aaGradient[vrt][0] + DoFRef(vy, ind[0]) * aaGradient[vrt][1];
+//			if (DoFRef(phi, ind[0]) < 0)
 //			    UG_LOG("coord=(" << coord[0] << "," << coord[1] << ") exact=" << coord[0]/sqrt(coord[0]*coord[0]+coord[1]*coord[1]) << " dnormal=" << BlockRef(dnormal[ind[0][0]],ind[0][1]) << "\n" << " v=(" << BlockRef(vx[ind[0][0]],ind[0][1]) << "," << BlockRef(vy[ind[0][0]],ind[0][1]) << ") " << " grad=(" << aaGradient[vrt][0] << "," << aaGradient[vrt][1] << ")" << "\n");
 	    }
 //		UG_LOG("#\n");
@@ -307,7 +307,7 @@ bool FV1LevelSetDisc<TGridFunction>::compute_ddnormal(TGridFunction& ddnormal,TG
 	// if (calculate_vertex_grad_vol(u,aaGradient, aaVolume)==false){UG_LOG("ERROR: gradient computation failed!"); return false;};
 	// calculate normal of phi
 
-	std::vector<MultiIndex<2> > ind;
+	std::vector<DoFIndex> ind;
 
 	for (int si=0;si<u.num_subsets();++si){
 		VertexBaseConstIterator iter = u.template begin<VertexBase>(si);
@@ -317,10 +317,10 @@ bool FV1LevelSetDisc<TGridFunction>::compute_ddnormal(TGridFunction& ddnormal,TG
 			VertexBase* vrt = *iter;
 			u.inner_multi_indices(vrt, 0, ind);
 			coord = aaPos[vrt];
-			BlockRef(ddnormal[ind[0][0]],ind[0][1])
-				= BlockRef(vx[ind[0][0]],ind[0][1]) * aaGradient[vrt][0]
-				+ BlockRef(vy[ind[0][0]],ind[0][1]) * aaGradient[vrt][1];
-		//	if (BlockRef(phi[ind[0][0]],ind[0][1])<0)
+			DoFRef(ddnormal, ind[0])
+				= DoFRef(vx, ind[0]) * aaGradient[vrt][0]
+				+ DoFRef(vy, ind[0]) * aaGradient[vrt][1];
+		//	if (DoFRef(phi, ind[0])<0)
 		//	    UG_LOG("coord=(" << coord[0] << "," << coord[1] << ") exact=" << coord[0]/sqrt(coord[0]*coord[0]+coord[1]*coord[1]) << " ddnormal=" << BlockRef(dnormal[ind[0][0]],ind[0][1]) << "\n" << " v=(" << BlockRef(vx[ind[0][0]],ind[0][1]) << "," << BlockRef(vy[ind[0][0]],ind[0][1]) << ") " << " grad=(" << aaGradient[vrt][0] << "," << aaGradient[vrt][1] << ")" << "\n");
 		}
 ///		UG_LOG("#\n");
@@ -875,7 +875,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 	typedef typename TGridFunction::template dim_traits<dim>::geometric_base_object ElemType;
 	typedef typename domain_type::position_accessor_type position_accessor_type;
 	const position_accessor_type& aaPos = u.domain()->position_accessor();
-	std::vector<MultiIndex<2> > ind;
+	std::vector<DoFIndex> ind;
 	number maxnormerr = 0;
 	//	loop elements of dimension
 	for (int si=0;si<u.num_subsets();++si){
@@ -912,7 +912,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 		for (size_t i=0;i<noc;i++){
 			nbrs[i]=elem->vertex(i);
 			u.inner_multi_indices(nbrs[i], 0, ind);
-			phi[i] = BlockRef(u[ind[0][0]],ind[0][1]);
+			phi[i] = DoFRef(u, ind[0]);
 			if (nonzerophifound==false){
 				if (phi[i]!=0){
 					nonzerophifound=true;
@@ -965,7 +965,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 			//debugUG_LOG("co0(" << i+1 << ",:)=[" << coord[i][0] << "," << coord[i][1] << "];\n");
 			if (i<noc) continue;
 			u.inner_multi_indices(nbrs[i], 0, ind);
-			phi[i] = DoFRef(u,ind[0]);
+			phi[i] = DoFRef(u, ind[0]);
 			//debug
 //			UG_LOG("phi[i]=" << phi[i] << "\n");
 		};
@@ -998,7 +998,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureFromSides(TGridFunct
 	typedef typename TGridFunction::template traits<side_type>::const_iterator side_iterator;
 	typedef typename domain_type::position_accessor_type position_accessor_type;
 	const position_accessor_type& aaPos = u.domain()->position_accessor();
-	std::vector<MultiIndex<2> > ind;
+	std::vector<DoFRef> ind;
 	typedef typename Grid::AttachmentAccessor<side_type,ANumber > aSideNumber;
 	aSideNumber acEdgeCurvature;
 	ANumber aEdgeCurvature;
@@ -1041,7 +1041,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureFromSides(TGridFunct
 			for (size_t i=0;i<noc;i++){
 				nbrs[i]=elem->vertex(i);
 				u.inner_multi_indices(nbrs[i], 0, ind);
-				phi[i] = BlockRef(u[ind[0][0]],ind[0][1]);
+				phi[i] = DoFRef(u, ind[0]);
 				if (nonzerophifound==false){
 					if (phi[i]!=0){
 						nonzerophifound=true;
@@ -1135,7 +1135,7 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaG
 
 	position_accessor_type& aaPos = uOld.domain()->position_accessor();
 
-	std::vector<MultiIndex<2> > ind;
+	std::vector<DoFIndex> ind;
 
 	//	create Attachment for scv-volume size
 	ANumber aMax;
@@ -1158,8 +1158,8 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaG
 		    	    //	read indices on vertex
 		      	    //	get vector holding all indices on the vertex
 				    uOld.inner_multi_indices(vrt, 0, ind);
-				    aaMax[vrt] = BlockRef(uOld[ind[0][0]],ind[0][1]);
-				    aaMin[vrt] = BlockRef(uOld[ind[0][0]],ind[0][1]);
+				    aaMax[vrt] = DoFRef(uOld, ind[0]);
+				    aaMin[vrt] = DoFRef(uOld, ind[0]);
 			    }
 	}
 	for (int si=0;si<uOld.num_subsets();++si){
@@ -1171,9 +1171,9 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaG
 			VertexBase* vi=edge->vertex(0);
 			VertexBase* vj=edge->vertex(1);
 			uOld.inner_multi_indices(vi, 0, ind);
-			number ui = BlockRef(uOld[ind[0][0]],ind[0][1]);
+			number ui = DoFRef(uOld, ind[0]);
 			uOld.inner_multi_indices(vj, 0, ind);
-			number uj = BlockRef(uOld[ind[0][0]],ind[0][1]);
+			number uj = BlockRef(uOld, ind[0]);
 			//UG_LOG("edge " << aaPos[vi] << "-" << aaPos[vj] << " [" << ui << " " << uj << "]\n");
 			if (uj<aaMin[vi]){
 				aaMin[vi]=uj;
@@ -1216,9 +1216,9 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaG
 		 coordi = aaPos[vi];
 		 coordj = aaPos[vj];
 		 uOld.inner_multi_indices(vi, 0, ind);
-		 number ui = BlockRef(uOld[ind[0][0]],ind[0][1]);
+		 number ui = DoFRef(uOld, ind[0]);
 		 uOld.inner_multi_indices(vj, 0, ind);
-		 number uj = BlockRef(uOld[ind[0][0]],ind[0][1]);
+		 number uj = DoFRef(uOld, ind[0]);
 		 VecScaleAdd(coordij,0.5,coordi,0.5,coordj);
 		 VecSubtract(distVec, coordij,coordi);
 		 number uij = ui + distVec*gradi;
@@ -1291,7 +1291,7 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaG
 			grad[i] = aaGrad[vVrt[i]] ;
 			VecAppend(center,coCoord[i]);
 			uOld.inner_multi_indices(vVrt[i], 0, ind);
-			u[i]=BlockRef(uOld[ind[0][0]],ind[0][1]);
+			u[i]=DoFRef(uOld, ind[0]);
 		};
 		center/=noc;
 		for (size_t i=0;i<noc;++i){
@@ -1335,7 +1335,7 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 	// typename domain_type::grid_type& grid = domain.grid();
 
 	//	create Multiindex
-	std::vector<MultiIndex<2> > multInd;
+	std::vector<DoFIndex> multInd;
 
 	typedef typename TGridFunction::template dim_traits<dim>::const_iterator ElemIterator;
 	typedef typename TGridFunction::template dim_traits<dim>::geometric_base_object ElemType;
@@ -1373,7 +1373,7 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 	for (size_t i=0;i < noc;i++){
 		// if (dd.template inner_multi_indices<VertexBase>(vVrt[i], 0, multInd) != 1) return false;
 		uOld.inner_multi_indices(vVrt[i], 0, multInd);
-		uValue[i]=BlockRef(uOld[multInd[0][0]],multInd[0][1]);
+		uValue[i]=DoFRef(uOld, multInd[0]);
 		//UG_LOG(coCoord[i] << "corner "<< i << " value " << uValue[i] << "\n");
 	}
 
@@ -1486,17 +1486,17 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 		flux = m_dt*(ipVelocity[ip]*scvf.normal())*( uValue[base] + (distVec*grad[base]) + 0.5*m_dt*(coSource[base] - (grad[base]*coVelocity[base])) );
 		//UG_LOG(ip << " flux=" << flux << "\n");
 		uOld.inner_multi_indices(vVrt[from], 0, multInd);
-        BlockRef(uNew[multInd[0][0]],multInd[0][1])-=flux/aaVolume[ vVrt[from] ];
+        DoFRef(uNew, multInd[0])-=flux/aaVolume[ vVrt[from] ];
 		if (m_divFree==false){
-		    BlockRef(uNew[multInd[0][0]],multInd[0][1])+=m_dt*(ipVelocity[ip]*scvf.normal())*(uValue[from] + 0.5*m_dt*(coSource[from] - (grad[from]*coVelocity[from])))/aaVolume[ vVrt[from] ];
+		    DoFRef(uNew, multInd[0])+=m_dt*(ipVelocity[ip]*scvf.normal())*(uValue[from] + 0.5*m_dt*(coSource[from] - (grad[from]*coVelocity[from])))/aaVolume[ vVrt[from] ];
 		    //BlockRef(uNew[multInd[0][0]],multInd[0][1])+=m_dt*(ipVelocity[ip]*scvf.normal())*(uValue[from] + 0.0*m_dt*(coSource[from] - (grad[from]*coVelocity[from])))/aaVolume[ vVrt[from] ];
 		};
 		//UG_LOG("source flux from " << m_dt*(ipVelocity[ip]*scvf.normal())*(uValue[from] + 0.5*m_dt*(coSource[from] - (grad[from]*coVelocity[from])))/aaVolume[ vVrt[from] ] << "\n");
 		//UG_LOG("v*n=" << (ipVelocity[ip]*scvf.normal()) << " uExtra=" <<  (uValue[from] + 0.5*m_dt*(coSource[from] - (grad[from]*coVelocity[from]))) << " vol=" << aaVolume[ vVrt[from] ] << "\n");
 		uOld.inner_multi_indices(vVrt[to], 0, multInd);
-        BlockRef(uNew[multInd[0][0]],multInd[0][1])+=flux/aaVolume[ vVrt[to] ];
+        DoFRef(uNew, multInd[0])+=flux/aaVolume[ vVrt[to] ];
 		if (m_divFree==false){
-		    BlockRef(uNew[multInd[0][0]],multInd[0][1])-=m_dt*(ipVelocity[ip]*scvf.normal())*(uValue[to] + 0.5*m_dt*(coSource[to] - (grad[to]*coVelocity[to])))/aaVolume[ vVrt[to] ];
+		    DoFRef(uNew, multInd[0])-=m_dt*(ipVelocity[ip]*scvf.normal())*(uValue[to] + 0.5*m_dt*(coSource[to] - (grad[to]*coVelocity[to])))/aaVolume[ vVrt[to] ];
 			//BlockRef(uNew[multInd[0][0]],multInd[0][1])-=m_dt*(ipVelocity[ip]*scvf.normal())*(uValue[to] + 0.0*m_dt*(coSource[to] - (grad[to]*coVelocity[to])))/aaVolume[ vVrt[to] ];
 		};
 		//UG_LOG("source flux to " << m_dt*(ipVelocity[ip]*scvf.normal())*(uValue[to] + 0.5*m_dt*(coSource[to] - (grad[to]*coVelocity[to])))/aaVolume[ vVrt[to] ] << "\n");
@@ -1651,7 +1651,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaVol& aaVolume)
 		typename domain_type::grid_type& grid = *domain.grid();
 
 	//	create Multiindex
-		std::vector<MultiIndex<2> > multInd;
+		std::vector<DoFIndex> multInd;
 
 	//	create a FV Geometry for the dimension
 		DimFV1Geometry<dim> geo;
@@ -1715,7 +1715,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaVol& aaVolume)
 					u.inner_multi_indices(vVrt[i], fct, multInd);
 
 				//	read value of index from vector
-					uValue[i]=BlockRef(u[multInd[0][0]],multInd[0][1]);
+					uValue[i]=DoFRef(u, multInd[0]);
 
 				//	debug log
 					//UG_LOG("corner " << i << " " << uValue[i] << "\n");
@@ -1809,7 +1809,7 @@ template<typename TGridFunction>
 		typename domain_type::grid_type& grid = *domain.grid();
 
 		//	create Multiindex
-		std::vector<MultiIndex<2> > multInd;
+		std::vector<DoFIndex> multInd;
 
 		//	create a FV Geometry for the dimension
 		DimFV1Geometry<dim> geo;
@@ -1873,15 +1873,15 @@ template<typename TGridFunction>
 					u.inner_multi_indices(vVrt[i], fct, multInd);
 
 					//	read value of index from vector
-					uValue[i]=BlockRef(u[multInd[0][0]],multInd[0][1]);
+					uValue[i]=DoFRef(u, multInd[0]);
 					if (sign==-1){
-						if (BlockRef(phi[multInd[0][0]],multInd[0][1])>0){
+						if (DoFRef(phi, multInd[0])>0){
 							rightsign = false;
 							break;
 						}
 				    };
 					if (sign==1){
-						if (BlockRef(phi[multInd[0][0]],multInd[0][1])>0){
+						if (DoFRef(phi, multInd[0])>0){
 							rightsign = false;
 							break;
 						};
@@ -1896,7 +1896,7 @@ template<typename TGridFunction>
 					u.inner_multi_indices(vVrt[i], fct, multInd);
 
 					//	read value of index from vector
-					uValue[i]=BlockRef(u[multInd[0][0]],multInd[0][1]);
+					uValue[i]=DoFRef(u, multInd[0]);
 
 					//	debug log
 					//UG_LOG("corner " << i << " " << uValue[i] << "\n");
@@ -1998,7 +1998,7 @@ bool FV1LevelSetDisc<TGridFunction>::assign_dirichlet(TGridFunction& numsol){
 				position_accessor_type aaPos = domain.position_accessor();
 
 			//	get vector holding all indices on the vertex
-				std::vector<MultiIndex<2> > ind;
+				std::vector<DoFIndex> ind;
 
 				const size_t numInd = numsol.inner_multi_indices(vrt, 0, ind);
 
@@ -2006,7 +2006,7 @@ bool FV1LevelSetDisc<TGridFunction>::assign_dirichlet(TGridFunction& numsol){
 				if(numInd != 1) {UG_LOG("ERROR: Wrong number of indices!"); return false;}
 
 				(*m_imDirichlet)(&exactVal,&aaPos[vrt],m_time,si,1);
-				BlockRef(numsol[ind[0][0]],ind[0][1]) = exactVal;
+				DoFRef(numsol, ind[0]) = exactVal;
 
 				// MathVector<dim> coord = aaPos[vrt];
 				// UG_LOG("coord " << coord[0] << "," << coord[1] << " <> " << BlockRef(numsol[ind[0][0]],ind[0][1]) << "\n");
@@ -2035,14 +2035,14 @@ bool FV1LevelSetDisc<TGridFunction>::overwrite(TGridFunction& unew,TGridFunction
 			VertexBase* vrt = * iter;
 
 		//	read indices on vertex
-			std::vector<MultiIndex<2> > ind;
+			std::vector<DoFIndex> ind;
 			unew.inner_multi_indices(vrt, 0, ind);
-		    number phiValue = BlockRef(phi[ind[0][0]],ind[0][1]);
+		    number phiValue = DoFRef(phi, ind[0]);
 			int nodeSign;
 			if (phiValue<0)  nodeSign =-1;
 			if (phiValue>0)  nodeSign = 1;
 			if (phiValue==0) nodeSign = 0;
-		    if (nodeSign==sign)	BlockRef(unew[ind[0][0]],ind[0][1]) = BlockRef(uold[ind[0][0]],ind[0][1]);
+		    if (nodeSign==sign)	DoFRef(unew, ind[0]) = DoFRef(uold, ind[0]);
 		}
 	};
     return true;
@@ -2063,14 +2063,14 @@ bool FV1LevelSetDisc<TGridFunction>::overwrite(TGridFunction& unew,number value,
 			VertexBase* vrt = * iter;
 
 		//	read indices on vertex
-			std::vector<MultiIndex<2> > ind;
+			std::vector<MultiIndex> ind;
 			unew.inner_multi_indices(vrt, 0, ind);
-		    number phiValue = BlockRef(phi[ind[0][0]],ind[0][1]);
+		    number phiValue = DoFRef(phi, ind[0]);
 			int nodeSign;
 			if (phiValue<0)  nodeSign =-1;
 			if (phiValue>0)  nodeSign = 1;
 			if (phiValue==0) nodeSign = 0;
-		    if (nodeSign==sign)	BlockRef(unew[ind[0][0]],ind[0][1]) = value;
+		    if (nodeSign==sign)	DoFRef(unew, ind[0]) = value;
 		}
 	};
     return true;
@@ -2127,7 +2127,7 @@ bool FV1LevelSetDisc<TGridFunction>::compute_error(TGridFunction& numsol)
 			position_accessor_type aaPos = domain.position_accessor();
 
 		//	get vector holding all indices on the vertex
-			std::vector<MultiIndex<2> > ind;
+			std::vector<DoFIndex> ind;
 
 			const size_t numInd = numsol.multi_indices(vrt, 0, ind);
 
@@ -2135,14 +2135,14 @@ bool FV1LevelSetDisc<TGridFunction>::compute_error(TGridFunction& numsol)
 			if(numInd != 1) {UG_LOG("ERROR: Wrong number of indices!"); return false;}
 
 			(*m_imDirichlet)(&exactVal,&aaPos[vrt],m_time,si,1);
-			number differ = abs(BlockRef(numsol[ind[0][0]],ind[0][1])-exactVal);
+			number differ = abs(DoFRef(numsol, ind[0])-exactVal);
 		
 			l1Error += aaVolume[vrt] * differ;
 			l2Error += aaVolume[vrt] * differ*differ;
 
 			if (m_print==true){
 			 //   if (differ>0)
-			    UG_LOG("coord=" << aaPos[vrt] << " value=" << BlockRef(numsol[ind[0][0]],ind[0][1]) << " exact=" << exactVal << " error=" << differ << "\n");
+			    UG_LOG("coord=" << aaPos[vrt] << " value=" << DoFRef(numsol, ind[0]) << " exact=" << exactVal << " error=" << differ << "\n");
 			};
 		
 			if (differ > maxErr) maxErr = differ;
@@ -2182,9 +2182,9 @@ bool FV1LevelSetDisc<TGridFunction>::init_function(TGridFunction& u)
 			MathVector<dim> coord;
 			coord = aaPos[vrt];
 		//	get vector holding all indices on the vertex
-			std::vector<MultiIndex<2> > ind;
+			std::vector<DoFIndex> ind;
 			u.inner_multi_indices(vrt, 0, ind);
-			BlockRef(u[ind[0][0]],ind[0][1]) = analytic_solution(m_time,coord);
+			DoFRef(u, ind[0]) = analytic_solution(m_time,coord);
 	     }
 	};
 	return true;
@@ -2315,7 +2315,7 @@ bool FV1LevelSetDisc<TGridFunction>::update_ls_subsets(TGridFunction& phi){
 	typedef typename TGridFunction::template dim_traits<dim>::geometric_base_object ElemType;
 
     //	create Multiindex
-    std::vector<MultiIndex<2> > ind;
+    std::vector<DoFIndex> ind;
 
 	//	get element iterator type
 	m_inactive_sg.set_subset_handler(domain.subset_handler());
@@ -2352,7 +2352,7 @@ bool FV1LevelSetDisc<TGridFunction>::update_ls_subsets(TGridFunction& phi){
      		number phiCo[noc];
            	for(int i = 0; i < noc; ++i){
 	        	phi.inner_multi_indices(vVrt[i], 0, ind);
-     			phiCo[i]=BlockRef(phi[ind[0][0]],ind[0][1]);
+     			phiCo[i]=DoFRef(phi, ind[0]);
       		};
 			int firstNonzero=-1;
 			for (int j=0;j<noc;j++){
@@ -2518,7 +2518,7 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 								   iter != grid.template end<VertexBase>(si); ++iter)
 	    {
 		    VertexBase* vrt = *iter;
-		    typedef typename TGridFunction::std::vector<MultiIndex<2> > index_type;
+		    typedef typename TGridFunction::std::vector<DoFIndex > index_type;
 
 	   //	get vector holding all indices on the vertex
 		    index_type ind;
@@ -2535,7 +2535,7 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
     position_accessor_type aaPos = domain.position_accessor();
 
     //	get vector holding all indices on the vertex
-	std::vector<MultiIndex<2> > ind;
+	std::vector<DoFIndex> ind;
     //	read indices on vertex
 	for (size_t step=0;step<m_nrOfSteps;step++)
 	{
@@ -2594,7 +2594,7 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 				sourceCo[0]= aaPos[vrt];
 				(*m_imSource)(&sourceValue[0],sourceCo,m_time,si,1);
 				uNew.inner_multi_indices(vrt, 0, ind);
-				BlockRef(uNew[ind[0][0]],ind[0][1]) += m_dt*sourceValue[0];
+				DoFRef(uNew, ind[0]) += m_dt*sourceValue[0];
 			};
 	    }
 	    m_time += m_dt;
@@ -2612,7 +2612,7 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 	    	     VertexBase* vrt = *iter;
 	    	     UG_LOG("*\n");
 	    	     uNew.inner_multi_indices(vrt, 0, ind);
-	    		 BlockRef(uNew[ind[0][0]],ind[0][1]) = BlockRef(uOld[ind[0][0]],ind[0][1]);
+	    		 DoFRef(uNew, ind[0]) = DoFRef(uOld, ind[0]);
 	    	 }
 	    };
 

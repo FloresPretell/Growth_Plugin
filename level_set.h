@@ -51,9 +51,6 @@ class FV1LevelSetDisc
 
 	///	type of gradient attachment
 		typedef typename Grid::VertexAttachmentAccessor<Attachment<MathVector<dim> > > aaGrad;
-
-		// 	Type of multi index vector
-		typedef std::vector<MultiIndex<2> > multi_index_vector_type;
 		
 		// edge iterator
 		typedef geometry_traits<EdgeBase>::const_iterator EdgeBaseConstIterator;
