@@ -232,7 +232,7 @@ class LevelSetUserData
 		//    create Multiindex
 		std::vector<DoFIndex> ind;
 		for (size_t i=0;i<numVertices;i++){
-			m_phi->multi_indices(childVertex[i], 0, ind);
+			m_phi->dof_indices(childVertex[i], 0, ind);
 			phi[i]=DoFRef(*m_phi, ind[0]);
 		};
 		bool onls=false;
@@ -311,7 +311,7 @@ class LevelSetUserData
 
 				//    get multiindices of element
 				std::vector<DoFIndex> ind;
-				m_phi->multi_indices(elem, 0, ind);
+				m_phi->dof_indices(elem, 0, ind);
 
 				//     compute lsf at integration point
 				number phiValue = 0.0;
@@ -365,7 +365,7 @@ class LevelSetUserData
 
 				//    get multiindices of element
 				std::vector<DoFIndex> ind;
-				m_phi->multi_indices(elem, 0, ind);
+				m_phi->dof_indices(elem, 0, ind);
 
 				//     compute lsf at integration point
 				phiSideValue[i] = 0.0;
@@ -636,7 +636,7 @@ class LevelSetUserVectorData
 		//    create Multiindex
 		std::vector<DoFIndex> ind;
 		for (size_t i=0;i<numVertices;i++){
-			m_phi->multi_indices(childVertex[i], 0, ind);
+			m_phi->dof_indices(childVertex[i], 0, ind);
 			phi[i]=DoFRef(*m_phi, ind[0]);
 		};
 		bool onls=false;
@@ -715,7 +715,7 @@ class LevelSetUserVectorData
 
 				//    get multiindices of element
 				std::vector<DoFIndex> ind;
-				m_phi->multi_indices(elem, 0, ind);
+				m_phi->dof_indices(elem, 0, ind);
 
 				//     compute lsf at integration point
 				number phiValue = 0.0;
@@ -769,7 +769,7 @@ class LevelSetUserVectorData
 
 				//    get multiindices of element
 				std::vector<DoFIndex> ind;
-				m_phi->multi_indices(elem, 0, ind);
+				m_phi->dof_indices(elem, 0, ind);
 
 				//     compute lsf at integration point
 				phiSideValue[i] = 0.0;
@@ -1056,7 +1056,7 @@ class CRTwoPhaseSource
 		//    create Multiindex
 		std::vector<DoFIndex> ind;
 		for (size_t i=0;i<numVertices;i++){
-			m_phi->multi_indices(childVertex[i], 0, ind);
+			m_phi->dof_indices(childVertex[i], 0, ind);
 			phi[i]=DoFRef(*m_phi, ind[0]);
 		};
 		bool onls=false;
@@ -1135,7 +1135,7 @@ class CRTwoPhaseSource
 					bool currentElemOnLS=false;
 					std::vector<number> currentPhi(elnoc);
 					for (size_t j=0;j<elnoc;j++){
-						m_phi->multi_indices(currentElem->vertex(j),0,ind);
+						m_phi->dof_indices(currentElem->vertex(j),0,ind);
 						currentPhi[j]=DoFRef(*m_phi,ind[0]);
 					}
 					for (size_t i=0;i<numVertices;i++){
@@ -1159,7 +1159,7 @@ class CRTwoPhaseSource
 					}
 				}
 			}
-			m_phi->multi_indices(evaluationElem,1, ind);
+			m_phi->dof_indices(evaluationElem,1, ind);
 			// evaluate curvature
 			number element_curvature=DoFRef(*m_phi, ind[0]);
 			// UG_LOG(element_curvature << "\n");
@@ -1186,7 +1186,7 @@ class CRTwoPhaseSource
 
 				//    get multiindices of element
 				std::vector<DoFIndex> ind;
-				m_phi->multi_indices(elem, 0, ind);
+				m_phi->dof_indices(elem, 0, ind);
 
 				//     compute lsf at integration point
 				phiSideValue[i] = 0.0;
