@@ -104,7 +104,7 @@ class FV1LevelSetDisc
 	/// set scale parameters for external velocity and velocity in normal direction
     	void set_vel_scale(number gamma,number delta){ };
     	void set_reinit(size_t n){ m_reinit=1;m_gamma=0;m_delta=1;m_nrOfSteps=n; };
-		void set_divfree_bool(bool b){m_divFree=b;};
+		void set_divfree(bool b){m_divFree=b;};
 		void set_gamma(number gamma){m_gamma =gamma;}
 		void set_delta(number delta){m_delta =delta;}
 		void set_time(double t){m_time = t;}

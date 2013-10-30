@@ -74,8 +74,8 @@ number FV1LevelSetDisc<TGridFunction>::analytic_solution(number t,MathVector<dim
         	// return 0;
         	//return x[1];//-t;
           //  number z;
-      //      z=min(min(abs(x[0]-1),abs(x[0]+1)),min(abs(x[1]-1),abs(x[1]+1)));
-            //z=min(min(abs(x[0]),abs(1-x[0])),min(abs(x[1]),abs(1-x[1])));
+      //      z=min(min(std::abs(x[0]-1),std::abs(x[0]+1)),min(std::abs(x[1]-1),std::abs(x[1]+1)));
+            //z=min(min(std::abs(x[0]),std::abs(1-x[0])),min(std::abs(x[1]),std::abs(1-x[1])));
         //	return z;
 		    xnew[0] = x[0]*cos(t)+x[1]*sin(t);
 		 	xnew[1] = -x[0]*sin(t)+x[1]*cos(t);
@@ -403,11 +403,11 @@ bool solveLS(std::vector<number>& x,/* solution */
 	for (i=0;i<n;i++){
 		j=i;
 		// Suche groesstes Element in Spalten
-		max=abs(A[i][i]);
+		max=std::abs(A[i][i]);
 		for (k=i+1;k<n;k++){
-			if (abs(A[k][i])>max){
+			if (std::abs(A[k][i])>max){
 				j=k;
-				max=abs(A[k][i]);
+				max=std::abs(A[k][i]);
 			};
 		};
 		//debug
@@ -704,7 +704,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d(number& kappa,siz
         if (order==3)
             phival = coeffs[0]+coeffs[1]*sol[0]+coeffs[2]*sol[1]+coeffs[3]*sol[0]*sol[0]+coeffs[4]*sol[0]*sol[1]+coeffs[5]*sol[1]*sol[1]
 					+coeffs[6]*sol[0]*sol[0]*sol[0]+coeffs[7]*sol[0]*sol[0]*sol[1]+coeffs[8]*sol[0]*sol[1]*sol[1]+coeffs[9]*sol[1]*sol[1]*sol[1];
-        if (abs(phival)<1e-12) break;
+        if (std::abs(phival)<1e-12) break;
         phigamma = coeffs[1]*b+coeffs[2]*d+2*coeffs[3]*sol[0]*b+coeffs[4]*b*sol[1]+coeffs[4]*sol[0]*d+2*coeffs[5]*sol[1]*d+3*coeffs[6]*sol[0]*sol[0]*b
 					+2*coeffs[7]*sol[0]*sol[1]*b+coeffs[7]*sol[0]*sol[0]*d+coeffs[8]*b*sol[1]*sol[1]+2*coeffs[8]*sol[0]*sol[1]*d+3*coeffs[9]*sol[1]*sol[1]*d;
         itgamma -= phival/phigamma;
@@ -837,7 +837,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvature2d2(number& kappa,si
         if (order==3)
             phival = coeffs[0]+coeffs[1]*sol[0]+coeffs[2]*sol[1]+coeffs[3]*sol[0]*sol[0]+coeffs[4]*sol[0]*sol[1]+coeffs[5]*sol[1]*sol[1]
 					+coeffs[6]*sol[0]*sol[0]*sol[0]+coeffs[7]*sol[0]*sol[0]*sol[1]+coeffs[8]*sol[0]*sol[1]*sol[1]+coeffs[9]*sol[1]*sol[1]*sol[1];
-        if (abs(phival)<1e-12) break;
+        if (std::abs(phival)<1e-12) break;
         phigamma = coeffs[1]*b+coeffs[2]*d+2*coeffs[3]*sol[0]*b+coeffs[4]*b*sol[1]+coeffs[4]*sol[0]*d+2*coeffs[5]*sol[1]*d+3*coeffs[6]*sol[0]*sol[0]*b
 					+2*coeffs[7]*sol[0]*sol[1]*b+coeffs[7]*sol[0]*sol[0]*d+coeffs[8]*b*sol[1]*sol[1]+2*coeffs[8]*sol[0]*sol[1]*d+3*coeffs[9]*sol[1]*sol[1]*d;
         itgamma -= phival/phigamma;
@@ -975,8 +975,8 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 		u.dof_indices(elem,1,ind);
 		DoFRef(u,ind[0]) = kappa;
 		if (m_exactcurvatureknown==true)
-			if (abs(kappa+m_exactcurv)>maxnormerr){
-				maxnormerr =abs(kappa+m_exactcurv);
+			if (std::abs(kappa+m_exactcurv)>maxnormerr){
+				maxnormerr =std::abs(kappa+m_exactcurv);
 			}
 		//u.inner_dof_indices(elem, 1, ind);
 		//DoFRef(u,ind[1]) = kappa;
@@ -998,7 +998,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureFromSides(TGridFunct
 	typedef typename TGridFunction::template traits<side_type>::const_iterator side_iterator;
 	typedef typename domain_type::position_accessor_type position_accessor_type;
 	const position_accessor_type& aaPos = u.domain()->position_accessor();
-	std::vector<DoFRef> ind;
+	std::vector<MultiIndex<2> > ind;
 	typedef typename Grid::AttachmentAccessor<side_type,ANumber > aSideNumber;
 	aSideNumber acEdgeCurvature;
 	ANumber aEdgeCurvature;
@@ -1113,14 +1113,15 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureFromSides(TGridFunct
 			u.dof_indices(elem,1,ind);
 			DoFRef(u,ind[0]) = kappa;
 			if (m_exactcurvatureknown==true)
-				if (abs(kappa+m_exactcurv)>maxnormerr){
-					maxnormerr =abs(kappa+m_exactcurv);
+				if (std::abs(kappa+m_exactcurv)>maxnormerr){
+					maxnormerr =std::abs(kappa+m_exactcurv);
 				}
 		}
 	};
 	if (m_exactcurvatureknown==true) UG_LOG("curvature maximum error " << maxnormerr << "\n");
 	return true;
 };
+
 // limit previously computed gradient so that the control-volume-wise linear interpolation function does not introduce new maxima or minima into the data 
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaGrad)
@@ -1173,7 +1174,7 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaG
 			uOld.inner_dof_indices(vi, 0, ind);
 			number ui = DoFRef(uOld, ind[0]);
 			uOld.inner_dof_indices(vj, 0, ind);
-			number uj = BlockRef(uOld, ind[0]);
+			number uj = DoFRef(uOld, ind[0]);
 			//UG_LOG("edge " << aaPos[vi] << "-" << aaPos[vj] << " [" << ui << " " << uj << "]\n");
 			if (uj<aaMin[vi]){
 				aaMin[vi]=uj;
@@ -1364,9 +1365,6 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 	// update fv geometry
 	geo.update(elem, &(coCoord[0]), uOld.domain()->subset_handler().get());
 
-    //UG_LOG("geo.num_scvf() " << geo.num_scvf() << "\n");
-    //UG_LOG("geo.num_scv() " << geo.num_scv() << "\n");
-
 //  fill node value vector
 	std::vector<number> uValue(geo.num_scv());
 	size_t noc = geo.num_scv();
@@ -1374,18 +1372,13 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 		// if (dd.template inner_dof_indices<VertexBase>(vVrt[i], 0, multInd) != 1) return false;
 		uOld.inner_dof_indices(vVrt[i], 0, multInd);
 		uValue[i]=DoFRef(uOld, multInd[0]);
-		//UG_LOG(coCoord[i] << "corner "<< i << " value " << uValue[i] << "\n");
 	}
-
-	//UG_LOG("uValues " << uValue[0] << " " << uValue[1] << " " << uValue[2] << "\n");
-
 //  fill grad vector
     MathVector<dim> grad[maxNumCo];
 	for (size_t i=0;i < noc;i++){
 		// if (dd.template inner_dof_indices<VertexBase>(vVrt[i], 0, multInd) != 1) return false;
 		uOld.inner_dof_indices(vVrt[i], 0, multInd);
 		grad[i]= aaGradient[vVrt[i]];
-		//UG_LOG("corner " << i << " gradient " << grad[i] << "\n");
 	}
 	
 	//  fill corner velocity vector
@@ -1409,57 +1402,38 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 			// 	read local values of u
 			GetLocalVector(localu, uNew);
 
-			//	compute data
-	//		try{
-				(*m_imVelocity)(coVelocity, geo.scv_global_ips(), m_time, si,
-				elem,
-				coCoord, geo.scv_local_ips(),
-				geo.num_sh(), &localu);
-	//		}
-	//		UG_CATCH_THROW("assemble_element : Cannot evaluate velocity data.");
+			(*m_imVelocity)(coVelocity, geo.scv_global_ips(), m_time, si,
+				elem,coCoord, geo.scv_local_ips(),geo.num_sh(), &localu);
 		} else {
 			// see user_data.h : 410
 			(*m_imVelocity)(coVelocity, geo.scv_global_ips(), m_time, si, geo.num_sh());
 		}
-
         if (m_gamma!=1) for (size_t i=0;i < noc;i++) coVelocity[i]*=m_gamma;
 	}
     if (m_delta!=0){
     	for (size_t i=0;i < noc;i++){
     	    number vnorm = VecLength(grad[i]);
     	    if (vnorm>1e-15) for (int j=0;j<dim;j++) coVelocity[i][j] += m_delta/vnorm*grad[i][j];
-    	    //UG_LOG("corner " << i << " gradient" << grad[i] << " velocity " << coVelocity[i] << "\n");
     	};
     };
 //  fill ipVel velocity vector
 	MathVector<dim> ipVelocity[maxNumCo];
-	//UG_LOG("num scvf " << geo.num_scvf() << "\n");
-//	if ((m_interpolate_v_in_ip==true)||(m_delta!=0)){
-		for (size_t ip=0;ip < geo.num_scvf();ip++){
-			ipVelocity[ip] = 0;
-			const typename DimFV1Geometry<dim>::SCVF& scvf = geo.scvf(ip);
-			for (size_t co=0;co < noc;co++){
-			   // UG_LOG("co " << co << "\n");
-				for (int j=0;j<dim;j++){
-				    ipVelocity[ip][j] += scvf.shape(co)*coVelocity[co][j];
-				    // UG_LOG("ip " << ip << " shape " << co << "[" << j << "]=" << scvf.shape(co) << " co velocity " << j << "=" << coVelocity[co][j]<<"\n");
-				};
+	for (size_t ip=0;ip < geo.num_scvf();ip++){
+		ipVelocity[ip] = 0;
+		const typename DimFV1Geometry<dim>::SCVF& scvf = geo.scvf(ip);
+		for (size_t co=0;co < noc;co++){
+			for (int j=0;j<dim;j++){
+			    ipVelocity[ip][j] += scvf.shape(co)*coVelocity[co][j];
 			};
-		}
-//	} else
-	//{
-		//const int si = 0;
-		//(*m_imVelocity)(coVelocity, geo.scv_global_ips(), m_time, si, geo.num_sh());;
-	//};
+		};
+	}
     //  fill source vector
 	std::vector<number> coSource(noc);
 	const int si = 0;
 	(*m_imSource)(&coSource[0], geo.scv_global_ips(), m_time, si, geo.num_sh());
     // get finite volume geometry
 	// FV1Geometry<TElem,dim> geo;
-
     //	typename TGridFunction::vector_type& v_vec = *dynamic_cast<typename TGridFunction::vector_type*>(&u);
-
 	size_t base;
 	number flux;
 	MathVector<dim> distVec;
@@ -1477,11 +1451,7 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 		} else {
 		    base = to;
 		};
-	    //UG_LOG("from " << coCoord[from] << " to " << coCoord[to] << "\n");
 		VecSubtract(distVec, ipCoord,coCoord[base]);
-		//UG_LOG("ip vel " << ipVelocity[ip] << " normal " << scvf.normal() << " v*n " << ipVelocity[ip]*scvf.normal() << "\n");
-		//UG_LOG("distVec*grad[base] " << distVec*grad[base] << " coSource[base] " << coSource[base] << " grad[base]*coVelocity[base] " << grad[base]*coVelocity[base] << "\n");
-		//UG_LOG("u^{n+0.5}_{ip_i} = " << uValue[base] + distVec*grad[base] + 0.5*m_dt*(coSource[base] - grad[base]*coVelocity[base]) << "\n");
 		// flux = v * n * u_{ip(i)}^{n+0.5}
 		flux = m_dt*(ipVelocity[ip]*scvf.normal())*( uValue[base] + (distVec*grad[base]) + 0.5*m_dt*(coSource[base] - (grad[base]*coVelocity[base])) );
 		//UG_LOG(ip << " flux=" << flux << "\n");
@@ -1489,30 +1459,20 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
         DoFRef(uNew, multInd[0])-=flux/aaVolume[ vVrt[from] ];
 		if (m_divFree==false){
 		    DoFRef(uNew, multInd[0])+=m_dt*(ipVelocity[ip]*scvf.normal())*(uValue[from] + 0.5*m_dt*(coSource[from] - (grad[from]*coVelocity[from])))/aaVolume[ vVrt[from] ];
-		    //BlockRef(uNew[multInd[0][0]],multInd[0][1])+=m_dt*(ipVelocity[ip]*scvf.normal())*(uValue[from] + 0.0*m_dt*(coSource[from] - (grad[from]*coVelocity[from])))/aaVolume[ vVrt[from] ];
+		    //DofRef(uNew[multInd[0][0]],multInd[0][1])+=m_dt*(ipVelocity[ip]*scvf.normal())*(uValue[from] + 0.0*m_dt*(coSource[from] - (grad[from]*coVelocity[from])))/aaVolume[ vVrt[from] ];
 		};
-		//UG_LOG("source flux from " << m_dt*(ipVelocity[ip]*scvf.normal())*(uValue[from] + 0.5*m_dt*(coSource[from] - (grad[from]*coVelocity[from])))/aaVolume[ vVrt[from] ] << "\n");
-		//UG_LOG("v*n=" << (ipVelocity[ip]*scvf.normal()) << " uExtra=" <<  (uValue[from] + 0.5*m_dt*(coSource[from] - (grad[from]*coVelocity[from]))) << " vol=" << aaVolume[ vVrt[from] ] << "\n");
 		uOld.inner_dof_indices(vVrt[to], 0, multInd);
         DoFRef(uNew, multInd[0])+=flux/aaVolume[ vVrt[to] ];
 		if (m_divFree==false){
 		    DoFRef(uNew, multInd[0])-=m_dt*(ipVelocity[ip]*scvf.normal())*(uValue[to] + 0.5*m_dt*(coSource[to] - (grad[to]*coVelocity[to])))/aaVolume[ vVrt[to] ];
-			//BlockRef(uNew[multInd[0][0]],multInd[0][1])-=m_dt*(ipVelocity[ip]*scvf.normal())*(uValue[to] + 0.0*m_dt*(coSource[to] - (grad[to]*coVelocity[to])))/aaVolume[ vVrt[to] ];
 		};
-		//UG_LOG("source flux to " << m_dt*(ipVelocity[ip]*scvf.normal())*(uValue[to] + 0.5*m_dt*(coSource[to] - (grad[to]*coVelocity[to])))/aaVolume[ vVrt[to] ] << "\n");
-		//UG_LOG("v*n=" << (ipVelocity[ip]*scvf.normal()) << " uExtra=" <<  (uValue[to] + 0.5*m_dt*(coSource[to] - (grad[to]*coVelocity[to]))) << " vol=" << aaVolume[ vVrt[to] ] << "\n");
-        number localCFL = std::max(m_dt*abs(ipVelocity[ip]*scvf.normal())/aaVolume[ vVrt[from] ],m_dt*abs(ipVelocity[ip]*scvf.normal())/aaVolume[ vVrt[to] ] );
-        //UG_LOG("localCFL " << localCFL << "\n");
+        number localCFL = std::max(m_dt*std::abs(ipVelocity[ip]*scvf.normal())/aaVolume[ vVrt[from] ],m_dt*std::abs(ipVelocity[ip]*scvf.normal())/aaVolume[ vVrt[to] ] );
         if (localCFL>m_maxCFL){
             m_maxCFL = localCFL;
         };
-        //UG_LOG("global CFL " << m_maxCFL << "\n");
-         //		number dist = VecTwoNorm(distVec);
 	};
 	// boundary
 	//	evaluate finite volume geometry
-
-		//UG_LOG("nr of bdry subsets: " << geo.num_boundary_subsets() << " nr of bdry faces: " << geo.num_bf() << "\n");
 		if (geo.num_bf()>0){
 		  	for (int si=0;si<uNew.num_subsets();++si)
 		    {
@@ -1543,37 +1503,18 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
     				flux = m_dt*(bipVelocity*bf.normal())*uValue[nodeID];// first order approximation
     				uOld.inner_dof_indices(vVrt[nodeID], 0, multInd);
     				DoFRef(uNew, multInd[0])-=flux/aaVolume[ vVrt[nodeID] ];
-    				//UG_LOG("coord=" << bf.global_ip( )<< "vel=" << bipVelocity << " n=" << bf.normal() << " flux=" << flux << " source flux=" << m_dt*(bipVelocity*bf.normal())*(uValue[nodeID] + 0.5*m_dt*(coSource[nodeID] - (grad[nodeID]*coVelocity[nodeID])))/aaVolume[ vVrt[nodeID] ] << "\n");
-    				//UG_LOG("v*n=" << (bipVelocity*bf.normal()) << " uExtra=" << (uValue[nodeID] + 0.5*m_dt*(coSource[nodeID] - (grad[nodeID]*coVelocity[nodeID]))) << " volume=" << aaVolume[ vVrt[nodeID] ] << "\n");
-    				if (m_divFree==false){
-    				    //BlockRef(uNew[multInd[0][0]],multInd[0][1])+=m_dt*(bipVelocity*bf.normal())*(uValue[nodeID] + 0.5*m_dt*(coSource[nodeID] - (grad[nodeID]*coVelocity[nodeID])))/aaVolume[ vVrt[nodeID] ];
+       				if (m_divFree==false){
     				    DoFRef(uNew, multInd[0])+=m_dt*(bipVelocity*bf.normal())*(uValue[nodeID] )/aaVolume[ vVrt[nodeID] ];// first order approximation
-    				    //BlockRef(uNew[multInd[0][0]],multInd[0][1])+=m_dt*(bipVelocity*bf.normal())*(uValue[nodeID] + 0.5*m_dt*(bipSource - (grad[nodeID]*coVelocity[nodeID])))/aaVolume[ vVrt[nodeID] ];
     				};
 		    	};
 		     };
 		 };
-
-	// give out corner values for debug
-//	for (size_t i=0;i < noc;i++){
-			// if (dd.template inner_dof_indices<VertexBase>(vVrt[i], 0, multInd) != 1) return false;
-//			dd.inner_dof_indices(vVrt[i], 0, multInd);
-//			uValue[i]=BlockRef(uNew[multInd[0][0]],multInd[0][1]);
-			//UG_LOG(coCoord[i] << "NEW corner "<< i << " value " << uValue[i] << "\n");
-//	}
-
-	//UG_LOG("NEW uValues " << uValue[0] << " " << uValue[1] << " " << uValue[2] << "\n");
-	// end of "for debug"
-
-//	we're done
 	return true;
 }
 
-/*************************
-
-COMPUTE VOLUME OF CONTROL VOLUMES
-
-**************************/
+/*
+compute volume of control volumes
+*/
 template <typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::
 calculate_vertex_vol(TGridFunction& u,aaVol& aaVolume)
@@ -2063,7 +2004,7 @@ bool FV1LevelSetDisc<TGridFunction>::overwrite(TGridFunction& unew,number value,
 			VertexBase* vrt = * iter;
 
 		//	read indices on vertex
-			std::vector<MultiIndex> ind;
+			std::vector<MultiIndex<2> > ind;
 			unew.inner_dof_indices(vrt, 0, ind);
 		    number phiValue = DoFRef(phi, ind[0]);
 			int nodeSign;
@@ -2135,7 +2076,7 @@ bool FV1LevelSetDisc<TGridFunction>::compute_error(TGridFunction& numsol)
 			if(numInd != 1) {UG_LOG("ERROR: Wrong number of indices!"); return false;}
 
 			(*m_imDirichlet)(&exactVal,&aaPos[vrt],m_time,si,1);
-			number differ = abs(DoFRef(numsol, ind[0])-exactVal);
+			number differ = std::abs(DoFRef(numsol, ind[0])-exactVal);
 		
 			l1Error += aaVolume[vrt] * differ;
 			l2Error += aaVolume[vrt] * differ*differ;
