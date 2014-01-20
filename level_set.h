@@ -166,7 +166,7 @@ class FV1LevelSetDisc
 #endif
 
 		void set_source(SmartPtr<CplUserData<number,dim> > user){m_imSource = user;};
-		void set_source(number val){set_source(CreateSmartPtr(new ConstUserNumber<dim>(val)));}
+		void set_source(number val){set_source(make_sp(new ConstUserNumber<dim>(val)));}
 #ifdef UG_FOR_LUA
 		void set_source(const char* fctName)
 		{
@@ -175,7 +175,7 @@ class FV1LevelSetDisc
 #endif
 
 		void set_dirichlet_data(SmartPtr<CplUserData<number,dim> > d){m_imDirichlet = d;};
-		void set_dirichlet_data(number val){set_dirichlet_data(CreateSmartPtr(new ConstUserNumber<dim>(val)));};
+		void set_dirichlet_data(number val){set_dirichlet_data(make_sp(new ConstUserNumber<dim>(val)));};
 #ifdef UG_FOR_LUA
 		void set_dirichlet_data(const char* fctName)
 		{
