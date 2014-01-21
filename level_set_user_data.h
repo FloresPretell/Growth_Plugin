@@ -147,7 +147,7 @@ class LevelSetUserData
 		m_imInsideData = user;
 	}
 	void set_inside_data(number val){
-		set_inside_data(make_sp(new ConstUserNumber<dim>(val)));
+		set_inside_data(CreateSmartPtr(new ConstUserNumber<dim>(val)));
 	}
 #ifdef UG_FOR_LUA
 	void set_inside_data(const char* fctName){
@@ -158,7 +158,7 @@ class LevelSetUserData
 		m_imOutsideData = user;
 	}
 	void set_outside_data(number val){
-		set_outside_data(make_sp(new ConstUserNumber<dim>(val)));
+		set_outside_data(CreateSmartPtr(new ConstUserNumber<dim>(val)));
 	}
 #ifdef UG_FOR_LUA
 	void set_outside_data(const char* fctName){
@@ -960,7 +960,7 @@ class CRTwoPhaseSource
 		m_imDensity = user;
 	}
 	void set_density(number val){
-		set_density(make_sp(new ConstUserNumber<dim>(val)));
+		set_density(CreateSmartPtr(new ConstUserNumber<dim>(val)));
 	}
 #ifdef UG_FOR_LUA
 	void set_density(const char* fctName){
