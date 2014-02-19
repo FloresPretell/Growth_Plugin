@@ -199,7 +199,7 @@ class LevelSetUserData
 		elem_type* element = static_cast<elem_type*>(elem);
 
 		const size_t numVertices = element->num_vertices();
-		std::vector<VertexBase*> childVertex(numVertices);
+		std::vector<Vertex*> childVertex(numVertices);
 		std::vector<number> phi(numVertices);
 
 		for (size_t i=0;i<nip;i++){
@@ -225,7 +225,7 @@ class LevelSetUserData
 			};
 			for (size_t i=0;i<nip;i++){
 				for (size_t j=0;j<lowerLevel;j++){
-					childVertex[i]=m_grid->template get_child<VertexBase>(childVertex[i],0);
+					childVertex[i]=m_grid->template get_child<Vertex>(childVertex[i],0);
 				}
 			}
 		}
@@ -343,7 +343,7 @@ class LevelSetUserData
 
 			//    coord and vertex array
 			MathVector<dim> coCoord[domain_traits<dim>::MaxNumVerticesOfElem];
-			VertexBase* vVrt[domain_traits<dim>::MaxNumVerticesOfElem];
+			Vertex* vVrt[domain_traits<dim>::MaxNumVerticesOfElem];
 			DimCRFVGeometry<dim> geo;
 
 			for(size_t i = 0; i < numVertices; ++i){
@@ -603,7 +603,7 @@ class LevelSetUserVectorData
 		elem_type* element = static_cast<elem_type*>(elem);
 
 		const size_t numVertices = element->num_vertices();
-		std::vector<VertexBase*> childVertex(numVertices);
+		std::vector<Vertex*> childVertex(numVertices);
 		std::vector<number> phi(numVertices);
 
 		for (size_t i=0;i<nip;i++){
@@ -629,7 +629,7 @@ class LevelSetUserVectorData
 			};
 			for (size_t i=0;i<nip;i++){
 				for (size_t j=0;j<lowerLevel;j++){
-					childVertex[i]=m_grid->template get_child<VertexBase>(childVertex[i],0);
+					childVertex[i]=m_grid->template get_child<Vertex>(childVertex[i],0);
 				}
 			}
 		}
@@ -747,7 +747,7 @@ class LevelSetUserVectorData
 
 			//    coord and vertex array
 			MathVector<dim> coCoord[domain_traits<dim>::MaxNumVerticesOfElem];
-			VertexBase* vVrt[domain_traits<dim>::MaxNumVerticesOfElem];
+			Vertex* vVrt[domain_traits<dim>::MaxNumVerticesOfElem];
 			DimCRFVGeometry<dim> geo;
 
 			for(size_t i = 0; i < numVertices; ++i){
@@ -1025,7 +1025,7 @@ class CRTwoPhaseSource
 		elem_type* element = static_cast<elem_type*>(elem);
 
 		const size_t numVertices = element->num_vertices();
-		std::vector<VertexBase*> childVertex(numVertices);
+		std::vector<Vertex*> childVertex(numVertices);
 		std::vector<number> phi(numVertices);
 
 		// find child vertices by injection
@@ -1048,7 +1048,7 @@ class CRTwoPhaseSource
 			};
 			for (size_t i=0;i<nip;i++){
 				for (size_t j=0;j<lowerLevel;j++){
-					childVertex[i]=m_grid->template get_child<VertexBase>(childVertex[i],0);
+					childVertex[i]=m_grid->template get_child<Vertex>(childVertex[i],0);
 				}
 			}
 		} else onfinestlevel=true;
@@ -1111,7 +1111,7 @@ class CRTwoPhaseSource
 
 			//    coord and vertex array
 			MathVector<dim> coCoord[domain_traits<dim>::MaxNumVerticesOfElem];
-			VertexBase* vVrt[domain_traits<dim>::MaxNumVerticesOfElem];
+			Vertex* vVrt[domain_traits<dim>::MaxNumVerticesOfElem];
 			elem_type* evaluationElem;
 			MathVector<dim> surftensSource[max_number_of_ips];
 			for (size_t i=0;i<nip;i++){

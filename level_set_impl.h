@@ -96,7 +96,7 @@ template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::fill_v_vec(TGridFunction& vel,int component)
 {
 	typedef typename domain_type::position_accessor_type position_accessor_type;
-	typedef typename TGridFunction::template traits<VertexBase>::const_iterator VertexBaseConstIterator;
+	typedef typename TGridFunction::template traits<Vertex>::const_iterator VertexConstIterator;
 
 	if (component>dim){
 		UG_THROW("fill_v_vec: component > dim.");
@@ -105,11 +105,11 @@ bool FV1LevelSetDisc<TGridFunction>::fill_v_vec(TGridFunction& vel,int component
 	position_accessor_type aaPos = vel.domain()->position_accessor();
 	for (int si=0;si<vel.num_subsets();++si)
 	{
-		for(VertexBaseConstIterator iter = vel.template begin<VertexBase>(si);
-									   iter != vel.template end<VertexBase>(si); ++iter)
+		for(VertexConstIterator iter = vel.template begin<Vertex>(si);
+									   iter != vel.template end<Vertex>(si); ++iter)
 		{
 		//	get vertex
-			VertexBase* vrt = *iter;
+			Vertex* vrt = *iter;
 			MathVector<dim> coord;
 			MathVector<dim> vnode;
 			coord = aaPos[vrt];
@@ -134,7 +134,7 @@ bool FV1LevelSetDisc<TGridFunction>::compute_normal(TGridFunction& vx,TGridFunct
 {
 	typedef typename TGridFunction::domain_type domain_type;
 	typedef typename domain_type::position_accessor_type position_accessor_type;
-	typedef typename TGridFunction::template traits<VertexBase>::const_iterator VertexBaseConstIterator;
+	typedef typename TGridFunction::template traits<Vertex>::const_iterator VertexConstIterator;
 
 	// get grid
 	typename domain_type::grid_type& grid = *u.domain()->grid();
@@ -177,10 +177,10 @@ bool FV1LevelSetDisc<TGridFunction>::compute_normal(TGridFunction& vx,TGridFunct
 	    if (m_dirichlet_sg.size()!=0) if (m_dirichlet_sg.contains(si)==true) continue;
 	    if (m_neumann_sg.size()!=0) if (m_neumann_sg.contains(si)==true) continue;
 	    if (m_inactive_sg.size()!=0) if (m_inactive_sg.contains(si)==true) continue;
-        VertexBaseConstIterator iter = u.template begin<VertexBase>(si);
-		VertexBaseConstIterator iterEnd = u.template end<VertexBase>(si);
+        VertexConstIterator iter = u.template begin<Vertex>(si);
+		VertexConstIterator iterEnd = u.template end<Vertex>(si);
 		for (;iter != iterEnd; ++iter){
-		    VertexBase* vrt = *iter;
+		    Vertex* vrt = *iter;
 			u.inner_dof_indices(vrt, 0, ind);
 			number vnorm = VecLength(aaGradient[vrt]);
 			if (vnorm>1e-15){
@@ -201,7 +201,7 @@ bool FV1LevelSetDisc<TGridFunction>::compute_dnormal(TGridFunction& dnormal,TGri
 {
 	typedef typename TGridFunction::domain_type domain_type;
 	typedef typename domain_type::position_accessor_type position_accessor_type;
-	typedef typename TGridFunction::template traits<VertexBase>::const_iterator VertexBaseConstIterator;
+	typedef typename TGridFunction::template traits<Vertex>::const_iterator VertexConstIterator;
 
 	// get grid
 	typename domain_type::grid_type& grid = *u.domain()->grid();
@@ -244,11 +244,11 @@ bool FV1LevelSetDisc<TGridFunction>::compute_dnormal(TGridFunction& dnormal,TGri
 	// calculate normal of phi
 	compute_normal(vx,vy,phi);
 	for (int si=0;si<u.num_subsets();++si){
-		VertexBaseConstIterator iter = u.template begin<VertexBase>(si);
-	    VertexBaseConstIterator iterEnd = u.template end<VertexBase>(si);
+		VertexConstIterator iter = u.template begin<Vertex>(si);
+	    VertexConstIterator iterEnd = u.template end<Vertex>(si);
 //	    UG_LOG("START INDEX" << si << "\n");
 		for (;iter != iterEnd; ++iter){
-			VertexBase* vrt = *iter;
+			Vertex* vrt = *iter;
 			u.inner_dof_indices(vrt, 0, ind);
 			coord = aaPos[vrt];
 			DoFRef(dnormal, ind[0]) = DoFRef(vx, ind[0]) * aaGradient[vrt][0] + DoFRef(vy, ind[0]) * aaGradient[vrt][1];
@@ -266,7 +266,7 @@ bool FV1LevelSetDisc<TGridFunction>::compute_ddnormal(TGridFunction& ddnormal,TG
 {
 	typedef typename TGridFunction::domain_type domain_type;
 	typedef typename domain_type::position_accessor_type position_accessor_type;
-	typedef typename TGridFunction::template traits<VertexBase>::const_iterator VertexBaseConstIterator;
+	typedef typename TGridFunction::template traits<Vertex>::const_iterator VertexConstIterator;
 
 	// get grid
 	typename domain_type::grid_type& grid = *u.domain()->grid();
@@ -310,11 +310,11 @@ bool FV1LevelSetDisc<TGridFunction>::compute_ddnormal(TGridFunction& ddnormal,TG
 	std::vector<DoFIndex> ind;
 
 	for (int si=0;si<u.num_subsets();++si){
-		VertexBaseConstIterator iter = u.template begin<VertexBase>(si);
-	    VertexBaseConstIterator iterEnd = u.template end<VertexBase>(si);
+		VertexConstIterator iter = u.template begin<Vertex>(si);
+	    VertexConstIterator iterEnd = u.template end<Vertex>(si);
 ////	    UG_LOG("START INDEX" << si << "\n");
 		for (;iter != iterEnd; ++iter){
-			VertexBase* vrt = *iter;
+			Vertex* vrt = *iter;
 			u.inner_dof_indices(vrt, 0, ind);
 			coord = aaPos[vrt];
 			DoFRef(ddnormal, ind[0])
@@ -892,8 +892,8 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 		}
 		std::vector<MathVector<dim> > coord;
 		std::vector<number> phi;
-		std::vector<VertexBase*> nbrs;
-		std::vector<VertexBase*> nbrCandidates;
+		std::vector<Vertex*> nbrs;
+		std::vector<Vertex*> nbrCandidates;
 		size_t depth=order;
 		std::vector<size_t> stageStart(depth+2);
 	for(  ;iter !=iterEnd; ++iter)
@@ -1022,8 +1022,8 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureFromSides(TGridFunct
 		}
 		std::vector<MathVector<dim> > coord;
 		std::vector<number> phi;
-		std::vector<VertexBase*> nbrs;
-		std::vector<VertexBase*> nbrCandidates;
+		std::vector<Vertex*> nbrs;
+		std::vector<Vertex*> nbrCandidates;
 		size_t depth=order;
 		std::vector<size_t> stageStart(depth+2);
 		for(  ;iter !=iterEnd; ++iter)
@@ -1128,7 +1128,7 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaG
 {
 	typedef typename TGridFunction::domain_type domain_type;
 	typedef typename domain_type::position_accessor_type position_accessor_type;
-	typedef typename TGridFunction::template traits<VertexBase>::const_iterator VertexBaseConstIterator;
+	typedef typename TGridFunction::template traits<Vertex>::const_iterator VertexConstIterator;
 	typedef typename TGridFunction::template traits<EdgeBase>::const_iterator EdgeBaseConstIterator;
 
 	// get grid
@@ -1150,10 +1150,10 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaG
 	Grid::VertexAttachmentAccessor<ANumber> aaMin(grid, aMin);
 	Grid::VertexAttachmentAccessor<ANumber> aaMax(grid, aMax);
 	for (int si=0;si<uOld.num_subsets();++si){
-		for(VertexBaseConstIterator iter = uOld.template begin<VertexBase>(si);
-				iter !=uOld.template end<VertexBase>(si); ++iter)
+		for(VertexConstIterator iter = uOld.template begin<Vertex>(si);
+				iter !=uOld.template end<Vertex>(si); ++iter)
 				{
-		    	    VertexBase* vrt = *iter;
+		    	    Vertex* vrt = *iter;
 		    	    MathVector<dim> coord;
 		    	    coord = aaPos[vrt];
 		    	    //	read indices on vertex
@@ -1169,8 +1169,8 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaG
 				iter !=uOld.template end<EdgeBase>(si); ++iter)
 		{
 			EdgeBase* edge = *iter;
-			VertexBase* vi=edge->vertex(0);
-			VertexBase* vj=edge->vertex(1);
+			Vertex* vi=edge->vertex(0);
+			Vertex* vj=edge->vertex(1);
 			uOld.inner_dof_indices(vi, 0, ind);
 			number ui = DoFRef(uOld, ind[0]);
 			uOld.inner_dof_indices(vj, 0, ind);
@@ -1192,10 +1192,10 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaG
 
 	};
 	for (int si=0;si<2;++si){
-		for(VertexBaseConstIterator iter = uOld.template begin<VertexBase>(si) ;
-				iter !=uOld.template end<VertexBase>(si); ++iter)
+		for(VertexConstIterator iter = uOld.template begin<Vertex>(si) ;
+				iter !=uOld.template end<Vertex>(si); ++iter)
 		{
-/*		    VertexBase* vrt = *iter;
+/*		    Vertex* vrt = *iter;
 			MathVector<dim> coord;
 			coord = aaPos[vrt];
 			// read indices on vertex
@@ -1209,8 +1209,8 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaG
 	    		iter !=uOld.template end<EdgeBase>(si); ++iter)
    	    {
          EdgeBase* edge = *iter;
-         VertexBase* vi=edge->vertex(0);
-         VertexBase* vj=edge->vertex(1);
+         Vertex* vi=edge->vertex(0);
+         Vertex* vj=edge->vertex(1);
          MathVector<dim> coordi,coordj,coordij,distVec,gradi,gradj;
          gradi = aaGrad[vi];
          gradj = aaGrad[vj];
@@ -1263,7 +1263,7 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaG
 	typedef typename TGridFunction::template dim_traits<dim>::const_iterator ElemIterator;
 	typedef typename TGridFunction::template dim_traits<dim>::grid_base_object ElemType;
 
-	VertexBase* vVrt[domain_traits<dim>::MaxNumVerticesOfElem];
+	Vertex* vVrt[domain_traits<dim>::MaxNumVerticesOfElem];
 	//	coord and vertex array
 	MathVector<dim> coCoord[domain_traits<dim>::MaxNumVerticesOfElem];
 	//	coord and vertex array
@@ -1354,7 +1354,7 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 
     //	coord and vertex array
 	MathVector<dim> coCoord[domain_traits<dim>::MaxNumVerticesOfElem];
-	VertexBase* vVrt[domain_traits<dim>::MaxNumVerticesOfElem];
+	Vertex* vVrt[domain_traits<dim>::MaxNumVerticesOfElem];
 
 	//	get vertices and extract corner coordinates
 	const size_t numVertices = elem->num_vertices();
@@ -1369,14 +1369,14 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 	std::vector<number> uValue(geo.num_scv());
 	size_t noc = geo.num_scv();
 	for (size_t i=0;i < noc;i++){
-		// if (dd.template inner_dof_indices<VertexBase>(vVrt[i], 0, multInd) != 1) return false;
+		// if (dd.template inner_dof_indices<Vertex>(vVrt[i], 0, multInd) != 1) return false;
 		uOld.inner_dof_indices(vVrt[i], 0, multInd);
 		uValue[i]=DoFRef(uOld, multInd[0]);
 	}
 //  fill grad vector
     MathVector<dim> grad[maxNumCo];
 	for (size_t i=0;i < noc;i++){
-		// if (dd.template inner_dof_indices<VertexBase>(vVrt[i], 0, multInd) != 1) return false;
+		// if (dd.template inner_dof_indices<Vertex>(vVrt[i], 0, multInd) != 1) return false;
 		uOld.inner_dof_indices(vVrt[i], 0, multInd);
 		grad[i]= aaGradient[vVrt[i]];
 	}
@@ -1611,7 +1611,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaVol& aaVolume)
 
 		//	coord and vertex array
 		MathVector<dim> coCoord[domain_traits<dim>::MaxNumVerticesOfElem];
-		VertexBase* vVrt[domain_traits<dim>::MaxNumVerticesOfElem];
+		Vertex* vVrt[domain_traits<dim>::MaxNumVerticesOfElem];
 
 	//	sum up all contributions of the sub control volumes to one vertex in an attachment
 		for(int si = 0; si < domain.subset_handler()->num_subsets(); ++si)
@@ -1704,15 +1704,15 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaVol& aaVolume)
 
 	// int count=0;
 	typedef typename domain_type::position_accessor_type position_accessor_type;
-	typedef typename TGridFunction::template traits<VertexBase>::const_iterator VertexBaseConstIterator;
+	typedef typename TGridFunction::template traits<Vertex>::const_iterator VertexConstIterator;
 	position_accessor_type aaPos = u.domain()->position_accessor();
 	for (int si=0;si < u.num_subsets();++si){
 		//UG_LOG("si " << si << "\n");
-	    for(VertexBaseConstIterator iter = u.template begin<VertexBase>(si);
-						   iter != u.template end<VertexBase>(si); ++iter)
+	    for(VertexConstIterator iter = u.template begin<Vertex>(si);
+						   iter != u.template end<Vertex>(si); ++iter)
 	    {
 	    //	get vertex
-		    VertexBase* vrt = *iter;
+		    Vertex* vrt = *iter;
 		    if (aaVolume[vrt]!=0){
 		        (aaGradient[vrt]) /= aaVolume[vrt];
 		    };
@@ -1769,7 +1769,7 @@ template<typename TGridFunction>
 
 		//	coord and vertex array
 		MathVector<dim> coCoord[domain_traits<dim>::MaxNumVerticesOfElem];
-		VertexBase* vVrt[domain_traits<dim>::MaxNumVerticesOfElem];
+		Vertex* vVrt[domain_traits<dim>::MaxNumVerticesOfElem];
 
 		//	sum up all contributions of the sub control volumes to one vertex in an attachment
 		for(int si = 0; si < domain.subset_handler()->num_subsets(); ++si)
@@ -1885,15 +1885,15 @@ template<typename TGridFunction>
 
 		// int count=0;
 		typedef typename domain_type::position_accessor_type position_accessor_type;
-		typedef typename TGridFunction::template traits<VertexBase>::const_iterator VertexBaseConstIterator;
+		typedef typename TGridFunction::template traits<Vertex>::const_iterator VertexConstIterator;
 		position_accessor_type aaPos = u.domain()->position_accessor();
 		for (int si=0;si < u.num_subsets();++si){
 			//UG_LOG("si " << si << "\n");
-			for(VertexBaseConstIterator iter = u.template begin<VertexBase>(si);
-				iter != u.template end<VertexBase>(si); ++iter)
+			for(VertexConstIterator iter = u.template begin<Vertex>(si);
+				iter != u.template end<Vertex>(si); ++iter)
 			{
 				//	get vertex
-				VertexBase* vrt = *iter;
+				Vertex* vrt = *iter;
 				if (aaVolume[vrt]!=0){
 					(aaGradient[vrt]) /= aaVolume[vrt];
 				};
@@ -1925,16 +1925,16 @@ bool FV1LevelSetDisc<TGridFunction>::assign_dirichlet(TGridFunction& numsol){
 
 		// UG_LOG("nr dir ss " << m_dirichlet_sg.size() << "\n");
 
-		typedef typename TGridFunction::template traits<VertexBase>::const_iterator VertexBaseConstIterator;
+		typedef typename TGridFunction::template traits<Vertex>::const_iterator VertexConstIterator;
 		for(size_t i = 0; i < m_dirichlet_sg.size(); ++i)
 		{
 	        const int si = m_dirichlet_sg[i];
 	        // UG_LOG("Dirichlet boundary is: "<<si<< "\n");
-			for(VertexBaseConstIterator iter = numsol.template begin<VertexBase>(si);
-										   iter != numsol.template end<VertexBase>(si); ++iter)
+			for(VertexConstIterator iter = numsol.template begin<Vertex>(si);
+										   iter != numsol.template end<Vertex>(si); ++iter)
 			{
 			//	get vertex
-				VertexBase* vrt = *iter;
+				Vertex* vrt = *iter;
 				number exactVal;
 				position_accessor_type aaPos = domain.position_accessor();
 
@@ -1967,13 +1967,13 @@ bool FV1LevelSetDisc<TGridFunction>::assign_dirichlet(TGridFunction& numsol){
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::overwrite(TGridFunction& unew,TGridFunction& uold,TGridFunction& phi,int sign)
 {
-	typedef typename TGridFunction::template traits<VertexBase>::const_iterator VertexBaseConstIterator;
+	typedef typename TGridFunction::template traits<Vertex>::const_iterator VertexConstIterator;
 
 	for (int si=0;si<unew.num_subsets();++si){
-		for(VertexBaseConstIterator iter = unew.template begin<VertexBase>(si);
-									   iter != unew.template end<VertexBase>(si); ++iter)
+		for(VertexConstIterator iter = unew.template begin<Vertex>(si);
+									   iter != unew.template end<Vertex>(si); ++iter)
 		{
-			VertexBase* vrt = * iter;
+			Vertex* vrt = * iter;
 
 		//	read indices on vertex
 			std::vector<DoFIndex> ind;
@@ -1994,14 +1994,14 @@ bool FV1LevelSetDisc<TGridFunction>::overwrite(TGridFunction& unew,TGridFunction
 template<typename TGridFunction>
 bool FV1LevelSetDisc<TGridFunction>::overwrite(TGridFunction& unew,number value,TGridFunction& phi,int sign)
 {
-	typedef typename TGridFunction::template traits<VertexBase>::const_iterator VertexBaseConstIterator;
+	typedef typename TGridFunction::template traits<Vertex>::const_iterator VertexConstIterator;
 
 	for (int si=0;si<unew.num_subsets();++si){
 
-		for(VertexBaseConstIterator iter = unew.template begin<VertexBase>(si);
-									   iter != unew.template end<VertexBase>(si); ++iter)
+		for(VertexConstIterator iter = unew.template begin<Vertex>(si);
+									   iter != unew.template end<Vertex>(si); ++iter)
 		{
-			VertexBase* vrt = * iter;
+			Vertex* vrt = * iter;
 
 		//	read indices on vertex
 			std::vector<MultiIndex<2> > ind;
@@ -2055,15 +2055,15 @@ bool FV1LevelSetDisc<TGridFunction>::compute_error(TGridFunction& numsol)
 
 	//UG_LOG("----------------------------\n");
 
-	typedef typename TGridFunction::template traits<VertexBase>::const_iterator VertexBaseConstIterator;
+	typedef typename TGridFunction::template traits<Vertex>::const_iterator VertexConstIterator;
 	if(!bRes) {UG_LOG("Error while calculating CV Volume.\n"); return false;}
 	for (int si=0;si<numsol.num_subsets();++si){
 		// UG_LOG("*** " << si << "\n");
-		for(VertexBaseConstIterator iter = numsol.template begin<VertexBase>(si);
-									   iter != numsol.template end<VertexBase>(si); ++iter)
+		for(VertexConstIterator iter = numsol.template begin<Vertex>(si);
+									   iter != numsol.template end<Vertex>(si); ++iter)
 		{
 		//	get vertex
-			VertexBase* vrt = *iter;
+			Vertex* vrt = *iter;
 			number exactVal;
 			position_accessor_type aaPos = domain.position_accessor();
 
@@ -2113,13 +2113,13 @@ bool FV1LevelSetDisc<TGridFunction>::init_function(TGridFunction& u)
 	//	read indices on vertex
 	position_accessor_type aaPos = domain.position_accessor();
 
-	typedef typename TGridFunction::template traits<VertexBase>::const_iterator VertexBaseConstIterator;
+	typedef typename TGridFunction::template traits<Vertex>::const_iterator VertexConstIterator;
 	for (int si=0;si<domain.subset_handler()->num_subsets();++si){
-		for(VertexBaseConstIterator iter = u.template begin<VertexBase>(si);
-									   iter != u.template end<VertexBase>(si); ++iter)
+		for(VertexConstIterator iter = u.template begin<Vertex>(si);
+									   iter != u.template end<Vertex>(si); ++iter)
 		{
 		//	get vertex
-			VertexBase* vrt = *iter;
+			Vertex* vrt = *iter;
 			MathVector<dim> coord;
 			coord = aaPos[vrt];
 		//	get vector holding all indices on the vertex
@@ -2190,7 +2190,7 @@ bool FV1LevelSetDisc<TGridFunction>::runtimetest(TGridFunction& uNew)
 			//	get Elem
 			ElemType* elem = *iter;
 			//	get vertices of the Elem
-			std::vector<VertexBase*> vVrt;
+			std::vector<Vertex*> vVrt;
 			CollectVertices(vVrt, grid, elem);
 			//	get position accessor
 			typedef typename domain_type::position_accessor_type position_accessor_type;
@@ -2214,7 +2214,7 @@ bool FV1LevelSetDisc<TGridFunction>::runtimetest(TGridFunction& uNew)
 			//	get Elem
 			ElemType* elem = *iter;
 			//	get vertices of the Elem
-			std::vector<VertexBase*> vVrt;
+			std::vector<Vertex*> vVrt;
 			CollectVertices(vVrt, grid, elem);
 		};
 	};
@@ -2224,12 +2224,12 @@ bool FV1LevelSetDisc<TGridFunction>::runtimetest(TGridFunction& uNew)
 	position_accessor_type aaPos = domain.position_accessor();
 
 	for (int si=0;si<uNew.num_subsets();++si){
-		VertexBaseConstIterator iter = uNew.template begin<VertexBase>(si);
-	    VertexBaseConstIterator iterEnd = uNew.template end<VertexBase>(si);
+		VertexConstIterator iter = uNew.template begin<Vertex>(si);
+	    VertexConstIterator iterEnd = uNew.template end<Vertex>(si);
 		for(;iter != iterEnd; ++iter)
 		{
 		//	get vertex
-			VertexBase* vrt = *iter;
+			Vertex* vrt = *iter;
 			coord = aaPos[vrt];
 		}
 	};*/
@@ -2273,7 +2273,7 @@ bool FV1LevelSetDisc<TGridFunction>::update_ls_subsets(TGridFunction& phi){
         	ElemType* elem = *iter;
 
         	//	coord and vertex array
-        	VertexBase* vVrt[domain_traits<dim>::MaxNumVerticesOfElem];
+        	Vertex* vVrt[domain_traits<dim>::MaxNumVerticesOfElem];
 
         	//	get vertices and extract corner coordinates
         	const size_t numVertices = elem->num_vertices();
@@ -2372,10 +2372,10 @@ bool FV1LevelSetDisc<TGridFunction>::update_ls_subsets(TGridFunction& phi){
     	};
     	UG_LOG(count << " elements in subset\n");
     	count=0;
-       	 for(VertexBaseConstIterator iter = phi.template begin<VertexBase>(sindex);
-    	   iter != phi.template end<VertexBase>(sindex); ++iter)
+       	 for(VertexConstIterator iter = phi.template begin<Vertex>(sindex);
+    	   iter != phi.template end<Vertex>(sindex); ++iter)
        	 {
-       	     VertexBase* vrt = *iter;
+       	     Vertex* vrt = *iter;
        	    ++count;
        	 }
     	 UG_LOG(count << " nodes in subset\n");
@@ -2455,10 +2455,10 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 	//UG_LOG("***************************************************\n");
 
 	/*for (int si=0;si<uNew.num_subsets();++si){
-		for(VertexBaseConstIterator iter = uNew.template begin<VertexBase>(si);
-								   iter != grid.template end<VertexBase>(si); ++iter)
+		for(VertexConstIterator iter = uNew.template begin<Vertex>(si);
+								   iter != grid.template end<Vertex>(si); ++iter)
 	    {
-		    VertexBase* vrt = *iter;
+		    Vertex* vrt = *iter;
 		    typedef typename TGridFunction::std::vector<DoFIndex > index_type;
 
 	   //	get vector holding all indices on the vertex
@@ -2523,15 +2523,15 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 			    assemble_element(elem, geo, *uNew.domain()->grid(),uNew,uOld,aaGradient,aaVolume);
 		    };
 	    };
-		typedef typename TGridFunction::template traits<VertexBase>::const_iterator VertexBaseConstIterator;
+		typedef typename TGridFunction::template traits<Vertex>::const_iterator VertexConstIterator;
 		for (int si=0;si<uOld.num_subsets();++si){
 			if (m_dirichlet_sg.size()!=0) if (m_dirichlet_sg.contains(si)==true) continue;
 			if (m_inactive_sg.size()!=0) if (m_inactive_sg.contains(si)==true) continue;
 			std::vector<number> sourceValue(1);
 			MathVector<dim> sourceCo[1];
-			for(VertexBaseConstIterator iter = uNew.template begin<VertexBase>(si);
-					    			                      iter != uNew.template end<VertexBase>(si); ++iter){
-				VertexBase* vrt = *iter;
+			for(VertexConstIterator iter = uNew.template begin<Vertex>(si);
+					    			                      iter != uNew.template end<Vertex>(si); ++iter){
+				Vertex* vrt = *iter;
 				sourceCo[0]= aaPos[vrt];
 				(*m_imSource)(&sourceValue[0],sourceCo,m_time,si,1);
 				uNew.inner_dof_indices(vrt, 0, ind);
@@ -2547,10 +2547,10 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 	    {
 	    	 const int si = m_inactive_sg[i];
 	    	 UG_LOG("inactive si: " << si << "\n");
-	    	 for(VertexBaseConstIterator iter = uNew.template begin<VertexBase>(si);
-	    	 									   iter != uNew.template end<VertexBase>(si); ++iter)
+	    	 for(VertexConstIterator iter = uNew.template begin<Vertex>(si);
+	    	 									   iter != uNew.template end<Vertex>(si); ++iter)
 	    	 {
-	    	     VertexBase* vrt = *iter;
+	    	     Vertex* vrt = *iter;
 	    	     UG_LOG("*\n");
 	    	     uNew.inner_dof_indices(vrt, 0, ind);
 	    		 DoFRef(uNew, ind[0]) = DoFRef(uOld, ind[0]);

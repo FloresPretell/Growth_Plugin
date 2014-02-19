@@ -56,7 +56,7 @@ class FV1LevelSetDisc
 		typedef geometry_traits<EdgeBase>::const_iterator EdgeBaseConstIterator;
 
 		// vertex base iterator
-		typedef geometry_traits<VertexBase>::const_iterator VertexBaseConstIterator;
+		typedef geometry_traits<Vertex>::const_iterator VertexConstIterator;
 
 	 public:
     ///	Constructor
