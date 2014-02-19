@@ -53,7 +53,7 @@ class FV1LevelSetDisc
 		typedef typename Grid::VertexAttachmentAccessor<Attachment<MathVector<dim> > > aaGrad;
 		
 		// edge iterator
-		typedef geometry_traits<EdgeBase>::const_iterator EdgeBaseConstIterator;
+		typedef geometry_traits<Edge>::const_iterator EdgeConstIterator;
 
 		// vertex base iterator
 		typedef geometry_traits<Vertex>::const_iterator VertexConstIterator;

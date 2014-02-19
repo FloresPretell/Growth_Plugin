@@ -1129,7 +1129,7 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaG
 	typedef typename TGridFunction::domain_type domain_type;
 	typedef typename domain_type::position_accessor_type position_accessor_type;
 	typedef typename TGridFunction::template traits<Vertex>::const_iterator VertexConstIterator;
-	typedef typename TGridFunction::template traits<EdgeBase>::const_iterator EdgeBaseConstIterator;
+	typedef typename TGridFunction::template traits<Edge>::const_iterator EdgeConstIterator;
 
 	// get grid
 	typename domain_type::grid_type& grid = *uOld.domain()->grid();
@@ -1165,10 +1165,10 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaG
 	}
 	for (int si=0;si<uOld.num_subsets();++si){
 		//UG_LOG("si " << si << "\n");
-		for(EdgeBaseConstIterator iter = uOld.template begin<EdgeBase>(si) ;
-				iter !=uOld.template end<EdgeBase>(si); ++iter)
+		for(EdgeConstIterator iter = uOld.template begin<Edge>(si) ;
+				iter !=uOld.template end<Edge>(si); ++iter)
 		{
-			EdgeBase* edge = *iter;
+			Edge* edge = *iter;
 			Vertex* vi=edge->vertex(0);
 			Vertex* vj=edge->vertex(1);
 			uOld.inner_dof_indices(vi, 0, ind);
@@ -1205,10 +1205,10 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaG
 		}
 	}
 	for (int si=0;si<1;++si){
-	    for(EdgeBaseConstIterator iter = uOld.template begin<EdgeBase>(si) ;
-	    		iter !=uOld.template end<EdgeBase>(si); ++iter)
+	    for(EdgeConstIterator iter = uOld.template begin<Edge>(si) ;
+	    		iter !=uOld.template end<Edge>(si); ++iter)
    	    {
-         EdgeBase* edge = *iter;
+         Edge* edge = *iter;
          Vertex* vi=edge->vertex(0);
          Vertex* vj=edge->vertex(1);
          MathVector<dim> coordi,coordj,coordij,distVec,gradi,gradj;
