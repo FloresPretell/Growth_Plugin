@@ -50,7 +50,7 @@ class LevelSetUserDataBase
 	void evaluate(TData vValue[],
 	                const MathVector<dim> vGlobIP[],
 	                number time, int si,
-	                GeometricObject* elem,
+	                GridObject* elem,
 	                const MathVector<dim> vCornerCoords[],
 	                const MathVector<refDim> vLocIP[],
 	                const size_t nip,
@@ -61,7 +61,7 @@ class LevelSetUserDataBase
 		                                    vCornerCoords,vLocIP,nip,u,vJT);
 	}
 
-	virtual void compute(LocalVector* u, GeometricObject* elem,
+	virtual void compute(LocalVector* u, GridObject* elem,
 	                     const MathVector<dim> vCornerCoords[], bool bDeriv = false)
 	{
 		const number t = this->time();
@@ -109,7 +109,7 @@ class LevelSetUserData
 	typedef typename domain_type::grid_type grid_type;
 
 	/// element type
-	typedef typename TGridFunction::template dim_traits<dim>::geometric_base_object elem_type;
+	typedef typename TGridFunction::template dim_traits<dim>::grid_base_object elem_type;
 
 	enum eval_type {sharp,cr_ip_average};
 
@@ -188,7 +188,7 @@ class LevelSetUserData
 	inline void evaluate(number vValue[],
 	                     const MathVector<dim> vGlobIP[],
 	                     number time, int si,
-	                     GeometricObject* elem,
+	                     GridObject* elem,
 	                     const MathVector<dim> vCornerCoords[],
 	                     const MathVector<refDim> vLocIP[],
 	                     const size_t nip,
@@ -436,7 +436,7 @@ class LevelSetUserVectorData
 	typedef typename domain_type::grid_type grid_type;
 
 	/// element type
-	typedef typename TGridFunction::template dim_traits<dim>::geometric_base_object elem_type;
+	typedef typename TGridFunction::template dim_traits<dim>::grid_base_object elem_type;
 
 	enum eval_type {sharp,cr_ip_average};
 
@@ -592,7 +592,7 @@ class LevelSetUserVectorData
 	inline void evaluate(MathVector<dim> vValue[],
 	                     const MathVector<dim> vGlobIP[],
 	                     number time, int si,
-	                     GeometricObject* elem,
+	                     GridObject* elem,
 	                     const MathVector<dim> vCornerCoords[],
 	                     const MathVector<refDim> vLocIP[],
 	                     const size_t nip,
@@ -871,7 +871,7 @@ class CRTwoPhaseSource
 	typedef typename domain_type::grid_type grid_type;
 
 	/// element type
-	typedef typename TGridFunction::template dim_traits<dim>::geometric_base_object elem_type;
+	typedef typename TGridFunction::template dim_traits<dim>::grid_base_object elem_type;
 
 	  private:
 	// level set grid function
@@ -1002,7 +1002,7 @@ class CRTwoPhaseSource
 	inline void evaluate(MathVector<dim> vValue[],
 	                     const MathVector<dim> vGlobIP[],
 	                     number time, int si,
-	                     GeometricObject* elem,
+	                     GridObject* elem,
 	                     const MathVector<dim> vCornerCoords[],
 	                     const MathVector<refDim> vLocIP[],
 	                     const size_t nip,

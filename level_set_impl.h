@@ -872,7 +872,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureOnGrid2d(TGridFuncti
 	// get grid
 	typename domain_type::grid_type& grid = *u.domain()->grid();
 	typedef typename TGridFunction::template dim_traits<dim>::const_iterator ElemIterator;
-	typedef typename TGridFunction::template dim_traits<dim>::geometric_base_object ElemType;
+	typedef typename TGridFunction::template dim_traits<dim>::grid_base_object ElemType;
 	typedef typename domain_type::position_accessor_type position_accessor_type;
 	const position_accessor_type& aaPos = u.domain()->position_accessor();
 	std::vector<DoFIndex> ind;
@@ -992,7 +992,7 @@ bool FV1LevelSetDisc<TGridFunction>::computeElementCurvatureFromSides(TGridFunct
 	typedef typename domain_type::grid_type grid_type;
 	// get grid
 	typename domain_type::grid_type& grid = *u.domain()->grid();
-	typedef typename TGridFunction::template dim_traits<dim>::geometric_base_object elem_type;
+	typedef typename TGridFunction::template dim_traits<dim>::grid_base_object elem_type;
 	typedef typename TGridFunction::template dim_traits<dim>::const_iterator elem_iterator;
 	typedef typename elem_type::side side_type;
 	typedef typename TGridFunction::template traits<side_type>::const_iterator side_iterator;
@@ -1261,7 +1261,7 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad(TGridFunction& uOld, aaGrad& aaG
 	}
 
 	typedef typename TGridFunction::template dim_traits<dim>::const_iterator ElemIterator;
-	typedef typename TGridFunction::template dim_traits<dim>::geometric_base_object ElemType;
+	typedef typename TGridFunction::template dim_traits<dim>::grid_base_object ElemType;
 
 	VertexBase* vVrt[domain_traits<dim>::MaxNumVerticesOfElem];
 	//	coord and vertex array
@@ -1339,7 +1339,7 @@ bool FV1LevelSetDisc<TGridFunction>::assemble_element(TElem& elem, DimFV1Geometr
 	std::vector<DoFIndex> multInd;
 
 	typedef typename TGridFunction::template dim_traits<dim>::const_iterator ElemIterator;
-	typedef typename TGridFunction::template dim_traits<dim>::geometric_base_object ElemType;
+	typedef typename TGridFunction::template dim_traits<dim>::grid_base_object ElemType;
 
 	//	hard code function (fct=0)
 	//\todo: generalize
@@ -1527,7 +1527,7 @@ calculate_vertex_vol(TGridFunction& u,aaVol& aaVolume)
 
 	//	element iterator type
 		typedef typename TGridFunction::template dim_traits<dim>::const_iterator ElemIterator;
-		typedef typename TGridFunction::template dim_traits<dim>::geometric_base_object ElemType;
+		typedef typename TGridFunction::template dim_traits<dim>::grid_base_object ElemType;
 
 	//	get position accessor
 		typedef typename domain_type::position_accessor_type position_accessor_type;
@@ -1599,7 +1599,7 @@ calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient,aaVol& aaVolume)
 
 	//	get element iterator type
 		typedef typename TGridFunction::template dim_traits<dim>::const_iterator ElemIterator;
-		typedef typename TGridFunction::template dim_traits<dim>::geometric_base_object ElemType;
+		typedef typename TGridFunction::template dim_traits<dim>::grid_base_object ElemType;
 
 	//	hard code function (fct=0)
 	//\todo: generalize
@@ -1757,7 +1757,7 @@ template<typename TGridFunction>
 
 		//	get element iterator type
 		typedef typename TGridFunction::template dim_traits<dim>::const_iterator ElemIterator;
-		typedef typename TGridFunction::template dim_traits<dim>::geometric_base_object ElemType;
+		typedef typename TGridFunction::template dim_traits<dim>::grid_base_object ElemType;
 
 		//	hard code function (fct=0)
 		//\todo: generalize
@@ -2146,7 +2146,7 @@ bool FV1LevelSetDisc<TGridFunction>::runtimetest(TGridFunction& uNew)
 
 	//	element iterator type
 	typedef typename TGridFunction::template dim_traits<dim>::const_iterator ElemIterator;
-	typedef typename TGridFunction::template dim_traits<dim>::geometric_base_object ElemType;
+	typedef typename TGridFunction::template dim_traits<dim>::grid_base_object ElemType;
 	
  	//	create a FV Geometry for the dimension
 	DimFV1Geometry<dim> geo;
@@ -2253,7 +2253,7 @@ bool FV1LevelSetDisc<TGridFunction>::update_ls_subsets(TGridFunction& phi){
 
 	//	element iterator type
 	typedef typename TGridFunction::template dim_traits<dim>::const_iterator ElemIterator;
-	typedef typename TGridFunction::template dim_traits<dim>::geometric_base_object ElemType;
+	typedef typename TGridFunction::template dim_traits<dim>::grid_base_object ElemType;
 
     //	create Multiindex
     std::vector<DoFIndex> ind;
@@ -2423,7 +2423,7 @@ bool FV1LevelSetDisc<TGridFunction>::advect_lsf(TGridFunction& uNew,TGridFunctio
 
 	//	element iterator type
 	typedef typename TGridFunction::template dim_traits<dim>::const_iterator ElemIterator;
-	typedef typename TGridFunction::template dim_traits<dim>::geometric_base_object ElemType;
+	typedef typename TGridFunction::template dim_traits<dim>::grid_base_object ElemType;
 
 	//	create Attachment for scv-volume size
 	ANumber aScvVolume;
