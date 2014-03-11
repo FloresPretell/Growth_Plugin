@@ -223,7 +223,7 @@ InitUGPlugin_LevelSet(Registry* reg, string grp)
 	typedef LevelSet::Functionality Functionality;
 
 	try{
-		RegisterDomainAlgebraDependent<Functionality>(*reg,grp);
+		RegisterDomain2d3dAlgebraDependent<Functionality>(*reg,grp);
 	}
 	UG_REGISTRY_CATCH_THROW(grp);
 }
