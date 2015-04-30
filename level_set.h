@@ -1,16 +1,15 @@
 /*
- * level_set_util.h
+ * level_set.h
  *
  *  Created on: 01.07.2011
  *      Author: Christian Wehner  christian.wehner@gcsc.uni-frankfurt.de
  */
-
-#ifndef LEVEL_SET_UTIL_H_
-#define LEVEL_SET_UTIL_H_
-
-#include "common/common.h"
+#ifndef __H__UG__PLUGINS__LEVEL_SET__LEVEL_SET_H__
+#define __H__UG__PLUGINS__LEVEL_SET__LEVEL_SET_H__
 
 #include <vector>
+
+#include "common/common.h"
 #include "lib_disc/common/groups_util.h"
 #include "lib_disc/spatial_disc/user_data/data_export.h"
 #include "lib_disc/spatial_disc/user_data/data_import.h"
@@ -30,7 +29,6 @@ namespace LevelSet{
 template<typename TGridFunction>
 class FV1LevelSetDisc
 {
-	    enum UserDataType {HardcodedData,FunctorData,VectorData,ConstantData};
 	///	domain type
 		typedef typename TGridFunction::domain_type domain_type;
 		
@@ -40,54 +38,40 @@ class FV1LevelSetDisc
 	///	world dimension
 		static const int dim = domain_type::dim;
 
-		///for debug	type of scv-size attachment
-			//	typedef typename Grid::VertexAttachmentAccessor<Attachment<number> > aaDiv;
+	//	for debug	type of scv-size attachment
+	//	typedef typename Grid::VertexAttachmentAccessor<Attachment<number> > aaDiv;
 
 	///	grid type
 		typedef typename domain_type::grid_type grid_type;
-
+	
+	/// type of the position accessor
+		typedef typename domain_type::position_accessor_type position_accessor_type;
+		
 	///	type of volume-size attachment
 		typedef typename Grid::VertexAttachmentAccessor<Attachment<number> > aaVol;
 
 	///	type of gradient attachment
 		typedef typename Grid::VertexAttachmentAccessor<Attachment<MathVector<dim> > > aaGrad;
 		
-		// edge iterator
-		typedef geometry_traits<Edge>::const_iterator EdgeConstIterator;
+	/// type of base grid object
+		typedef typename TGridFunction::template dim_traits<dim>::grid_base_object ElemType;
 
-		// vertex base iterator
-		typedef geometry_traits<Vertex>::const_iterator VertexConstIterator;
+	/// edge iterator
+		typedef typename TGridFunction::template traits<Edge>::const_iterator EdgeConstIterator;
 
-	 public:
-    ///	Constructor
-      	    ///	Destructor
-      	~FV1LevelSetDisc() {};
+	/// vertex base iterator
+		typedef typename TGridFunction::template traits<Vertex>::const_iterator VertexConstIterator;
+		
+	///	grid element iterator
+		typedef typename TGridFunction::template dim_traits<dim>::const_iterator ElemIterator;
 
-    ///	set time step
-     	FV1LevelSetDisc() :
+	public:
+	///	Constructor
+		FV1LevelSetDisc() :
       		m_dt(0.0), m_time(0), m_gamma(1.0), m_delta(0.0),
-      		m_reinit(false), m_analyticalSolution(true),
-      		m_analyticalVelocity(false),m_externalVelocity(true),m_analyticalSource(false),m_divFree(false),
+      		m_divFree(false),
       		m_nrOfSteps(1),
       		m_maxCFL(0),m_print(false),m_timestep_nr(0),m_limiter(false),
-		    m_vel_x_fct(0),
-		    m_vel_y_fct(0),
-		    m_vel_z_fct(0),
-		    m_source_fct(0),
-		    m_solution_fct(0),
-		    m_vel_x_vec(0),
-		    m_vel_y_vec(0),
-		    m_vel_z_vec(0),
-		    m_source_vec(0),
-		    m_source_constant(0),
-		    m_constantv_x(0),
-		    m_constantv_y(0),
-		    m_constantv_z(0),
-		    m_dirichlet_constant(0),
-		    m_source_type(HardcodedData),
-		    m_velocity_type(HardcodedData),
-      	    m_dirichlet_data_type(HardcodedData),
-      	    m_interpolate_v_in_ip(true),
       	    m_inside_elements_si(2),
       	  	m_outside_elements_si(3),
       	  	m_onls_elements_si(4),
@@ -95,33 +79,34 @@ class FV1LevelSetDisc
       	  	m_outside_nodes_si(6),
       	  	m_onls_nodes_si(7)
       	{
-     		m_exactcurvatureknown=false;
      		set_source(0.0);
       	}
 
+	///	Destructor
+		~FV1LevelSetDisc() {};
+
+    ///	set time step
         void set_dt(number deltaT){ UG_LOG("Set dt="<<deltaT<<"\n"); m_dt=deltaT; };
 
-	/// set scale parameters for external velocity and velocity in normal direction
-    	void set_vel_scale(number gamma,number delta){ };
-    	void set_reinit(size_t n){ m_reinit=1;m_gamma=0;m_delta=1;m_nrOfSteps=n; };
+	/// set nr of time steps to perform in advect_lsf (default is 1)
+		void set_nr_of_steps(size_t n){m_nrOfSteps = n;};
+		
+    	void set_reinit(size_t n){ m_gamma=0;m_delta=1;m_nrOfSteps=n; };
 		void set_divfree(bool b){m_divFree=b;};
 		void set_gamma(number gamma){m_gamma =gamma;}
 		void set_delta(number delta){m_delta =delta;}
-		void set_time(double t){m_time = t;}
+		void set_time(number t){m_time = t;}
 		number get_time(){return m_time;};
 		void set_info(bool b){m_print=b;};
 		void set_limiter(bool b){m_limiter=b;};
 		void set_timestep_nr(size_t n){m_timestep_nr = n;};
-		// set nr of time steps to perform in advect_lsf (default is 1)
-		void set_nr_of_steps(size_t n){m_nrOfSteps = n;};
-		///	adds a post process to be used when stepping the level set function
-//		void add_post_process(IConstraint<dof_distribution_type, algebra_type>& pp){m_vPP.push_back(&pp);}
-	    bool compute_error(TGridFunction& numsol);
+		
+	///	computes the time steps of the discretization of the level-set equation
 		bool advect_lsf(TGridFunction& uNew,TGridFunction& u);
-	    bool init_function(TGridFunction& u);
-	///	adds a post process to be used when stepping the level set function
-		void add_post_process(SmartPtr<IConstraint<algebra_type> > pp) {m_vPP.push_back(pp);}
-
+		
+	/// computes error w.r.t. the analytical solution (taken from the dirichlet bc)
+	    bool compute_error(TGridFunction& numsol);
+	    
 		void set_velocity(SmartPtr<CplUserData<MathVector<dim>, dim> > user) {m_imVelocity=user;}
 
 		void set_velocity(number vel_x)
@@ -183,19 +168,12 @@ class FV1LevelSetDisc
 		}
 #endif
 
-		bool fill_v_vec(TGridFunction& vel,int component);
-		
 		bool runtimetest (TGridFunction& u);
 
 		bool compute_normal(TGridFunction& vx,TGridFunction& vy,TGridFunction& u);
 		bool compute_dnormal(TGridFunction& dnormal,TGridFunction& vx,TGridFunction& vy,TGridFunction& phi,TGridFunction& u);
 		bool compute_ddnormal(TGridFunction& ddnormal,TGridFunction& dnormal,TGridFunction& vx,TGridFunction& vy,TGridFunction& phi,TGridFunction& u);
 		
-		bool computeElementCurvature2d(number& kappa,size_t elementnoc,const std::vector<MathVector<dim> >& co,std::vector<number> phi,size_t order);
-		bool computeElementCurvature2d2(number& kappa,size_t elementnoc,const std::vector<MathVector<dim> >& co,std::vector<number> phi,size_t order,number nodefactor);
-		bool computeElementCurvatureOnGrid2d(TGridFunction& u,size_t order,number leastSquaresFactor);
-		bool computeElementCurvatureFromSides(TGridFunction& u,size_t order,number leastSquaresFactor);
-
       /// boundary condition subset handling
 		bool set_dirichlet_boundary(TGridFunction& uNew,const char* subsets){
 			try{
@@ -212,11 +190,6 @@ class FV1LevelSetDisc
 
 			return true;
 		}
-
-	   void exact_curvature(number kappa){
-		   m_exactcurvatureknown = true;
-		   m_exactcurv = kappa;
-	   }
 
 /// subset handling methods:
 
@@ -280,15 +253,9 @@ class FV1LevelSetDisc
         bool overwrite(TGridFunction&,number,TGridFunction&,int);
 
 	 protected:
-	    number analytic_solution(number,MathVector<dim>);
-		number analytic_source(number,MathVector<dim>);
-	    bool analytic_velocity(MathVector<dim>&,number, MathVector<dim>);
 
 	///	fills the scvVolume attachment for all element types
 	    bool calculate_vertex_vol(TGridFunction& u, aaVol& aaVolVolume);
-
-//	    template <typename TElem>
-//   	    bool calculate_vertex_grad_vol(grid_type& grid,TGridFunction& u, aaGrad& aaGradient, aaVol& aaVolume );
 
 	    bool calculate_vertex_grad_vol(TGridFunction& u, aaGrad& aaGradient, aaVol& aaVolume );
 
@@ -297,63 +264,29 @@ class FV1LevelSetDisc
 		template <typename TElem>
 		bool assemble_element(TElem& elem, DimFV1Geometry<dim>& geo, grid_type& grid,TGridFunction& uNew,const TGridFunction& uOld,aaGrad& aaGradient, aaVol& aaVolume );
 
-//fordebug		template <typename TElem>
-//		bool assemble_divergence(TElem& elem,grid_type& grid,TGridFunction& uNew,aaDiv& aaDivergence,aaGrad& aaGradient );
-
 		bool assign_dirichlet(TGridFunction&);
 		bool limit_grad(TGridFunction& uOld, aaGrad& aaGradient);
 
-		//bool limit_grad_alpha(TGridFunction& uOld,aaGrad& aaGradient,aaAlpha& aaAlpha);
-
 	private:
-	///	vector holding all scheduled post processes
-		std::vector<SmartPtr<IConstraint<algebra_type> > > m_vPP;
       	number m_dt;
 		number m_time;
     	number m_gamma;
       	number m_delta;
-    	bool m_reinit;
-    	bool m_analyticalSolution;
-	    bool m_analyticalVelocity;
-	    bool m_externalVelocity;
-		bool m_analyticalSource;
     	bool m_divFree;
-    	bool m_exactcurvatureknown;
      	size_t m_nrOfSteps;
 		number m_maxCFL;
 		bool m_print;
-		number m_exactcurv;
 		size_t m_timestep_nr;
 		size_t m_limiter;
 		SubsetGroup m_neumann_sg;
 		SubsetGroup m_dirichlet_sg;
 		SubsetGroup m_inactive_sg;
-		SmartPtr<CplUserData<number,dim> > m_vel_x_fct;
-		SmartPtr<CplUserData<number,dim> > m_vel_y_fct;
-		SmartPtr<CplUserData<number,dim> > m_vel_z_fct;
-		SmartPtr<CplUserData<number,dim> > m_source_fct;
-		SmartPtr<CplUserData<number,dim> > m_solution_fct;
-		TGridFunction* m_vel_x_vec;
-		TGridFunction* m_vel_y_vec;
-		TGridFunction* m_vel_z_vec;
-		TGridFunction* m_source_vec;
-		number m_source_constant;
-		number m_constantv_x;
-		number m_constantv_y;
-		number m_constantv_z;
-		number m_dirichlet_constant;
-		UserDataType m_source_type;
-		UserDataType m_velocity_type;
-		UserDataType m_dirichlet_data_type;
-		bool m_interpolate_v_in_ip;
 		int m_inside_elements_si;
 		int m_outside_elements_si;
 		int m_onls_elements_si;
 		int m_inside_nodes_si;
 		int m_outside_nodes_si;
 		int m_onls_nodes_si;
-
-		static const size_t maxNumCo = 20;
 
 		///	Data import for the Velocity field
 		SmartPtr<CplUserData<MathVector<dim>, dim> > m_imVelocity;
@@ -369,4 +302,4 @@ class FV1LevelSetDisc
 // include implementation
 #include "level_set_impl.h"
 
-#endif /* LEVEL_SET_UTIL_H_ */
+#endif /* __H__UG__PLUGINS__LEVEL_SET__LEVEL_SET_H__ */

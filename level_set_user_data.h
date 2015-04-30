@@ -72,6 +72,16 @@ class LevelSetUserDataBase
 			                                 this->num_ip(s), u);
 	}
 
+	virtual void compute(LocalVectorTimeSeries* u, GridObject* elem,
+	                     const MathVector<dim> vCornerCoords[], bool bDeriv = false)
+	{
+		const int si = this->subset();
+		for(size_t s = 0; s < this->num_series(); ++s)
+			getImpl().template evaluate<dim>(this->values(s), this->ips(s),  this->time(s), si,
+			                                 elem, vCornerCoords, this->template local_ips<dim>(s),
+			                                 this->num_ip(s), &(u->solution(this->time_point(s))));
+	}
+
 	///	returns if provided data is continuous over geometric object boundaries
 	virtual bool continuous() const {return false;}
 
@@ -202,9 +212,9 @@ class LevelSetUserData
 		std::vector<Vertex*> childVertex(numVertices);
 		std::vector<number> phi(numVertices);
 
-		for (size_t i=0;i<nip;i++){
-			//		            	UG_LOG("co(" << i << ",:)=" << vGlobIP[i] << "\n");
-		}
+	//	for (size_t i=0;i<nip;i++){
+	//		UG_LOG("co(" << i << ",:)=" << vGlobIP[i] << "\n");
+	//	}
 
 		// find child vertices by injection
 		for(size_t i = 0; i < numVertices; ++i){

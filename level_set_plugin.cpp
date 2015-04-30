@@ -4,13 +4,17 @@
  * created by Christian Wehner
  */
 
+// ug4 headers
 #include "bridge/util.h"
 #include "bridge/util_domain_algebra_dependent.h"
+#include "lib_disc/operator/non_linear_operator/newton_solver/newton_update_interface.h"
 
+// plugin headers
 #include "level_set.h"
 #include "level_set_user_data.h"
-
-#include "lib_disc/operator/non_linear_operator/newton_solver/newton_update_interface.h"
+#include "ls_analytic.h"
+#include "ls_curvature2d.h"
+#include "hrfblsm_discr.h"
 
 using namespace std;
 using namespace ug::bridge;
@@ -54,20 +58,18 @@ static void DomainAlgebra(Registry& reg, string grp)
 		reg.add_class_<T>(name, grp)
 			.add_constructor()
 			.add_method("set_dt", &T::set_dt)
-			.add_method("set_vel_scale", &T::set_vel_scale)
+			.add_method("set_time", &T::set_time)
 			.add_method("set_reinit", &T::set_reinit)
 			.add_method("set_divfree", &T::set_divfree)
 			.add_method("set_info", &T::set_info)
 			.add_method("set_timestep_nr",&T::set_timestep_nr)
 			.add_method("set_nr_of_steps", &T::set_nr_of_steps)
 			.add_method("advect_lsf", &T::advect_lsf)
-			.add_method("add_post_process", &T::add_post_process)
 			.add_method("set_delta", &T::set_delta)
 			.add_method("set_gamma", &T::set_gamma)
-			.add_method("set_limiter",&T::set_limiter)
+			.add_method("set_limiter", &T::set_limiter)
 			.add_method("set_dirichlet_boundary",&T::set_dirichlet_boundary)
 			.add_method("set_outflow_boundary",&T::set_outflow_boundary)
-			.add_method("init_function", &T::init_function)
 			.add_method("set_source", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim> >)>(&T::set_source), "", "Source")
 			.add_method("set_source", static_cast<void (T::*)(number)>(&T::set_source), "", "Source")
 #ifdef UG_FOR_LUA
@@ -80,36 +82,19 @@ static void DomainAlgebra(Registry& reg, string grp)
 #ifdef UG_FOR_LUA
 			.add_method("set_velocity", static_cast<void (T::*)(const char*)>(&T::set_velocity), "", "Velocity Field")
 #endif
-/*			.add_method("set_vel_x", static_cast<void (T::*)(SmartPtr<CplUserData<number,dim> >)>(&T::set_vel_x))
-			.add_method("set_vel_y", static_cast<void (T::*)(SmartPtr<CplUserData<number,dim> >)>(&T::set_vel_y))
-			.add_method("set_vel_z", static_cast<void (T::*)(SmartPtr<CplUserData<number,dim> >)>(&T::set_vel_z))
-			.add_method("set_source", static_cast<void (T::*)(SmartPtr<CplUserData<number,dim> >)>(&T::set_source))
-			.add_method("set_vel_x", static_cast<void (T::*)(function_type&)>(&T::set_vel_x))
-			.add_method("set_vel_y", static_cast<void (T::*)(function_type&)>(&T::set_vel_y))
-			.add_method("set_vel_z", static_cast<void (T::*)(function_type&)>(&T::set_vel_z))
-			.add_method("set_vel_x", static_cast<void (T::*)(number)>(&T::set_vel_x))
-			.add_method("set_vel_y", static_cast<void (T::*)(number)>(&T::set_vel_y))
-			.add_method("set_vel_z", static_cast<void (T::*)(number)>(&T::set_vel_z))
-			.add_method("set_vel_x", static_cast<void (T::*)()>(&T::set_vel_x))
-			.add_method("set_vel_y", static_cast<void (T::*)()>(&T::set_vel_y))
-			.add_method("set_vel_z", static_cast<void (T::*)()>(&T::set_vel_z))
-			.add_method("set_source", static_cast<void (T::*)(function_type&)>(&T::set_source))
-			.add_method("set_source", static_cast<void (T::*)(number)>(&T::set_source))
-			.add_method("set_source", static_cast<void (T::*)()>(&T::set_source))*/
 			.add_method("set_dirichlet_data", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim> >)>(&T::set_dirichlet_data), "", "Source")
 			.add_method("set_dirichlet_data", static_cast<void (T::*)(number)>(&T::set_dirichlet_data), "", "Source")
 #ifdef UG_FOR_LUA
 			.add_method("set_dirichlet_data", static_cast<void (T::*)(const char*)>(&T::set_dirichlet_data), "", "Source")
 #endif
-			.add_method("compute_normal",&T::compute_normal)
-			.add_method("compute_dnormal",&T::compute_dnormal)
-			.add_method("compute_ddnormal",&T::compute_ddnormal)
-			.add_method("fill_v_vec",&T::fill_v_vec)
-			.add_method("get_time",&T::get_time)
+			.add_method("compute_normal", &T::compute_normal)
+			.add_method("compute_dnormal", &T::compute_dnormal)
+			.add_method("compute_ddnormal", &T::compute_ddnormal)
+			.add_method("get_time", &T::get_time)
 			.add_method("runtimetest", &T::runtimetest)
-			.add_method("init_ls_subsets",&T::init_ls_subsets)
-			.add_method("create_ls_subsets",&T::create_ls_subsets)
-			.add_method("update_ls_subsets",&T::update_ls_subsets)
+			.add_method("init_ls_subsets", &T::init_ls_subsets)
+			.add_method("create_ls_subsets", &T::create_ls_subsets)
+			.add_method("update_ls_subsets" ,&T::update_ls_subsets)
 			.add_method("set_elements_active", static_cast<void (T::*)(int)>(&T::set_elements_active))
 			.add_method("set_elements_active", static_cast<void (T::*)(int,int)>(&T::set_elements_active))
 			.add_method("set_elements_active", static_cast<void (T::*)(int,int,int)>(&T::set_elements_active))
@@ -124,11 +109,35 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.add_method("set_nodes_inactive", static_cast<void (T::*)(int,int,int)>(&T::set_nodes_inactive))
 			.add_method("overwrite",static_cast<bool (T::*)(function_type&,function_type&,function_type&,int)>(&T::overwrite))
 			.add_method("overwrite",static_cast<bool (T::*)(function_type&,number,function_type&,int)>(&T::overwrite))
-			.add_method("compute_error", &T::compute_error)
+			.add_method("compute_error", &T::compute_error);
+		reg.add_class_to_group(name, "FV1LevelSetDisc", tag);
+	}
+	
+	// level set analytic functions
+	{
+		typedef LevelSetAnalytic<function_type> T;
+		typedef typename function_type::domain_type domain_type;
+		string name = string("LevelSetAnalytic").append(suffix);
+		reg.add_class_<T>(name, grp)
+			.add_constructor()
+			.add_method("set_time", &T::set_time)
+			.add_method("get_time", &T::get_time)
+			.add_method("fill_v_vec",&T::fill_v_vec)
+			.add_method("init_function", &T::init_function);
+		reg.add_class_to_group(name, "LevelSetAnalytic", tag);
+	}
+	
+	// computation of the curvature in 2d
+	{
+		typedef LevelSetCurvature<function_type> T;
+		typedef typename function_type::domain_type domain_type;
+		string name = string("LevelSetCurvature").append(suffix);
+		reg.add_class_<T>(name, grp)
+			.add_constructor()
 			.add_method("compute_curvature", &T::computeElementCurvatureOnGrid2d)
 			.add_method("compute_curvature_from_sides", &T::computeElementCurvatureFromSides)
 			.add_method("exact_curvature", static_cast<void (T::*)(number)>(&T::exact_curvature), "", "Exact curvature");
-		reg.add_class_to_group(name, "FV1LevelSetDisc", tag);
+		reg.add_class_to_group(name, "LevelSetCurvature", tag);
 	}
 
 	// level set user data
@@ -207,6 +216,44 @@ static void DomainAlgebra(Registry& reg, string grp)
 			reg.add_class_to_group(name, "CRTwoPhaseSource", tag);
 		}
 
+// 	HiResFluxBasedLSM
+	{
+		typedef HiResFluxBasedLSM<function_type> T;
+		typedef typename function_type::domain_type domain_type;
+		string name = string("HiResFluxBasedLSM").append(suffix);
+		reg.add_class_<T>(name, grp)
+			.add_constructor()
+			.add_method("advect_lsf", static_cast<void (T::*) ()>(&T::advect_lsf), "", "Compute the time steps of the method")
+			.add_method("set_solutions", static_cast<void (T::*)(SmartPtr<function_type>,SmartPtr<function_type>)>(&T::set_solutions), "old#new", "Solutions at the time levels")
+			.add_method("set_LSF", static_cast<void (T::*)(SmartPtr<function_type>)>(&T::set_LSF), "", "Level-Set function to specity the interface")
+			.add_method("set_SDF", static_cast<void (T::*)(SmartPtr<function_type>)>(&T::set_SDF), "", "Signed-distance function to get the eff. dt at the interface")
+			.add_method("set_vel_potential", static_cast<void (T::*)(SmartPtr<function_type>)>(&T::set_vel_potential), "", "Potential of the velocity")
+			.add_method("set_dt", &T::set_dt)
+			.add_method("set_time", &T::set_time)
+			.add_method("get_time", &T::get_time)
+			.add_method("set_divfree", &T::set_divfree)
+			.add_method("set_timestep_nr", &T::set_timestep_nr)
+			.add_method("set_nr_of_steps", &T::set_nr_of_steps)
+			.add_method("set_delta", &T::set_delta)
+			.add_method("set_gamma", &T::set_gamma)
+			.add_method("set_source", static_cast<void (T::*)(number)>(&T::set_source), "", "Source")
+			.add_method("set_source_neg", static_cast<void (T::*)(number)>(&T::set_source_neg), "", "Source (for LSF < 0)")
+			.add_method("set_source_pos", static_cast<void (T::*)(number)>(&T::set_source_pos), "", "Source (for LSF > 0)")
+			.add_method("set_interface_data", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim> >)>(&T::set_interface_data), "", "Dirichlet BC at the interface")
+#ifdef UG_FOR_LUA
+			.add_method("set_interface_data", static_cast<void (T::*)(const char*)>(&T::set_interface_data), "", "Dirichlet BC at the interface")
+#endif
+			.add_method("set_outflow_boundary", &T::set_outflow_boundary)
+			.add_method("set_dirichlet_boundary", &T::set_dirichlet_boundary)
+			.add_method("set_dirichlet_data", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim> >)>(&T::set_dirichlet_data), "", "Dirichlet BC")
+			.add_method("set_dirichlet_data", static_cast<void (T::*)(number)>(&T::set_dirichlet_data), "", "Dirichlet BC")
+#ifdef UG_FOR_LUA
+			.add_method("set_dirichlet_data", static_cast<void (T::*)(const char*)>(&T::set_dirichlet_data), "", "Dirichlet BC")
+#endif
+			.add_method("set_limiter", static_cast<void (T::*)(bool)>(&T::set_limiter));
+		reg.add_class_to_group(name, "HiResFluxBasedLSM", tag);
+	}
+	
 }// end Domain algebra
 
 }; // end Functionality

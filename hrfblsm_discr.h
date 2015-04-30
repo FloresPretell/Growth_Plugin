@@ -1,0 +1,394 @@
+/*
+ * High-resolution flux-based level set method
+ *
+ * Mar. 26, 2015	created
+ * Authors: C. Wehner, D. Logashenko
+ */
+#ifndef __H__UG__PLUGINS__LEVEL_SET__HR_FB_LSM_DISCR_H__
+#define __H__UG__PLUGINS__LEVEL_SET__HR_FB_LSM_DISCR_H__
+
+// ug4 headers
+#include "common/common.h"
+#include "lib_disc/function_spaces/grid_function.h"
+#ifdef UG_FOR_LUA
+#include "bindings/lua/lua_user_data.h"
+#endif
+
+namespace ug{
+namespace LevelSet{
+
+/**
+ * Class of an explicit discretization of the Level-Set-Equation
+ *
+ * This class implements the hight-resolution flux-based level-set method
+ * for the discretization of the level-set equation of the form
+ * \f{eqnarray*}{
+ *   u_t + \nabla \cdot (u \, \mathbf{V}) = u \, \nabla \mathbf{V} + r,
+ * \f}
+ * where
+ * <ul>
+ * <li> \f$ u \f$			(unknown, scalar) the level-set function (solution)
+ * <li> \f$ \mathbf{V} \f$	(given, vector) advection velocity
+ * <li> \f$ r \f$			(given, scalar) source term
+ * </ul>
+ * The advection velocity consists of two parts:
+ * \f{eqnarray*}{
+ *  \mathbf{V} = \delta \frac{\nabla u}{\| \nabla u \|} + \gamma \mathb{V}_{\mathrm{user}},
+ * \f}
+ * where
+ * <ul>
+ * <li> \f$ \delta \f$		(given, scalar) a scaling factor for the normal velocity
+ * <li> \f$ \mathbf{V} \f$	(given, vector) user-given velocity vector field
+ * <li> \f$ \gamma \f$		(given, scalar) a scaling factor for the user-given velocity
+ * </ul>
+ *
+ * For the details of the method, cf.
+ * <ul>
+ * <li> P. Frolkovic, K. Mikula, High-Resolution Flux-Based Level Set Method, SIAM. J. Sci. Comput., Vol. 29(2), pp. 579--597, DOI: 10.1137/050646561
+ * <li> P. Frolkovic, Immersed Interface Method For a Level Set Formulation of Problems With Moving Boundaries, Proceedings of ALGORITHMY 2012, pp. 32--41
+ * </ul>
+ *
+ * \tparam	TGridFunction	grid function type
+ */
+template<typename TGridFunction>
+class HiResFluxBasedLSM
+{
+///	domain type
+	typedef typename TGridFunction::domain_type domain_type;
+	
+///	algebra type
+	typedef typename TGridFunction::algebra_type algebra_type;
+
+///	world dimension
+	static const int dim = domain_type::dim;
+
+///	grid type
+	typedef typename domain_type::grid_type grid_type;
+
+/// type of the position accessor
+	typedef typename domain_type::position_accessor_type position_accessor_type;
+	
+///	type of gradient attachment
+	typedef Attachment<MathVector<dim> > ADimVector;
+
+///	type of volume attachment accessor
+	typedef typename Grid::VertexAttachmentAccessor<ANumber> t_aaVol;
+
+///	type of gradient attachment accessor
+	typedef typename Grid::VertexAttachmentAccessor<ADimVector> t_aaGrad;
+	
+///	type of the attachment accessor for the updates
+	typedef typename Grid::VertexAttachmentAccessor<ANumber> t_aaUpd;
+
+///	type of the attachment accessor for corners of intersected elements
+	typedef typename Grid::VertexAttachmentAccessor<ABool> t_aaCoIE;
+
+/// type of base grid object
+	typedef typename TGridFunction::template dim_traits<dim>::grid_base_object ElemType;
+
+/// edge iterator
+	typedef typename TGridFunction::template traits<Edge>::const_iterator EdgeConstIterator;
+
+/// vertex base iterator
+	typedef typename TGridFunction::template traits<Vertex>::const_iterator VertexConstIterator;
+	
+///	grid element iterator
+	typedef typename TGridFunction::template dim_traits<dim>::const_iterator ElemIterator;
+
+///	max. number of corners and subcontrol volume faces
+	static const size_t maxNumCo = DimFV1Geometry<dim>::maxNumSCV;
+	static const size_t maxNumIP = DimFV1Geometry<dim>::maxNumSCVF;
+	
+///	threshold for the level-set-function
+	static number lsf_threshold () {return 1e-8;}
+	
+public:
+
+///	Constructor
+	HiResFluxBasedLSM()
+	:	m_dt(0), m_timestep_nr(0), m_nrOfSteps(1),
+		m_gamma(1), m_delta(0), m_divFree(false),
+		m_limiter(false),
+		m_time(0),
+		m_maxCFL(0)
+	{
+		set_source (0);
+	}
+
+///	Destructor
+	virtual ~HiResFluxBasedLSM() {};
+	
+//	Controls
+
+///	set the grid functions for the old and new solutions
+	void set_solutions
+	(
+		SmartPtr<TGridFunction> uOld, ///< at the old time step
+		SmartPtr<TGridFunction> uNew ///< at the new time step
+	)
+	{
+		m_oldSol = uOld; m_newSol = uNew;
+	}
+
+///	set level-set function to specify the interface
+	void set_LSF(SmartPtr<TGridFunction> spLSF) { m_spLSF = spLSF; }
+	
+///	set the signed-distance function for the computation of the effective time step length at the interface
+	void set_SDF(SmartPtr<TGridFunction> spSDF) { m_spSDF = spSDF; }
+	
+///	set the potential for the computation of the velocity
+	void set_vel_potential(SmartPtr<TGridFunction> spVelPot) { m_spVelPot = spVelPot; }
+
+///	set time step
+	void set_dt(number dt) { m_dt = dt; UG_LOG("dt=" << m_dt << "\n"); }
+
+/// set nr of time steps to perform
+	void set_nr_of_steps(size_t n) { m_nrOfSteps = n; }
+	
+///	set current step number
+	void set_timestep_nr(size_t n) { m_timestep_nr = n; }
+	
+///	set the time argument
+	void set_time(number t) { m_time = t; }
+/// get the current time argument
+	number get_time() { return m_time; }
+	
+///	set scaling factor for the user-given velocity (if it is given by the user data)
+	void set_gamma(number gamma) { m_gamma = gamma; }
+	
+///	set scaling factor for the gradient in the velocity (if it is used for the velocity)
+	void set_delta(number delta) { m_delta = delta; }
+	
+///	sets the divergence free flag
+	void set_divfree(bool b) { m_divFree=b; }
+	
+///	sets whether to use the slope limiter
+	void set_limiter(bool b) { m_limiter=b; }
+	
+///	set a constant source term (both the values)
+	void set_source(number val) { m_source_pos = val; m_source_neg = - val; }
+	
+///	set the source only for the subdomain with the negative values of the LSF
+	void set_source_neg(number val) { m_source_neg = val; }
+
+///	set the source only for the subdomain with the positive values of the LSF
+	void set_source_pos(number val) { m_source_pos = val; }
+	
+///	sets the Dirichlet values at the interface
+	void set_interface_data(SmartPtr<CplUserData<number,dim> > d) { m_imInterfaceVal = d; }
+#ifdef UG_FOR_LUA
+///	sets the Dirichlet values at the interface as lua function
+	void set_interface_data(const char* fctName) { set_interface_data(LuaUserDataFactory<number,dim>::create(fctName)); }
+#endif
+
+///	set the Dirichlet values as a user data object
+	void set_dirichlet_data(SmartPtr<CplUserData<number,dim> > d) { m_imDirichlet = d; }
+///	set constant Dirichlet values
+	void set_dirichlet_data(number val) { set_dirichlet_data(make_sp(new ConstUserNumber<dim>(val))); }
+#ifdef UG_FOR_LUA
+///	set the Dirichlet values as a lua function
+	void set_dirichlet_data(const char* fctName) { set_dirichlet_data(LuaUserDataFactory<number,dim>::create(fctName)); }
+#endif
+
+/// boundary condition subset handling: dirichlet boundary
+	void set_dirichlet_boundary(const char* subsets);
+
+/// boundary condition subset handling: outflow boundary
+	void set_outflow_boundary(const char* subsets);
+	
+//	Computation
+
+///	computes the time steps of the discretization of the level-set equation
+	void advect_lsf ();
+	
+private:
+
+//	Auxiliary tools
+
+/// slope limiter
+	void limit_grad(TGridFunction& uOld, t_aaGrad& aaGradient);
+
+///	computes the scvf-update of the solution in an element
+	inline void sol_update
+	(
+		MathVector<dim>& ip,
+		MathVector<dim>& x_up,
+		number u_up,
+		MathVector<dim>& grad_up,
+		MathVector<dim>& vel_up,
+		number u_down,
+		MathVector<dim>& grad_down,
+		MathVector<dim>& vel_down,
+		number& corr_up,
+		number& curr_down
+	);
+///	gets corner velocity and source
+	inline void get_nodal_vel
+	(
+		ElemType* elem,
+		MathVector<dim> coCoord[],
+		DimFV1Geometry<dim>& geo,
+		LocalVector& u,
+		MathVector<dim> grad[],
+		MathVector<dim> co_vel[],
+		int lsf_sign
+	);
+///	assemble local contributions of one element
+	void assemble_element
+	(
+		ElemType* elem,
+		DimFV1Geometry<dim>& geo,
+		domain_type& grid,
+		LocalVector& uOld,
+		t_aaGrad& aaGradient,
+		t_aaGrad& aaVelGrad,
+		t_aaVol& aaVolume,
+		int sign,
+		t_aaUpd& aaUpdate
+	);
+///	get the velocity for a given SCVF in an element intersected by the interface
+	void get_scvf_vel_on_if
+	(
+		DimFV1Geometry<dim>& geo,
+		const typename DimFV1Geometry<dim>::SCVF& scvf,
+		number u[],
+		MathVector<dim> grad[],
+		number lsf[],
+		MathVector<dim>& from_co_vel,
+		number& from_flux,
+		MathVector<dim>& to_co_vel,
+		number& to_flux
+	);
+/// get the velocity for a given BF in an element intersected by the interface
+	void get_bf_vel_on_if
+	(
+		DimFV1Geometry<dim>& geo,
+		const typename DimFV1Geometry<dim>::BF& bf,
+		number u[],
+		MathVector<dim> grad[],
+		number lsf[],
+		MathVector<dim>& co_vel,
+		number& flux
+	);
+///	assemble an element intersected by the interface
+	int assemble_cut_element
+	(
+		ElemType* elem,
+		DimFV1Geometry<dim>& geo,
+		domain_type& domain,
+		LocalVector& uOld,
+		LocalVector& locLSF,
+		LocalVector& locVelPot,
+		t_aaGrad& aaGradient,
+		t_aaGrad& aaVelGrad,
+		t_aaVol& aaVolume,
+		t_aaUpd& aaUpdate
+	);
+
+/// compute CV volumes
+	void compute_volumes
+	(
+		TGridFunction& u,
+		DimFV1Geometry<dim>& geo,
+		t_aaVol& aaVolume
+	);
+	
+///	compute gradients in an element
+	void compute_elem_grad
+	(
+		DimFV1Geometry<dim> & geo,
+		number uValue [],
+		MathVector<dim> co_grad [],
+		number * lsf,
+		CplUserData<number,dim> * if_val_data,
+		int si
+	);
+/// compute gradients and volumes
+	void compute_vertex_grad
+	(
+		TGridFunction& u,
+		DimFV1Geometry<dim>& geo,
+		t_aaVol& aaVolume,
+		t_aaGrad& aaGradient,
+		CplUserData<number,dim> * if_val_data
+	);
+	
+///	sign of the LSF
+	inline int lsf_sign
+	(
+		size_t noc,
+		number lsf []
+	);
+///	extrapolation by the LSF
+	inline void extrapolate_by_lsf
+	(
+		const CplUserData<number,dim> * if_val_data,
+		int si,
+		size_t noc,
+		const MathVector<dim> co_coord[],
+		number sol[],
+		number lsf[],
+		size_t base,
+		number ext[]
+	);
+///	mark corners at the interface
+	void mark_CoIE
+	(
+		grid_type& grid,
+		t_aaCoIE& aaCoIE
+	);
+
+///	assign Dirichlet values
+	void assign_dirichlet
+	(
+		TGridFunction& numsol
+	);
+
+private:
+
+//	Grid functions:
+	
+	SmartPtr<TGridFunction> m_oldSol; ///< solution at the old time step
+	SmartPtr<TGridFunction> m_newSol; ///< computed solution at the new time step
+	
+	SmartPtr<TGridFunction> m_spLSF; ///< Level-Set Function data (if any)
+	SmartPtr<TGridFunction> m_spSDF; ///< Signed-Distance Function (for computations of the eff. dt at the interface)
+	SmartPtr<TGridFunction> m_spVelPot; ///< vert.-centred potential for the computation of the velocity (or SPNULL)
+	
+//	Parameters of the method:
+
+	number m_dt; ///< current time step
+	size_t m_timestep_nr; ///< number of the current time step
+	size_t m_nrOfSteps; ///< number of time steps to compute
+	
+	number m_gamma; ///< scaling factor for the user-given velocity (if it is given by the user data)
+	number m_delta; ///< scaling factor for the gradient of the potential in the velocity (if it is used for the velocity)
+	bool m_divFree; ///< if the velocity field is divergence free
+	
+	bool m_limiter; ///< whether to use the slope limiter
+	
+	SubsetGroup m_neumann_sg; ///< subsets with the Neumann BC
+	SubsetGroup m_dirichlet_sg; ///< subsets with the Dirichlet BC
+	
+	SmartPtr<CplUserData<MathVector<dim>, dim> > m_imVelocity; ///< data import for the velocity field (if used)
+	SmartPtr<CplUserData<number,dim> > m_imDirichlet; ///< data import for the Dirichlet values
+	SmartPtr<CplUserData<number,dim> > m_imInterfaceVal; ///< Dirichlet values at the interface
+	
+///	Values of the source for the positive and negative values of the LSF. (If no LSF, only the former is used.)
+	number m_source_pos, m_source_neg;
+	
+//	Temporary and computed data
+	
+	number m_time; ///< current time
+	number m_maxCFL; ///< maximum Courant-number achieved (computed in the time steps)
+};
+
+} // end namespace LevelSet
+} // end namespace ug
+
+// include implementation
+#include "hrfblsm_discr_impl.h"
+
+#endif /* __H__UG__PLUGINS__LEVEL_SET__HR_FB_LSM_DISCR_H__ */
+
+/* End of File */
