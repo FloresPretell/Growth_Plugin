@@ -1016,7 +1016,7 @@ void HiResFluxBasedLSM<TGridFunction>::limit_grad
  * Frolkovic/Mikula, HIGH-RESOLUTION FLUX-BASED LEVEL SET METHOD, SIAM
  */
 template<typename TGridFunction>
-void HiResFluxBasedLSM<TGridFunction>::advect_lsf ()
+void HiResFluxBasedLSM<TGridFunction>::advect ()
 {
 //	get the grid functions
 	if (m_oldSol.invalid () || m_newSol.invalid ())
@@ -1121,8 +1121,8 @@ void HiResFluxBasedLSM<TGridFunction>::advect_lsf ()
 			if (m_limiter)
 				limit_grad (*m_spSDF, aaSDFGrad);
 		//	attach and access the update
-			grid.attach_to_vertices (aUpdate);
-			aaSDFUpdate.access (grid, aUpdate);
+			grid.attach_to_vertices (aSDFUpdate);
+			aaSDFUpdate.access (grid, aSDFUpdate);
 		}
 	}
 	
@@ -1292,6 +1292,10 @@ void HiResFluxBasedLSM<TGridFunction>::advect_lsf ()
 	}
 	
     //	detach from grid
+    if (m_spVelPot.valid () && m_spVelPot != m_newSol)
+		grid.detach_from_vertices (aVelGrad);
+	if (m_spLSF.valid () && m_spSDF != m_newSol)
+		grid.detach_from_vertices (aSDFUpdate);
 	grid.detach_from_vertices (aCoIE);
 	grid.detach_from_vertices (aUpdate);
 	grid.detach_from_vertices (aGradient);

@@ -223,7 +223,7 @@ static void DomainAlgebra(Registry& reg, string grp)
 		string name = string("HiResFluxBasedLSM").append(suffix);
 		reg.add_class_<T>(name, grp)
 			.add_constructor()
-			.add_method("advect_lsf", static_cast<void (T::*) ()>(&T::advect_lsf), "", "Compute the time steps of the method")
+			.add_method("advect", static_cast<void (T::*) ()>(&T::advect), "", "Compute the time steps of the method")
 			.add_method("set_solutions", static_cast<void (T::*)(SmartPtr<function_type>,SmartPtr<function_type>)>(&T::set_solutions), "old#new", "Solutions at the time levels")
 			.add_method("set_LSF", static_cast<void (T::*)(SmartPtr<function_type>)>(&T::set_LSF), "", "Level-Set function to specity the interface")
 			.add_method("set_SDF", static_cast<void (T::*)(SmartPtr<function_type>)>(&T::set_SDF), "", "Signed-distance function to get the eff. dt at the interface")

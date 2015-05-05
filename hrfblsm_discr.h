@@ -199,7 +199,7 @@ public:
 //	Computation
 
 ///	computes the time steps of the discretization of the level-set equation
-	void advect_lsf ();
+	void advect ();
 	
 private:
 
