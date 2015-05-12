@@ -104,7 +104,7 @@ void HiResFluxBasedLSM<TGridFunction>::extrapolate_by_lsf
 			else
 			{
 				MathVector<dim> if_pnt_coord;
-				number s = lsf[co] / (lsf[base] + lsf[co]);
+				number s = lsf[co] / (lsf[co] - lsf[base]);
 				VecScaleAdd (if_pnt_coord, s, co_coord[base], 1 - s, co_coord[co]);
 				(* if_val_data) (&interface_val, &if_pnt_coord, m_time, si, 1);
 			}
