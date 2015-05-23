@@ -118,18 +118,19 @@ void HiResFluxBasedLSM<TGridFunction>::extrapolate_by_lsf
  * compute the update of the solution through a SCVF and the correction due to the source
  */
 template<typename TGridFunction>
-void HiResFluxBasedLSM<TGridFunction>::sol_update
+inline void HiResFluxBasedLSM<TGridFunction>::sol_update
 (
-	MathVector<dim>& ip, ///< coordinates of the integration point
+	bool redOrder, ///< whether to reduce the order of the discretization
+	const MathVector<dim>& ip, ///< coordinates of the integration point
 //	Data at the upwind corner
-	MathVector<dim>& x_up, ///< coordinates of the upwind corner
+	const MathVector<dim>& x_up, ///< coordinates of the upwind corner
 	number u_up, ///< solution at the upwind corner
-	MathVector<dim>& grad_up, ///< gradient at the upwind corner
-	MathVector<dim>& vel_up, ///< velocity at the upwind corner
+	const MathVector<dim>& grad_up, ///< gradient at the upwind corner
+	const MathVector<dim>& vel_up, ///< velocity at the upwind corner
 //	Data at the downwind corner
 	number u_down, ///< solution at the downwind corner
-	MathVector<dim>& grad_down, ///< gradient at the downwind corner
-	MathVector<dim>& vel_down, ///< velocity at the downwind corner
+	const MathVector<dim>& grad_down, ///< gradient at the downwind corner
+	const MathVector<dim>& vel_down, ///< velocity at the downwind corner
 //	Computed update
 	number& corr_up, ///< update for the upwind corner
 	number& corr_down ///< update for the downwind corner
@@ -139,7 +140,10 @@ void HiResFluxBasedLSM<TGridFunction>::sol_update
 //	conv_corr = u_{ip}^{n+0.5}, where u_{ip}^{n+0.5} is interpolated along the characteristic
 	MathVector<dim> distVec;
 	VecSubtract (distVec, ip, x_up);
-	corr_up = corr_down = u_up + (grad_up * distVec) - 0.5 * m_dt * (grad_up * vel_up);
+	corr_up = u_up - 0.5 * m_dt * (grad_up * vel_up);
+	if (! redOrder)
+		corr_up += grad_up * distVec;
+	corr_down = corr_up;
 	
 //	due to the divergence
 	if (! m_divFree)
@@ -150,6 +154,37 @@ void HiResFluxBasedLSM<TGridFunction>::sol_update
 	//	div_corr_down = u_{co_down}^{n+0.5}, where u_{co_up}^{n+0.5} is interpolated along the characteristic
 		corr_down -= u_down - 0.5 * m_dt * (grad_down * vel_down);
 	}
+}
+
+/**
+ * compute the update of the solution through a BF and the correction due to the source
+ */
+template<typename TGridFunction>
+inline void HiResFluxBasedLSM<TGridFunction>::bnd_sol_update
+(
+	bool redOrder, ///< whether to reduce the order of the discretization
+	const MathVector<dim>& bip, ///< coordinates of the boundary integration point
+//	Data at the upwind corner
+	const MathVector<dim>& x, ///< coordinates of the boundary corner
+	number u, ///< solution at the corner
+	const MathVector<dim>& grad, ///< gradient at the corner
+	const MathVector<dim>& vel, ///< velocity at the corner
+//	Computed update
+	number& corr ///< update for the corner
+)
+{
+//	due to the convection
+//	conv_corr = u_{bip}^{n+0.5}, where u_{bip}^{n+0.5} is interpolated along the characteristic
+	MathVector<dim> distVec;
+	VecSubtract (distVec, bip, x);
+	corr = u - 0.5 * m_dt * (grad * vel);
+	if (! redOrder)
+		corr += grad * distVec;
+	
+//	due to the divergence
+	if (! m_divFree)
+	//	div_corr = u_{co}^{n+0.5}, where u_{co}^{n+0.5} is interpolated along the characteristic
+		corr -= u - 0.5 * m_dt * (grad * vel);
 }
 
 /**
@@ -199,8 +234,7 @@ void HiResFluxBasedLSM<TGridFunction>::get_nodal_vel
     	    	co_vel[i] = 0;
     	}
     else
-		for (size_t i = 0; i < noc; i++)
-			co_vel[i] = 0;
+		for (size_t i = 0; i < noc; i++) co_vel[i] = 0;
 }
 
 /**
@@ -225,7 +259,7 @@ void HiResFluxBasedLSM<TGridFunction>::assemble_element
 {
 //	get position accessor
 	const position_accessor_type& aaPos = domain.position_accessor ();
-
+	
 //	get vertices and extract corner coordinates
 	MathVector<dim> coCoord[maxNumCo];
 	Vertex* vVrt[maxNumCo];
@@ -254,7 +288,42 @@ void HiResFluxBasedLSM<TGridFunction>::assemble_element
 	MathVector<dim> coVelocity[maxNumCo];
 	get_nodal_vel (elem, coCoord, geo, uOld, vel_grad, coVelocity, sign);
 
-//	compute fluxes
+//	outflow boundary
+	bool outBndCo[maxNumCo];
+	for (size_t i = 0; i < noc; i++) outBndCo[i] = false;
+	for (size_t k = 0; k < m_neumann_sg.size (); k++)
+	{
+		int si = m_neumann_sg [k];
+		for (size_t i = 0; i < geo.num_bf (si); i++)
+		{
+		// 	get current BF
+			const typename DimFV1Geometry<dim>::BF& bf = geo.bf (si, i);
+			const size_t nodeID = bf.node_id ();
+			
+		//	mark the corner
+			outBndCo[nodeID] = true;
+			
+		//	compute values at the bip
+			MathVector<dim> bipVelocity;
+			bipVelocity = 0;
+			for (size_t co = 0; co < noc; co++)
+				VecScaleAppend (bipVelocity, bf.shape (co), coVelocity[co]);
+			number bipNormalVel = bipVelocity * bf.normal ();
+			
+		//	assemble the fluxes
+			number corr;
+			bnd_sol_update (true, bf.global_ip (), coCoord[nodeID], uValue[nodeID],
+				grad[nodeID], coVelocity[nodeID], corr);
+			aaUpdate[ vVrt[nodeID] ] -= bipNormalVel * corr / aaVolume[ vVrt[nodeID] ];
+		
+		// the local Courant-number
+			number localCFL = m_dt * bipNormalVel/aaVolume[ vVrt[nodeID] ];
+			if (localCFL > m_maxCFL)
+				m_maxCFL = localCFL;
+		}
+	}
+	
+//	fluxes through the inner scvfaces
 	for (size_t ip = 0; ip < geo.num_scvf (); ++ip)
 	{
 	//	get current SCVF
@@ -269,7 +338,7 @@ void HiResFluxBasedLSM<TGridFunction>::assemble_element
 		for (size_t co = 0; co < noc; co++)
 			VecScaleAppend (ipVelocity, scvf.shape (co), coVelocity[co]);
 	
-	//	normal ip-velocity * dt
+	//	normal ip-velocity
 		number ipNormalVel = ipVelocity * scvf.normal ();
 		
 	//	upwinding
@@ -285,50 +354,21 @@ void HiResFluxBasedLSM<TGridFunction>::assemble_element
 		
 	//	assemble the fluxes
 		number corr_up, corr_down;
-		sol_update (ipCoord, coCoord[up_co], uValue[up_co], grad[up_co], coVelocity[up_co],
-			uValue[down_co], grad[down_co], coVelocity[down_co],
-				corr_up, corr_down);
+		sol_update (outBndCo[up_co], // reduce the order at the outflow boundary
+			ipCoord, coCoord[up_co], uValue[up_co], grad[up_co], coVelocity[up_co],
+				uValue[down_co], grad[down_co], coVelocity[down_co],
+					corr_up, corr_down);
 		aaUpdate[ vVrt[up_co] ] -= ipNormalVel * corr_up / aaVolume[ vVrt[up_co] ];
 		aaUpdate[ vVrt[down_co] ] += ipNormalVel * corr_down / aaVolume[ vVrt[down_co] ];
 		
-		// the local Courant-number
+	// the local Courant-number
         number localCFL = std::max
         	(
         		m_dt * ipNormalVel/aaVolume[ vVrt[from] ],
         		m_dt * ipNormalVel/aaVolume[ vVrt[to] ]
         	);
-        if (localCFL>m_maxCFL)
+        if (localCFL > m_maxCFL)
             m_maxCFL = localCFL;
-	}
-	
-//	outflow boundary
-	if (geo.num_bf () > 0)
-	{
-		number flux;
-		
-		for (int si=0; si < domain.subset_handler()->num_subsets (); ++si)
-		{
-			for (size_t i = 0; i < geo.num_bf (si); i++)
-			{
-			// 	get current BF
-				const typename DimFV1Geometry<dim>::BF& bf = geo.bf (si, i);
-				const size_t nodeID = bf.node_id ();
-				
-			//	compute values at the bip
-				MathVector<dim> bipVelocity;
-				bipVelocity=0;
-				for (size_t co = 0; co < noc; co++)
-					VecScaleAppend (bipVelocity, bf.shape (co), coVelocity[co]);
-				number bipNormalVel = bipVelocity * bf.normal ();
-				
-			//	assemble the fluxes
-				flux = bipNormalVel * uValue[nodeID]; // first order approximation
-				aaUpdate[ vVrt[nodeID] ] -= flux / aaVolume[ vVrt[nodeID] ];
-				if (!m_divFree)
-					aaUpdate[ vVrt[nodeID] ] += bipNormalVel
-						* (uValue[nodeID] ) / aaVolume[ vVrt[nodeID] ]; // first order approximation
-			}
-		}
 	}
 }
 
@@ -511,12 +551,12 @@ int HiResFluxBasedLSM<TGridFunction>::assemble_cut_element
 			from_co_vel, from_flux, to_co_vel, to_flux);
 	
 	//	assemble the flux for the from-corner
-		sol_update (ipCoord, coCoord[from], uValue[from], grad[from], from_co_vel,
+		sol_update (false, ipCoord, coCoord[from], uValue[from], grad[from], from_co_vel,
 			uValue[to], grad[to], to_co_vel, corr, t);
 		aaUpdate[ vVrt[from] ] -= from_flux * corr / aaVolume[ vVrt[from] ];
 		
 	//	assemble the flux for the to-corner
-		sol_update (ipCoord, coCoord[to], uValue[to], grad[to], to_co_vel,
+		sol_update (false, ipCoord, coCoord[to], uValue[to], grad[to], to_co_vel,
 			uValue[from], grad[from], from_co_vel, corr, t);
 		aaUpdate[ vVrt[to] ] += to_flux * corr / aaVolume[ vVrt[to] ];
 	}
@@ -1159,9 +1199,10 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 	//	loop over subsets to compute the new solution
 	    for (int si = 0; si < uOld.num_subsets (); si++)
 	    {
+	    //TODO: Remove this! These are full-dimensional elements!
 	    //	skip boundaries
-	        if (m_dirichlet_sg.size() != 0) if (m_dirichlet_sg.contains (si)) continue;
-	        if (m_neumann_sg.size() != 0) if (m_neumann_sg.contains (si)) continue;
+		//	if (m_dirichlet_sg.size() != 0) if (m_dirichlet_sg.contains (si)) continue;
+	    //	if (m_neumann_sg.size() != 0) if (m_neumann_sg.contains (si)) continue;
 	        
 		//	loop elements compute the update of the solution
 		    ElemIterator iterEnd = uNew.template end<ElemType> (si);

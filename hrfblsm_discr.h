@@ -106,11 +106,11 @@ public:
 
 ///	Constructor
 	HiResFluxBasedLSM()
-	:	m_dt(0), m_timestep_nr(0), m_nrOfSteps(1),
-		m_gamma(1), m_delta(0), m_divFree(false),
-		m_limiter(false),
-		m_time(0),
-		m_maxCFL(0)
+	:	m_dt (0), m_timestep_nr (0), m_nrOfSteps (1),
+		m_gamma (1), m_delta (0), m_divFree (false),
+		m_limiter (false),
+		m_time (0),
+		m_maxCFL (0)
 	{
 		set_source (0);
 	}
@@ -211,16 +211,28 @@ private:
 ///	computes the scvf-update of the solution in an element
 	inline void sol_update
 	(
-		MathVector<dim>& ip,
-		MathVector<dim>& x_up,
+		bool redOrder,
+		const MathVector<dim>& ip,
+		const MathVector<dim>& x_up,
 		number u_up,
-		MathVector<dim>& grad_up,
-		MathVector<dim>& vel_up,
+		const MathVector<dim>& grad_up,
+		const MathVector<dim>& vel_up,
 		number u_down,
-		MathVector<dim>& grad_down,
-		MathVector<dim>& vel_down,
+		const MathVector<dim>& grad_down,
+		const MathVector<dim>& vel_down,
 		number& corr_up,
 		number& curr_down
+	);
+///	computes the bf-update of the solution in an element
+	inline void bnd_sol_update
+	(
+		bool redOrder,
+		const MathVector<dim>& bip,
+		const MathVector<dim>& x,
+		number u,
+		const MathVector<dim>& grad,
+		const MathVector<dim>& vel,
+		number& curr
 	);
 ///	gets corner velocity and source
 	inline void get_nodal_vel
