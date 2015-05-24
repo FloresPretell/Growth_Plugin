@@ -106,11 +106,12 @@ public:
 
 ///	Constructor
 	HiResFluxBasedLSM()
-	:	m_dt (0), m_timestep_nr (0), m_nrOfSteps (1),
+	:	m_dt (0), m_nrOfSteps (1),
+		m_time_control (false), m_maxCFL (0.95), m_minCFL (0.85),
 		m_gamma (1), m_delta (0), m_divFree (false),
 		m_limiter (false),
 		m_time (0),
-		m_maxCFL (0)
+		m_curCFL (0)
 	{
 		set_source (0);
 	}
@@ -131,70 +132,92 @@ public:
 	}
 
 ///	set level-set function to specify the interface
-	void set_LSF(SmartPtr<TGridFunction> spLSF) { m_spLSF = spLSF; }
+	void set_LSF (SmartPtr<TGridFunction> spLSF) { m_spLSF = spLSF; }
 	
 ///	set the signed-distance function for the computation of the effective time step length at the interface
-	void set_SDF(SmartPtr<TGridFunction> spSDF) { m_spSDF = spSDF; }
+	void set_SDF (SmartPtr<TGridFunction> spSDF) { m_spSDF = spSDF; }
 	
 ///	set the potential for the computation of the velocity
-	void set_vel_potential(SmartPtr<TGridFunction> spVelPot) { m_spVelPot = spVelPot; }
+	void set_vel_potential (SmartPtr<TGridFunction> spVelPot) { m_spVelPot = spVelPot; }
 
 ///	set time step
-	void set_dt(number dt) { m_dt = dt; UG_LOG("dt=" << m_dt << "\n"); }
+	void set_dt (number dt) { m_dt = dt; }
+	
+///	get time step
+	number get_dt () { return m_dt; }
+	
+///	switch the time control on
+	void set_time_control (number minCFL, number maxCFL)
+		{ m_time_control = true; m_minCFL = minCFL; m_maxCFL = maxCFL; }
+		
+/// switch the time control off
+	void set_time_control_off () { m_time_control = false; }
 
 /// set nr of time steps to perform
-	void set_nr_of_steps(size_t n) { m_nrOfSteps = n; }
-	
-///	set current step number
-	void set_timestep_nr(size_t n) { m_timestep_nr = n; }
+	void set_nr_of_steps (size_t n) { m_nrOfSteps = n; }
 	
 ///	set the time argument
-	void set_time(number t) { m_time = t; }
+	void set_time (number t) { m_time = t; }
 /// get the current time argument
-	number get_time() { return m_time; }
+	number get_time () { return m_time; }
 	
 ///	set scaling factor for the user-given velocity (if it is given by the user data)
-	void set_gamma(number gamma) { m_gamma = gamma; }
+	void set_gamma (number gamma) { m_gamma = gamma; }
 	
 ///	set scaling factor for the gradient in the velocity (if it is used for the velocity)
-	void set_delta(number delta) { m_delta = delta; }
+	void set_delta (number delta) { m_delta = delta; }
 	
 ///	sets the divergence free flag
-	void set_divfree(bool b) { m_divFree=b; }
+	void set_divfree (bool b) { m_divFree = b; }
 	
 ///	sets whether to use the slope limiter
-	void set_limiter(bool b) { m_limiter=b; }
+	void set_limiter (bool b) { m_limiter = b; }
 	
 ///	set a constant source term (both the values)
-	void set_source(number val) { m_source_pos = val; m_source_neg = - val; }
+	void set_source (number val) { m_source_pos = val; m_source_neg = - val; }
 	
 ///	set the source only for the subdomain with the negative values of the LSF
-	void set_source_neg(number val) { m_source_neg = val; }
+	void set_source_neg (number val) { m_source_neg = val; }
 
 ///	set the source only for the subdomain with the positive values of the LSF
-	void set_source_pos(number val) { m_source_pos = val; }
+	void set_source_pos (number val) { m_source_pos = val; }
 	
 ///	sets the Dirichlet values at the interface
-	void set_interface_data(SmartPtr<CplUserData<number,dim> > d) { m_imInterfaceVal = d; }
+	void set_interface_data (SmartPtr<CplUserData<number,dim> > d) { m_imInterfaceVal = d; }
 #ifdef UG_FOR_LUA
 ///	sets the Dirichlet values at the interface as lua function
-	void set_interface_data(const char* fctName) { set_interface_data(LuaUserDataFactory<number,dim>::create(fctName)); }
+	void set_interface_data (const char* fctName) { set_interface_data(LuaUserDataFactory<number,dim>::create(fctName)); }
 #endif
 
 ///	set the Dirichlet values as a user data object
-	void set_dirichlet_data(SmartPtr<CplUserData<number,dim> > d) { m_imDirichlet = d; }
+	void set_dirichlet_data (SmartPtr<CplUserData<number,dim> > d) { m_imDirichlet = d; }
 ///	set constant Dirichlet values
-	void set_dirichlet_data(number val) { set_dirichlet_data(make_sp(new ConstUserNumber<dim>(val))); }
+	void set_dirichlet_data (number val) { set_dirichlet_data(make_sp(new ConstUserNumber<dim>(val))); }
 #ifdef UG_FOR_LUA
 ///	set the Dirichlet values as a lua function
-	void set_dirichlet_data(const char* fctName) { set_dirichlet_data(LuaUserDataFactory<number,dim>::create(fctName)); }
+	void set_dirichlet_data (const char* fctName) { set_dirichlet_data(LuaUserDataFactory<number,dim>::create(fctName)); }
 #endif
 
 /// boundary condition subset handling: dirichlet boundary
-	void set_dirichlet_boundary(const char* subsets);
+	void set_dirichlet_boundary (const char* subsets);
 
 /// boundary condition subset handling: outflow boundary
-	void set_outflow_boundary(const char* subsets);
+	void set_outflow_boundary (const char* subsets);
+	
+///	prerapre the object for the computation of the SDF
+	void prepare_for_SDF
+	(
+		SmartPtr<TGridFunction> uOld, ///< solution at the old time step
+		SmartPtr<TGridFunction> uNew ///< solution at the new time step
+	)
+	{
+		set_solutions (uOld, uNew);
+		set_SDF (uOld);
+		set_vel_potential (uOld);
+		set_delta (1);
+		set_gamma (0);
+		set_source (1);
+	}
 	
 //	Computation
 
@@ -370,8 +393,10 @@ private:
 //	Parameters of the method:
 
 	number m_dt; ///< current time step
-	size_t m_timestep_nr; ///< number of the current time step
 	size_t m_nrOfSteps; ///< number of time steps to compute
+	bool m_time_control; ///< whether to compute the appropriate time step
+	number m_maxCFL; ///< max. allowed Courant number in a time step
+	number m_minCFL; ///< min. allowed Courant number in a time step
 	
 	number m_gamma; ///< scaling factor for the user-given velocity (if it is given by the user data)
 	number m_delta; ///< scaling factor for the gradient of the potential in the velocity (if it is used for the velocity)
@@ -392,7 +417,7 @@ private:
 //	Temporary and computed data
 	
 	number m_time; ///< current time
-	number m_maxCFL; ///< maximum Courant-number achieved (computed in the time steps)
+	number m_curCFL; ///< max. Courant number achieved in the last time step
 };
 
 } // end namespace LevelSet

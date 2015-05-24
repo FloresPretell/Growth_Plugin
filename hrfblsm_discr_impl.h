@@ -317,9 +317,9 @@ void HiResFluxBasedLSM<TGridFunction>::assemble_element
 			aaUpdate[ vVrt[nodeID] ] -= bipNormalVel * corr / aaVolume[ vVrt[nodeID] ];
 		
 		// the local Courant-number
-			number localCFL = m_dt * bipNormalVel/aaVolume[ vVrt[nodeID] ];
-			if (localCFL > m_maxCFL)
-				m_maxCFL = localCFL;
+			number localCFL = m_dt * bipNormalVel / aaVolume[ vVrt[nodeID] ];
+			if (localCFL > m_curCFL)
+				m_curCFL = localCFL;
 		}
 	}
 	
@@ -362,13 +362,13 @@ void HiResFluxBasedLSM<TGridFunction>::assemble_element
 		aaUpdate[ vVrt[down_co] ] += ipNormalVel * corr_down / aaVolume[ vVrt[down_co] ];
 		
 	// the local Courant-number
-        number localCFL = std::max
+		number localCFL = std::max
         	(
-        		m_dt * ipNormalVel/aaVolume[ vVrt[from] ],
-        		m_dt * ipNormalVel/aaVolume[ vVrt[to] ]
+        		m_dt * ipNormalVel / aaVolume[ vVrt[from] ],
+        		m_dt * ipNormalVel / aaVolume[ vVrt[to] ]
         	);
-        if (localCFL > m_maxCFL)
-            m_maxCFL = localCFL;
+		if (localCFL > m_curCFL)
+			m_curCFL = localCFL;
 	}
 }
 
@@ -533,7 +533,35 @@ int HiResFluxBasedLSM<TGridFunction>::assemble_cut_element
 		vel_grad[i] = aaVelGrad[vVrt[i]];
 	}
 	
-//	compute fluxes
+//	outflow boundary
+	for (size_t k = 0; k < m_neumann_sg.size (); k++)
+	{
+		int si = m_neumann_sg [k];
+		for(size_t i = 0; i < geo.num_bf (si); i++)
+		{
+		// 	get the BF
+			const typename DimFV1Geometry<dim>::BF& bf = geo.bf (si, i);
+			const size_t nodeID = bf.node_id ();
+			
+		//	get the velocity
+			MathVector<dim> co_vel;
+			number flux;
+			get_bf_vel_on_if (geo, bf, vel_pot, vel_grad, lsf, co_vel, flux);
+			
+		//	assemble the fluxes
+			aaUpdate[ vVrt[nodeID] ] -= flux * uValue[nodeID] / aaVolume[ vVrt[nodeID] ]; // first order approximation
+			if (!m_divFree)
+				aaUpdate[ vVrt[nodeID] ] += flux
+					* (uValue[nodeID] ) / aaVolume[ vVrt[nodeID] ]; // first order approximation
+		
+		// the local Courant-number
+			number localCFL = m_dt * flux / aaVolume[ vVrt[nodeID] ];
+			if (localCFL > m_curCFL)
+				m_curCFL = localCFL;
+		}
+	}
+	
+//	fluxes through the inner scvfaces
 	for (size_t ip = 0; ip < geo.num_scvf (); ip++)
 	{
 		number corr, t;
@@ -559,30 +587,15 @@ int HiResFluxBasedLSM<TGridFunction>::assemble_cut_element
 		sol_update (false, ipCoord, coCoord[to], uValue[to], grad[to], to_co_vel,
 			uValue[from], grad[from], from_co_vel, corr, t);
 		aaUpdate[ vVrt[to] ] += to_flux * corr / aaVolume[ vVrt[to] ];
-	}
-	
-//	outflow boundary
-	if (geo.num_bf () > 0)
-	{
-		MathVector<dim> co_vel;
-		number flux;
 		
-		for (int si = 0; si < domain.subset_handler()->num_subsets (); si++)
-		{
-			for(size_t i = 0; i < geo.num_bf (si); i++)
-			{
-			// 	get current BF and the velocity at it
-				const typename DimFV1Geometry<dim>::BF& bf = geo.bf (si, i);
-				const size_t nodeID = bf.node_id ();
-				get_bf_vel_on_if (geo, bf, vel_pot, vel_grad, lsf, co_vel, flux);
-				
-			//	assemble the fluxes
-				aaUpdate[ vVrt[nodeID] ] -= flux * uValue[nodeID] / aaVolume[ vVrt[nodeID] ]; // first order approximation
-				if (!m_divFree)
-					aaUpdate[ vVrt[nodeID] ] += flux
-						* (uValue[nodeID] ) / aaVolume[ vVrt[nodeID] ]; // first order approximation
-			}
-		}
+	// the local Courant-number
+		number localCFL = std::max
+        	(
+        		m_dt * std::abs (from_flux) / aaVolume[ vVrt[from] ],
+        		m_dt * std::abs (to_flux) / aaVolume[ vVrt[to] ]
+        	);
+		if (localCFL > m_curCFL)
+			m_curCFL = localCFL;
 	}
 	
 	return 0;
@@ -1058,6 +1071,9 @@ void HiResFluxBasedLSM<TGridFunction>::limit_grad
 template<typename TGridFunction>
 void HiResFluxBasedLSM<TGridFunction>::advect ()
 {
+//	should we compute anything?
+	if (m_nrOfSteps <= 0) return;
+	
 //	get the grid functions
 	if (m_oldSol.invalid () || m_newSol.invalid ())
 		UG_THROW ("Grid functions for the solutions not specified.");
@@ -1120,7 +1136,7 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 //	attachment for the gradient used for the velocity
 	if (m_spVelPot.valid ())
 	{
-		if (m_spVelPot == m_newSol)
+		if (m_spVelPot == m_oldSol)
 			aaVelGrad.access (grid, aGradient); // merely redirect the accessor
 		else
 		{
@@ -1139,7 +1155,7 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 		if (m_spSDF.invalid ())
 			UG_THROW ("Computation with the LSF interface is only possible with the SDF. Specify it!");
 		
-		if (m_spSDF == m_newSol)
+		if (m_spSDF == m_oldSol)
 		{ // merely redirect the accessors
 			aaSDFGrad.access (grid, aGradient);
 			aaSDFUpdate.access (grid, aUpdate);
@@ -1175,25 +1191,25 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 //	local indices and values
 	LocalIndices locInd; LocalVector locOldU, locLSF, locVelPot;
 	
-//	the CFL constant to compute
-	m_maxCFL = 0;
-	
-//	compute time steps
-	for (size_t step = 0; step < m_nrOfSteps; step++)
+//	computation of the time steps
+	size_t step = 1;
+	VecAssign (uOld, uNew);
+	while (true)
 	{
+	//	the CFL number to compute
+		m_curCFL = 0;
+	
+	//	indicators of wrong signes of the gradient
 		bool wrong_sgn_at_if_A = false, wrong_sgn_at_if_B = false;
 		
-	//	store the solution than becomes old
-	    VecAssign (uOld, uNew);
-	    
 	//	compute scv volume and the gradient
-	    compute_vertex_grad (uNew, geo, aaVolume, aaGradient, m_imInterfaceVal.get ());
+	    compute_vertex_grad (uOld, geo, aaVolume, aaGradient, m_imInterfaceVal.get ());
 	    if (m_limiter)
-	    	limit_grad (uNew, aaGradient);
+	    	limit_grad (uOld, aaGradient);
 	    
 	//	initialize attachment values
 		SetAttachmentValues (aaUpdate, grid.vertices_begin (), grid.vertices_end (), 0);
-		if (m_spLSF.valid () && m_spSDF != m_newSol)
+		if (m_spLSF.valid () && m_spSDF != m_oldSol)
 			SetAttachmentValues (aaSDFUpdate, grid.vertices_begin (), grid.vertices_end (), 0);
 
 	//	loop over subsets to compute the new solution
@@ -1228,7 +1244,7 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 			}
 			
 		//	loop elements to assemble the update of the SDF (if needed)
-			if (m_spLSF.valid () && m_spSDF != m_newSol)
+			if (m_spLSF.valid () && m_spSDF != m_oldSol)
 				for (ElemIterator iter = uNew.template begin<ElemType> (si); iter != iterEnd; ++iter)
 				{
 		    		ElemType* elem = *iter;
@@ -1253,7 +1269,16 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 				}
 	    }
 	    
-	//	take into account the source at the vertices
+	//	check the CFL
+		if (m_time_control && m_curCFL > 1e-10 && (m_curCFL < m_minCFL || m_curCFL > m_maxCFL))
+		{
+			number old_dt = m_dt;
+			m_dt = m_dt / m_curCFL * (m_minCFL + m_maxCFL) / 2;
+			UG_LOG ("CFL " << m_curCFL << " ... resetting time step: " << old_dt << " -> " << m_dt << "\n");
+			continue; // recompute the step
+		}
+	    
+	//	take into account the source at the vertices and update the solution
 		for (int si = 0; si < uOld.num_subsets (); si++)
 		{
 		//	skip the Dirichlet boundary
@@ -1314,28 +1339,35 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 	    
 	//	warnings
 		if (wrong_sgn_at_if_A)
-			UG_LOG ("advect_lsf: Wrong (non-negative) sign of the gradient occured!\n");
+			UG_LOG ("advect: Wrong (non-negative) sign of the gradient occured!\n");
 		if (wrong_sgn_at_if_B)
-			UG_LOG ("advect_lsf: Wrong (non-positive) sign of the gradient occured!\n");
+			UG_LOG ("advect: Wrong (non-positive) sign of the gradient occured!\n");
 	    
 	//	the new solution computed
 	    m_time += m_dt;
-	    m_timestep_nr++;
 	    
 	//	set the Dirichlet values
 	    assign_dirichlet (uNew);
 	    
-	//	time step done:
-	    UG_LOG ("time step length: " << m_dt << "\n");
-	    UG_LOG ("time step no.: " << m_timestep_nr << "\n");
+	//	the time step is done
+	    UG_LOG ("step length: " << m_dt << " (step # " << step << ")\n");
 	    UG_LOG ("time: " << m_time << "\n");
-        UG_LOG ("max CFL: " << m_maxCFL << "\n");
+        UG_LOG ("CFL in step: " << m_curCFL << "\n");
+        
+    //	is that all?
+        if (step >= m_nrOfSteps)
+        	break;
+        else
+        {
+        	step++;
+	   		VecAssign (uOld, uNew);
+	   	}
 	}
 	
     //	detach from grid
-    if (m_spVelPot.valid () && m_spVelPot != m_newSol)
+    if (m_spVelPot.valid () && m_spVelPot != m_oldSol)
 		grid.detach_from_vertices (aVelGrad);
-	if (m_spLSF.valid () && m_spSDF != m_newSol)
+	if (m_spLSF.valid () && m_spSDF != m_oldSol)
 		grid.detach_from_vertices (aSDFUpdate);
 	grid.detach_from_vertices (aCoIE);
 	grid.detach_from_vertices (aUpdate);
