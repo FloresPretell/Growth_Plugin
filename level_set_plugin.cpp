@@ -229,12 +229,14 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.add_method("set_SDF", static_cast<void (T::*)(SmartPtr<function_type>)>(&T::set_SDF), "", "Signed-distance function to get the eff. dt at the interface")
 			.add_method("set_vel_potential", static_cast<void (T::*)(SmartPtr<function_type>)>(&T::set_vel_potential), "", "Potential of the velocity")
 			.add_method("prepare_for_SDF", static_cast<void (T::*)(SmartPtr<function_type>,SmartPtr<function_type>)>(&T::prepare_for_SDF), "old#new", "Prepare for computation of SDF")
+			.add_method("set_verbose", &T::set_verbose)
 			.add_method("set_dt", &T::set_dt)
 			.add_method("get_dt", &T::get_dt)
 			.add_method("set_time_control", &T::set_time_control)
 			.add_method("set_time_control_off", &T::set_time_control_off)
 			.add_method("set_time", &T::set_time)
 			.add_method("get_time", &T::get_time)
+			.add_method("get_CFL", &T::get_CFL)
 			.add_method("set_divfree", &T::set_divfree)
 			.add_method("set_nr_of_steps", &T::set_nr_of_steps)
 			.add_method("set_delta", &T::set_delta)
@@ -242,9 +244,21 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.add_method("set_source", static_cast<void (T::*)(number)>(&T::set_source), "", "Source")
 			.add_method("set_source_neg", static_cast<void (T::*)(number)>(&T::set_source_neg), "", "Source (for LSF < 0)")
 			.add_method("set_source_pos", static_cast<void (T::*)(number)>(&T::set_source_pos), "", "Source (for LSF > 0)")
+			.add_method("set_velocity", static_cast<void (T::*)(SmartPtr<CplUserData<MathVector<dim>, dim> >)>(&T::set_velocity), "", "Velocity vector field")
+#ifdef UG_FOR_LUA
+			.add_method("set_velocity", static_cast<void (T::*)(const char*)>(&T::set_velocity), "", "Velocity vector field")
+#endif
+			.add_method("set_normal_velocity", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim> >)>(&T::set_normal_velocity), "", "Normal velocity field")
+#ifdef UG_FOR_LUA
+			.add_method("set_normal_velocity", static_cast<void (T::*)(const char*)>(&T::set_normal_velocity), "", "Normal velocity field")
+#endif
 			.add_method("set_interface_data", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim> >)>(&T::set_interface_data), "", "Dirichlet BC at the interface")
 #ifdef UG_FOR_LUA
 			.add_method("set_interface_data", static_cast<void (T::*)(const char*)>(&T::set_interface_data), "", "Dirichlet BC at the interface")
+#endif
+			.add_method("compute_normal_vel", static_cast<void (T::*)(SmartPtr<CplUserData<MathVector<dim>, dim> >, SmartPtr<function_type>)>(&T::compute_normal_vel), "VelField#NormalVel", "Compute normal velocity")
+#ifdef UG_FOR_LUA
+			.add_method("compute_normal_vel", static_cast<void (T::*)(const char*, SmartPtr<function_type>)>(&T::compute_normal_vel), "VelField#NormalVel", "Compute normal velocity")
 #endif
 			.add_method("set_outflow_boundary", &T::set_outflow_boundary)
 			.add_method("set_dirichlet_boundary", &T::set_dirichlet_boundary)
@@ -257,7 +271,7 @@ static void DomainAlgebra(Registry& reg, string grp)
 		reg.add_class_to_group(name, "HiResFluxBasedLSM", tag);
 	}
 	
-}// end Domain algebra
+} // end Domain algebra
 
 }; // end Functionality
 } // end namespace LevelSet

@@ -106,12 +106,12 @@ public:
 
 ///	Constructor
 	HiResFluxBasedLSM()
-	:	m_dt (0), m_nrOfSteps (1),
+	:	m_bVerbose (false), m_dt (0), m_nrOfSteps (1),
 		m_time_control (false), m_maxCFL (0.95), m_minCFL (0.85),
 		m_gamma (1), m_delta (0), m_divFree (false),
 		m_limiter (false),
 		m_time (0),
-		m_curCFL (0)
+		m_curCFL (0), m_CFL (0)
 	{
 		set_source (0);
 	}
@@ -120,6 +120,9 @@ public:
 	virtual ~HiResFluxBasedLSM() {};
 	
 //	Controls
+
+///	set the output level
+	void set_verbose (bool b) { m_bVerbose = b; }
 
 ///	set the grid functions for the old and new solutions
 	void set_solutions
@@ -160,6 +163,8 @@ public:
 	void set_time (number t) { m_time = t; }
 /// get the current time argument
 	number get_time () { return m_time; }
+///	get the max. CFL
+	number get_CFL () { return m_CFL; }
 	
 ///	set scaling factor for the user-given velocity (if it is given by the user data)
 	void set_gamma (number gamma) { m_gamma = gamma; }
@@ -182,20 +187,34 @@ public:
 ///	set the source only for the subdomain with the positive values of the LSF
 	void set_source_pos (number val) { m_source_pos = val; }
 	
+///	set velocity vector field
+	void set_velocity (SmartPtr<CplUserData<MathVector<dim>, dim> > vel) {m_imVelocity = vel;}
+#ifdef UG_FOR_LUA
+///	set velocity vector field as lua function
+	void set_velocity (const char* fctName) { set_velocity (LuaUserDataFactory<MathVector<dim>,dim>::create (fctName)); }
+#endif
+	
+///	set normal velocity field
+	void set_normal_velocity (SmartPtr<CplUserData<number, dim> > vel) {m_imNormalVel = vel;}
+#ifdef UG_FOR_LUA
+///	set normal velocity field as lua function
+	void set_normal_velocity (const char* fctName) { set_normal_velocity (LuaUserDataFactory<number,dim>::create (fctName)); }
+#endif
+	
 ///	sets the Dirichlet values at the interface
 	void set_interface_data (SmartPtr<CplUserData<number,dim> > d) { m_imInterfaceVal = d; }
 #ifdef UG_FOR_LUA
 ///	sets the Dirichlet values at the interface as lua function
-	void set_interface_data (const char* fctName) { set_interface_data(LuaUserDataFactory<number,dim>::create(fctName)); }
+	void set_interface_data (const char* fctName) { set_interface_data (LuaUserDataFactory<number,dim>::create (fctName)); }
 #endif
 
 ///	set the Dirichlet values as a user data object
 	void set_dirichlet_data (SmartPtr<CplUserData<number,dim> > d) { m_imDirichlet = d; }
 ///	set constant Dirichlet values
-	void set_dirichlet_data (number val) { set_dirichlet_data(make_sp(new ConstUserNumber<dim>(val))); }
+	void set_dirichlet_data (number val) { set_dirichlet_data (make_sp (new ConstUserNumber<dim> (val))); }
 #ifdef UG_FOR_LUA
 ///	set the Dirichlet values as a lua function
-	void set_dirichlet_data (const char* fctName) { set_dirichlet_data(LuaUserDataFactory<number,dim>::create(fctName)); }
+	void set_dirichlet_data (const char* fctName) { set_dirichlet_data (LuaUserDataFactory<number,dim>::create (fctName)); }
 #endif
 
 /// boundary condition subset handling: dirichlet boundary
@@ -223,6 +242,24 @@ public:
 
 ///	computes the time steps of the discretization of the level-set equation
 	void advect ();
+	
+///	compute the normal velocity using a user-data object
+	void compute_normal_vel
+	(
+		SmartPtr<CplUserData<MathVector<dim>, dim> > spVelField,
+		SmartPtr<TGridFunction> spNormVel
+	);
+#ifdef UG_FOR_LUA
+///	compute the normal velocity using a user-data object
+	void compute_normal_vel
+	(
+		const char* fctName,
+		SmartPtr<TGridFunction> spNormVel
+	)
+	{
+		compute_normal_vel (LuaUserDataFactory<MathVector<dim>,dim>::create (fctName), spNormVel);
+	}
+#endif
 	
 private:
 
@@ -354,18 +391,19 @@ private:
 		size_t noc,
 		number lsf []
 	);
+	
 ///	extrapolation by the LSF
 	inline void extrapolate_by_lsf
 	(
 		const CplUserData<number,dim> * if_val_data,
 		int si,
-		size_t noc,
-		const MathVector<dim> co_coord[],
+		DimFV1Geometry<dim> & geo,
 		number sol[],
 		number lsf[],
 		size_t base,
 		number ext[]
 	);
+	
 ///	mark corners at the interface
 	void mark_CoIE
 	(
@@ -392,6 +430,8 @@ private:
 	
 //	Parameters of the method:
 
+	bool m_bVerbose; ///< whether to print more details
+
 	number m_dt; ///< current time step
 	size_t m_nrOfSteps; ///< number of time steps to compute
 	bool m_time_control; ///< whether to compute the appropriate time step
@@ -408,6 +448,7 @@ private:
 	SubsetGroup m_dirichlet_sg; ///< subsets with the Dirichlet BC
 	
 	SmartPtr<CplUserData<MathVector<dim>, dim> > m_imVelocity; ///< data import for the velocity field (if used)
+	SmartPtr<CplUserData<number, dim> > m_imNormalVel; ///< data import for the normal velocity field (if used)
 	SmartPtr<CplUserData<number,dim> > m_imDirichlet; ///< data import for the Dirichlet values
 	SmartPtr<CplUserData<number,dim> > m_imInterfaceVal; ///< Dirichlet values at the interface
 	
@@ -418,6 +459,7 @@ private:
 	
 	number m_time; ///< current time
 	number m_curCFL; ///< max. Courant number achieved in the last time step
+	number m_CFL; ///< max. Courant number achieved in all the computed steps
 };
 
 } // end namespace LevelSet
