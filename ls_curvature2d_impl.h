@@ -366,11 +366,13 @@ bool LevelSetCurvature<TGridFunction>::computeElementCurvature2d(number& kappa,s
 	if (order==2){
         dxphi=coeffs[1]+2*coeffs[3]*elemBasePoint[0]+coeffs[4]*elemBasePoint[1];
         dyphi=coeffs[2]+coeffs[4]*elemBasePoint[0]+2*coeffs[5]*elemBasePoint[1];
-    };
-    if (order==3){
+    }
+	else if (order==3){
 		dxphi=coeffs[1]+2*coeffs[3]*elemBasePoint[0]+coeffs[4]*elemBasePoint[1]+3*coeffs[6]*elemBasePoint[0]*elemBasePoint[0]+2*coeffs[7]*elemBasePoint[0]*elemBasePoint[1]+coeffs[8]*elemBasePoint[1]*elemBasePoint[1];
 		dyphi=coeffs[2]+coeffs[4]*elemBasePoint[0]+2*coeffs[5]*elemBasePoint[1]+coeffs[7]*elemBasePoint[0]*elemBasePoint[0]+2*coeffs[8]*elemBasePoint[0]*elemBasePoint[1]+3*coeffs[9]*elemBasePoint[1]*elemBasePoint[1];
-    };
+    } else {
+    	UG_THROW("Case unsupported");
+    }
     number gradnorm=sqrt(dxphi*dxphi+dyphi*dyphi);
 	// characteristic element length
     number hh= std::min(VecDistance(co[0],co[1]),VecDistance(co[0],co[2]));
