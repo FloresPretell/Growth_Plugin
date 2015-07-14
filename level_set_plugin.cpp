@@ -15,6 +15,7 @@
 #include "ls_analytic.h"
 #include "ls_curvature2d.h"
 #include "hrfblsm_discr.h"
+#include "level_set_pos.h"
 
 using namespace std;
 using namespace ug::bridge;
@@ -109,7 +110,8 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.add_method("set_nodes_inactive", static_cast<void (T::*)(int,int,int)>(&T::set_nodes_inactive))
 			.add_method("overwrite",static_cast<bool (T::*)(function_type&,function_type&,function_type&,int)>(&T::overwrite))
 			.add_method("overwrite",static_cast<bool (T::*)(function_type&,number,function_type&,int)>(&T::overwrite))
-			.add_method("compute_error", &T::compute_error);
+			.add_method("compute_error", &T::compute_error)
+			.set_construct_as_smart_pointer(true);
 		reg.add_class_to_group(name, "FV1LevelSetDisc", tag);
 	}
 	
@@ -123,7 +125,8 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.add_method("set_time", &T::set_time)
 			.add_method("get_time", &T::get_time)
 			.add_method("fill_v_vec",&T::fill_v_vec)
-			.add_method("init_function", &T::init_function);
+			.add_method("init_function", &T::init_function)
+			.set_construct_as_smart_pointer(true);
 		reg.add_class_to_group(name, "LevelSetAnalytic", tag);
 	}
 	
@@ -136,7 +139,8 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.add_constructor()
 			.add_method("compute_curvature", &T::computeElementCurvatureOnGrid2d)
 			.add_method("compute_curvature_from_sides", &T::computeElementCurvatureFromSides)
-			.add_method("exact_curvature", static_cast<void (T::*)(number)>(&T::exact_curvature), "", "Exact curvature");
+			.add_method("exact_curvature", static_cast<void (T::*)(number)>(&T::exact_curvature), "", "Exact curvature")
+			.set_construct_as_smart_pointer(true);
 		reg.add_class_to_group(name, "LevelSetCurvature", tag);
 	}
 
@@ -267,11 +271,25 @@ static void DomainAlgebra(Registry& reg, string grp)
 #ifdef UG_FOR_LUA
 			.add_method("set_dirichlet_data", static_cast<void (T::*)(const char*)>(&T::set_dirichlet_data), "", "Dirichlet BC")
 #endif
-			.add_method("set_limiter", static_cast<void (T::*)(bool)>(&T::set_limiter));
+			.add_method("set_limiter", static_cast<void (T::*)(bool)>(&T::set_limiter))
+			.set_construct_as_smart_pointer(true);
 		reg.add_class_to_group(name, "HiResFluxBasedLSM", tag);
 	}
 	
-} // end Domain algebra
+// 	LSPositionZ
+	{
+		typedef LSPositionZ<function_type> T;
+		typedef typename function_type::domain_type domain_type;
+		static const int dim = domain_type::dim;
+		string name = string("LSPositionZ").append(suffix);
+		reg.add_class_<T>(name, grp)
+			.template add_constructor<void (*) (SmartPtr<function_type>)> ("LSF")
+			.add_method("reinit", static_cast<void (T::*) ()> (&T::reinit), "", "Initialize for computations")
+			//.add_method("get_height_at", static_cast<number (T::*) (const MathVector<dim>&, number)> (&T::get_height_at), "(x,y)#default", "z-coordinate of the level set")
+			.set_construct_as_smart_pointer(true);
+		reg.add_class_to_group(name, "LSPositionZ", tag);
+	}
+} // end Domain Algebra
 
 }; // end Functionality
 } // end namespace LevelSet
