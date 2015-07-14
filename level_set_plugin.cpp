@@ -285,7 +285,7 @@ static void DomainAlgebra(Registry& reg, string grp)
 		reg.add_class_<T>(name, grp)
 			.template add_constructor<void (*) (SmartPtr<function_type>)> ("LSF")
 			.add_method("reinit", static_cast<void (T::*) ()> (&T::reinit), "", "Initialize for computations")
-			//.add_method("get_height_at", static_cast<number (T::*) (const MathVector<dim>&, number)> (&T::get_height_at), "(x,y)#default", "z-coordinate of the level set")
+			.add_method("get_height_at", static_cast<number (T::*) (const MathVector<dim>&, number)> (&T::get_height_at), "(x,y)#default", "z-coordinate of the level set")
 			.set_construct_as_smart_pointer(true);
 		reg.add_class_to_group(name, "LSPositionZ", tag);
 	}
