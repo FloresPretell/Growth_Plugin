@@ -13,7 +13,7 @@
 #include "level_set.h"
 #include "level_set_user_data.h"
 #include "ls_analytic.h"
-#include "ls_curvature2d.h"
+//#include "ls_curvature2d.h"
 #include "hrfblsm_discr.h"
 #include "level_set_pos.h"
 
@@ -131,18 +131,18 @@ static void DomainAlgebra(Registry& reg, string grp)
 	}
 	
 	// computation of the curvature in 2d
-	{
-		typedef LevelSetCurvature<function_type> T;
-		typedef typename function_type::domain_type domain_type;
-		string name = string("LevelSetCurvature").append(suffix);
-		reg.add_class_<T>(name, grp)
-			.add_constructor()
-			.add_method("compute_curvature", &T::computeElementCurvatureOnGrid2d)
-			.add_method("compute_curvature_from_sides", &T::computeElementCurvatureFromSides)
-			.add_method("exact_curvature", static_cast<void (T::*)(number)>(&T::exact_curvature), "", "Exact curvature")
-			.set_construct_as_smart_pointer(true);
-		reg.add_class_to_group(name, "LevelSetCurvature", tag);
-	}
+//	{
+//		typedef LevelSetCurvature<function_type> T;
+//		typedef typename function_type::domain_type domain_type;
+//		string name = string("LevelSetCurvature").append(suffix);
+//		reg.add_class_<T>(name, grp)
+//			.add_constructor()
+//			.add_method("compute_curvature", &T::computeElementCurvatureOnGrid2d)
+//			.add_method("compute_curvature_from_sides", &T::computeElementCurvatureFromSides)
+//			.add_method("exact_curvature", static_cast<void (T::*)(number)>(&T::exact_curvature), "", "Exact curvature")
+//			.set_construct_as_smart_pointer(true);
+//		reg.add_class_to_group(name, "LevelSetCurvature", tag);
+//	}
 
 	// level set user data
 	{
