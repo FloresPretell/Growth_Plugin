@@ -1433,7 +1433,7 @@ bool FV1LevelSetDisc<TGridFunction>::update_ls_subsets(TGridFunction& phi)
      		std::vector<MathVector<dim> > grad;
      		center=0;
       		int noc=elem->num_vertices();
-     		number phiCo[noc];
+      		std::vector<number> phiCo(noc);
            	for(int i = 0; i < noc; ++i)
            	{
 	        	phi.inner_dof_indices(vVrt[i], 0, ind);
