@@ -175,6 +175,8 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad
 		MathVector<dim> coCoord[domain_traits<dim>::MaxNumVerticesOfElem];
 		//	coord and vertex array
 		MathVector<dim> grad[domain_traits<dim>::MaxNumVerticesOfElem];
+		//	values of the grid function
+		number u[domain_traits<dim>::MaxNumVerticesOfElem];
 		//	get iterators
 		ElemIterator iter = uOld.template begin<ElemType>(si);
 		ElemIterator iterEnd = uOld.template end<ElemType>(si);
@@ -191,7 +193,6 @@ bool FV1LevelSetDisc<TGridFunction>::limit_grad
 			MathVector<dim> center;
 			center=0;
 			size_t noc=elem->num_vertices();
-			number u[noc];
 			for(size_t i = 0; i < noc; ++i)
 			{
 				vVrt[i] = elem->vertex(i);
