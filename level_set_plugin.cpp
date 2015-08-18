@@ -15,7 +15,6 @@
 #include "ls_analytic.h"
 //#include "ls_curvature2d.h"
 #include "hrfblsm_discr.h"
-#include "level_set_pos.h"
 
 using namespace std;
 using namespace ug::bridge;
@@ -274,20 +273,6 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.add_method("set_limiter", static_cast<void (T::*)(bool)>(&T::set_limiter))
 			.set_construct_as_smart_pointer(true);
 		reg.add_class_to_group(name, "HiResFluxBasedLSM", tag);
-	}
-	
-// 	LSPositionZ
-	{
-		typedef LSPositionZ<function_type> T;
-		typedef typename function_type::domain_type domain_type;
-		static const int dim = domain_type::dim;
-		string name = string("LSPositionZ").append(suffix);
-		reg.add_class_<T>(name, grp)
-			.template add_constructor<void (*) (SmartPtr<function_type>)> ("LSF")
-			.add_method("reinit", static_cast<void (T::*) ()> (&T::reinit), "", "Initialize for computations")
-			.add_method("get_height_at", static_cast<number (T::*) (const MathVector<dim>&, number)> (&T::get_height_at), "(x,y)#default", "z-coordinate of the level set")
-			.set_construct_as_smart_pointer(true);
-		reg.add_class_to_group(name, "LSPositionZ", tag);
 	}
 } // end Domain Algebra
 
