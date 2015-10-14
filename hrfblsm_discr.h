@@ -10,6 +10,7 @@
 // ug4 headers
 #include "common/common.h"
 #include "lib_disc/function_spaces/grid_function.h"
+#include "lib_disc/function_spaces/grid_function_user_data.h"
 #ifdef UG_FOR_LUA
 #include "bindings/lua/lua_user_data.h"
 #endif
@@ -249,6 +250,25 @@ public:
 		SmartPtr<CplUserData<MathVector<dim>, dim> > spVelField,
 		SmartPtr<TGridFunction> spNormVel
 	);
+		
+///	appends a vertical vector the the normal velocity (using a user-data object)
+	void append_to_normal_vel
+	(
+		SmartPtr<CplUserData<number, dim> > spNVelField,
+		SmartPtr<TGridFunction> spNormVel
+	);
+	
+///	appends a vertical vector the the normal velocity (using a user-data object)
+	void append_to_normal_vel
+	(
+		SmartPtr<TGridFunction> spNVelGF,
+		const char * cmp,
+		SmartPtr<TGridFunction> spNormVel
+	)
+	{
+		append_to_normal_vel (SmartPtr<CplUserData<number, dim> > (new GridFunctionNumberData<TGridFunction> (spNVelGF, cmp)), spNormVel);
+	}
+	
 #ifdef UG_FOR_LUA
 ///	compute the normal velocity using a user-data object
 	void compute_normal_vel
@@ -261,6 +281,13 @@ public:
 	}
 #endif
 	
+///	compare the solution with a given level-set function
+	void compare_lsf_with
+	(
+		SmartPtr<TGridFunction> spLSF2, ///< the second level-set function
+		number eps ///< tolerance
+	);
+
 private:
 
 //	Auxiliary tools

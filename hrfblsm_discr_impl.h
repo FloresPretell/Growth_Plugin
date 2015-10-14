@@ -876,7 +876,10 @@ void HiResFluxBasedLSM<TGridFunction>::assign_dirichlet
 			numsol.inner_dof_indices (vrt, 0, ind);
 		
 		//	get the bc and save it in the solution
-			(*m_imDirichlet) (&exactVal, &aaPos[vrt], m_time, si, 1);
+			if (m_imDirichlet.valid ())
+				(*m_imDirichlet) (&exactVal, &aaPos[vrt], m_time, si, 1);
+			else
+				exactVal = DoFRef (*m_oldSol, ind[0]);
 			DoFRef (numsol, ind[0]) = exactVal;
 		}
 	}
@@ -1395,7 +1398,7 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 	
 	if (! m_bVerbose)
 	{
-		UG_LOG ("advect: " << step << " step(s) done, last dt: " << m_dt << "\n");
+		UG_LOG ("advect: " << step << " step(s) done, last dt: " << m_dt << ", last CFL = " << m_curCFL << "\n");
 	}
 	UG_LOG ("advect: max. CFL = " << m_CFL << "\n");
 	
@@ -1426,7 +1429,7 @@ void HiResFluxBasedLSM<TGridFunction>::compute_normal_vel
 {
 //	we need the solution
 	if (! m_newSol.valid ())
-		UG_THROW ("Specify the signed distance function!");
+		UG_THROW ("Specify the level-set function!");
 	
 //	get domain
 	domain_type& domain = * (m_newSol->domain().get ());
@@ -1452,12 +1455,6 @@ void HiResFluxBasedLSM<TGridFunction>::compute_normal_vel
 	t_aaVol aaVolume (grid, aScvVolume);
 	compute_volumes (*m_newSol, geo, aaVolume);
 	
-//	prepare an attachment for the volumes unter the interface
-	ANumber aScvVolUnder;
-	grid.attach_to_vertices (aScvVolUnder);
-	t_aaVol aaVolUnder (grid, aScvVolUnder);
-	SetAttachmentValues (aaVolUnder, grid.vertices_begin (), grid.vertices_end (), 0);
-	
 //	attach, access and compute the gradient
 	ADimVector aGradient;
 	grid.attach_to_vertices (aGradient);
@@ -1468,6 +1465,9 @@ void HiResFluxBasedLSM<TGridFunction>::compute_normal_vel
 		
 //	local indices
 	std::vector<DoFIndex> ind;
+	
+//	from now on, aScvVolume will keep the volumes unter the interface
+	SetAttachmentValues (aaVolume, grid.vertices_begin (), grid.vertices_end (), 0);
 	
 //	reset the data
 	(*spNormVel) = 0.0;
@@ -1514,7 +1514,7 @@ void HiResFluxBasedLSM<TGridFunction>::compute_normal_vel
     	    	number gnorm = VecLength (aaGradient [vrt]);
 				spNormVel->inner_dof_indices (vrt, 0, ind);
 				DoFRef (*spNormVel, ind[0]) += (co_vel [i] * aaGradient [vrt]) * vol / gnorm;
-				aaVolUnder[vrt] += vol;
+				aaVolume[vrt] += vol;
 			}
 		}
 	}
@@ -1526,18 +1526,142 @@ void HiResFluxBasedLSM<TGridFunction>::compute_normal_vel
 								iter != m_newSol->template end<Vertex> (si); ++iter)
 		{
 			Vertex* vrt = *iter;
-			number vol = aaVolUnder[vrt];
+			number vol = aaVolume[vrt];
 			if (vol == 0)
 				continue; // we are not under the interface!
-			m_newSol->inner_dof_indices (vrt, 0, ind);
+			spNormVel->inner_dof_indices (vrt, 0, ind);
 			DoFRef (*spNormVel, ind[0]) /= vol;
 		}
 	}
 	
 //	detach from the grid
 	grid.detach_from_vertices (aGradient);
-	grid.detach_from_vertices (aScvVolUnder);
 	grid.detach_from_vertices (aScvVolume);
+}
+
+/**
+ * compute the normal velocity using a user-data object
+ */
+template<typename TGridFunction>
+void HiResFluxBasedLSM<TGridFunction>::append_to_normal_vel
+(
+	SmartPtr<CplUserData<number, dim> > spNVelField, ///< user data for the velocity vector field
+	SmartPtr<TGridFunction> spNormVel ///< to save the normal velocity
+)
+{
+//	we need the solution
+	if (! m_newSol.valid ())
+		UG_THROW ("Specify the level-set function!");
+	
+//	get domain
+	domain_type& domain = * (m_newSol->domain().get ());
+
+//	get grid of domain
+	grid_type& grid = *domain.grid ();
+
+//	get position accessor
+	const position_accessor_type& aaPos = domain.position_accessor ();
+	
+//	FV geometry
+	DimFV1Geometry<dim> geo;
+
+//	specify the neumann (outflow) bnd subsets for the geometry, so that the
+//	geometry produces boundary faces (BF) for all sides of the
+//	element, that is in one of the subsets
+	for (size_t i = 0; i < m_neumann_sg.size (); i++)
+		geo.add_boundary_subset (m_neumann_sg[i]);
+
+//	Attachment for the contribution of the normal velocity
+	ANumber aNVelocity;
+	grid.attach_to_vertices (aNVelocity);
+	t_aaVol aaNVel (grid, aNVelocity);
+	SetAttachmentValues (aaNVel, grid.vertices_begin (), grid.vertices_end (), 0);
+	
+//	get the total scv volumes
+	ANumber aScvVolume;
+	grid.attach_to_vertices (aScvVolume);
+	t_aaVol aaVolume (grid, aScvVolume);
+	compute_volumes (*m_newSol, geo, aaVolume);
+	
+//	attach, access and compute the gradient
+	ADimVector aGradient;
+	grid.attach_to_vertices (aGradient);
+	t_aaGrad aaGradient (grid, aGradient);
+	compute_vertex_grad (*m_newSol, geo, aaVolume, aaGradient, NULL);
+	if (m_limiter)
+		limit_grad (*m_newSol, aaGradient);
+		
+//	local indices
+	std::vector<DoFIndex> ind;
+	
+//	from now on, aScvVolume will keep the volumes unter the interface
+	SetAttachmentValues (aaVolume, grid.vertices_begin (), grid.vertices_end (), 0);
+	
+//	loop over subsets to sum up the normal velocities
+	for (int si = 0; si < m_newSol->num_subsets (); si++)
+	{
+		ElemIterator iterEnd = m_newSol->template end<ElemType> (si);
+		for (ElemIterator iter = m_newSol->template begin<ElemType> (si); iter != iterEnd; ++iter)
+		{
+			ElemType* elem = *iter;
+			
+		//	check if this is a "positive" element
+			number uValue[maxNumCo];
+			Vertex* vVrt[maxNumCo];
+			for (size_t i = 0; i < elem->num_vertices (); ++i)
+			{
+				Vertex* vrt = elem->vertex (i);
+				m_newSol->inner_dof_indices ((vVrt[i] = vrt), 0, ind);
+				uValue[i] = DoFRef (*m_newSol, ind[0]);
+			}
+			if (lsf_sign (elem->num_vertices (), uValue) > 0)
+				continue; // we do not consider this element
+			
+		//	get vertices and extract corner coordinates
+			MathVector<dim> coCoord[maxNumCo];
+			for (size_t i = 0; i < elem->num_vertices (); ++i)
+				coCoord[i] = aaPos[vVrt[i]];
+
+		//	update fv geometry
+			geo.update (elem, coCoord, domain.subset_handler().get ());
+			size_t noc = geo.num_scv ();
+			
+		//	get the nodal velocity
+			number co_nVel[maxNumCo];
+			(*spNVelField) (co_nVel, geo.scv_global_ips (), m_time, si,
+				elem, geo.corners (), geo.scv_local_ips (), noc, NULL);
+		
+		//	compute the normal velocity
+			for (size_t i = 0; i < noc; i++)
+			{
+				Vertex* vrt = vVrt[i];
+				number vol = geo.scv(i).volume ();
+    	    	number gnorm = VecLength (aaGradient [vrt]);
+				aaNVel [vrt] += (co_nVel [i] * aaGradient [vrt] [dim-1]) * vol / gnorm;
+				aaVolume[vrt] += vol;
+			}
+		}
+	}
+	
+//	loop over subsets to divide the normal velocities by the volumes
+	for (int si = 0; si < m_newSol->num_subsets (); si++)
+	{
+		for (VertexConstIterator iter = m_newSol->template begin<Vertex> (si);
+								iter != m_newSol->template end<Vertex> (si); ++iter)
+		{
+			Vertex* vrt = *iter;
+			number vol = aaVolume[vrt];
+			if (vol == 0)
+				continue; // we are not under the interface!
+			spNormVel->inner_dof_indices (vrt, 0, ind);
+			DoFRef (*spNormVel, ind[0]) += aaNVel [vrt] / vol;
+		}
+	}
+	
+//	detach from the grid
+	grid.detach_from_vertices (aGradient);
+	grid.detach_from_vertices (aScvVolume);
+	grid.detach_from_vertices (aNVelocity);
 }
 
 /**
@@ -1549,13 +1673,14 @@ void HiResFluxBasedLSM<TGridFunction>::set_dirichlet_boundary
 	const char* subsets
 )
 {
-	if (m_newSol.invalid ())
-		UG_THROW ("Grid function for the solution not set.");
-	try
+	if (m_dirichlet_sg.subset_handler().invalid ())
 	{
-		m_dirichlet_sg = m_newSol->subset_grp_by_name (subsets);
+		if (m_newSol.invalid ())
+			UG_THROW ("Grid function for the solution not set.");
+		m_dirichlet_sg.set_subset_handler (m_newSol->subset_handler ());
 	}
-	UG_CATCH_THROW ("ERROR while parsing Subsets.");
+	
+	m_dirichlet_sg.add (TokenizeString (subsets));
 }
 
 /**
@@ -1567,13 +1692,138 @@ void HiResFluxBasedLSM<TGridFunction>::set_outflow_boundary
 	const char* subsets
 )
 {
-	if (m_newSol.invalid ())
-		UG_THROW ("Grid function for the solution not set.");
-	try
+	if (m_neumann_sg.subset_handler().invalid ())
 	{
-		m_neumann_sg = m_newSol->subset_grp_by_name (subsets);
+		if (m_newSol.invalid ())
+			UG_THROW ("Grid function for the solution not set.");
+		m_neumann_sg.set_subset_handler (m_newSol->subset_handler ());
 	}
-	UG_CATCH_THROW ("ERROR while parsing Subsets.");
+	
+	m_neumann_sg.add (TokenizeString (subsets));
+}
+
+/**
+ * checks whether two level-set functions specify the same interface
+ */
+template<typename TGridFunction>
+void HiResFluxBasedLSM<TGridFunction>::compare_lsf_with
+(
+	SmartPtr<TGridFunction> spLSF2, ///< the second level-set function
+	number eps ///< tolerance
+)
+{
+	if (m_newSol.invalid ())
+		UG_THROW ("compare_lsf_with: Solution is not specified!\n");
+	
+	bool check_failed = false;
+	std::vector<DoFIndex> ind;
+	
+//	get domain
+	domain_type& domain = * (m_newSol->domain().get ());
+
+//	get position accessor
+	const position_accessor_type& aaPos = domain.position_accessor ();
+	
+// 1. Compare the values at the vertices
+	UG_LOG ("--- Checking solution, phase 1: Nodal values\n");
+	for (int si = 0; si < domain.subset_handler()->num_subsets (); si++)
+	{
+		UG_LOG (" -- subset "<< si << "\n");
+		for (VertexConstIterator iter = m_newSol->template begin<Vertex> (si);
+								iter != m_newSol->template end<Vertex> (si); ++iter)
+		{
+		//	get vertex
+			Vertex* vrt = *iter;
+		//	get the index in the vector
+			m_newSol->inner_dof_indices (vrt, 0, ind);
+		//	compare the values
+			number lsf_1 = DoFRef (*m_newSol, ind[0]);
+			number lsf_2 = DoFRef (*spLSF2, ind[0]);
+			if (lsf_1 * lsf_2 <= 0 && (lsf_1 != 0 || lsf_2 != 0))
+			{
+				check_failed = true;
+				UG_LOG ("  > vertex " << vrt->grid_data_index() << " @ (" << aaPos[vrt][0]);
+				for (size_t i = 1; i < dim; i++)
+					UG_LOG (", " << aaPos[vrt][i]);
+				UG_LOG ("): sol = " << lsf_1 << ", lsf = " << lsf_2 << "\n");
+			}
+		}
+	}
+	if (check_failed)
+	{
+		UG_LOG ("--- failed.\n");
+		return;
+	}
+	UG_LOG ("--- passed.\n");
+	
+//	2. Compare the interface in the elements
+	UG_LOG ("--- Checking solution, phase 2: Interface in the elements\n");
+	for (int si = 0; si < domain.subset_handler()->num_subsets (); si++)
+	{
+		UG_LOG (" -- subset "<< si << "\n");
+	//	loop grid elements of the full dimensionality
+		ElemIterator iterEnd = m_newSol->template end<ElemType> (si);
+		for (ElemIterator iter = m_newSol->template begin<ElemType> (si); iter != iterEnd; ++iter)
+		{
+			ElemType* elem = *iter;
+			const size_t numVertices = elem->num_vertices ();
+			
+		//	local values
+			Vertex* vVrt[maxNumCo];
+			number lsf_1 [maxNumCo], lsf_2 [maxNumCo];
+
+		//	get the vertices, extract the values of the functions
+			for (size_t i = 0; i < numVertices; i++)
+			{
+				vVrt[i] = elem->vertex (i);
+				m_newSol->inner_dof_indices (vVrt[i], 0, ind);
+				lsf_1[i] = DoFRef (*m_newSol, ind[0]);
+				lsf_2[i] = DoFRef (*spLSF2, ind[0]);
+			}
+		
+		//	check if this is an interface element
+			if (lsf_sign (numVertices, lsf_1) != 0)
+				continue;
+			
+		//	check the position of the interface
+			bool bad_if_elem = false;
+			number param_1 [maxNumCo][maxNumCo];
+			number param_2 [maxNumCo][maxNumCo];
+			memset (param_1, 0, maxNumCo * maxNumCo * sizeof (number));
+			memset (param_2, 0, maxNumCo * maxNumCo * sizeof (number));
+			for (size_t i = 0; i < numVertices; i++)
+				for (size_t j = i + 1; j < numVertices; j++)
+				{
+					if (lsf_1[i] * lsf_1[j] > 0) continue;
+					param_1[i][j] = lsf_1[i] / (lsf_1[i] - lsf_1[j]);
+					param_2[i][j] = lsf_2[i] / (lsf_2[i] - lsf_2[j]);
+					if (std::fabs (param_1[i][j] - param_2[i][j]) >= eps)
+						bad_if_elem = true;
+				}
+			if (bad_if_elem)
+			{
+				check_failed = true;
+				UG_LOG ("  > elem " << elem->grid_data_index() << " (" << numVertices << " corners):\n");
+				for (size_t i = 0; i < numVertices; i++)
+				{
+					UG_LOG ("  : " << i << " @ (" << aaPos[vVrt[i]][0]);
+					for (size_t j = 1; j < dim; j++)
+						UG_LOG (", " << aaPos[vVrt[i]][j]);
+					UG_LOG ("): sol = " << lsf_1[i] << ", lsf = " << lsf_2[i] << "\n");
+				}
+				for (size_t i = 0; i < numVertices; i++)
+					for (size_t j = i + 1; j < numVertices; j++)
+						if (std::fabs (param_1[i][j] - param_2[i][j]) >= eps)
+							UG_LOG ("  ! " << i << " to " << j << ": sol = " << param_1[i][j] << ", lsf = " << param_2[i][j] << "\n");
+			}
+		}
+	}
+	if (check_failed)
+	{
+		UG_LOG ("--- failed.\n");
+		return;
+	}
+	UG_LOG ("--- passed.\n");
 }
 
 } // end namespace LevelSet
