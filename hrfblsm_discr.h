@@ -389,6 +389,7 @@ private:
 	(
 		TGridFunction& u,
 		DimFV1Geometry<dim>& geo,
+		ANumber& aVolume,
 		t_aaVol& aaVolume
 	);
 	
@@ -408,8 +409,9 @@ private:
 		TGridFunction& u,
 		DimFV1Geometry<dim>& geo,
 		t_aaVol& aaVolume,
+		ADimVector& aGradient,
 		t_aaGrad& aaGradient,
-		CplUserData<number,dim> * if_val_data
+		CplUserData<number,dim> * if_val_data = NULL
 	);
 	
 ///	sign of the LSF
@@ -435,6 +437,7 @@ private:
 	void mark_CoIE
 	(
 		grid_type& grid,
+		ABool& aCoIE,
 		t_aaCoIE& aaCoIE
 	);
 

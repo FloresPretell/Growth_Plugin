@@ -10,6 +10,9 @@
 #include "lib_disc/spatial_disc/disc_util/fv1_geom.h"
 #include "lib_disc/reference_element/reference_element.h"
 #include "lib_grid/algorithms/attachment_util.h"
+#ifdef UG_PARALLEL
+#include "lib_grid/parallelization/util/attachment_operations.hpp"
+#endif
 
 namespace ug{
 namespace LevelSet{
@@ -45,7 +48,8 @@ template<typename TGridFunction>
 void HiResFluxBasedLSM<TGridFunction>::mark_CoIE
 (
 	grid_type& grid, ///< the grid
-	t_aaCoIE& aaCoIE ///< the attachment for the marks
+	ABool& aCoIE, ///< the attachment for the marks
+	t_aaCoIE& aaCoIE ///< accessor for the attachment
 )
 {
 //	set the default value (false everywhere)
@@ -75,6 +79,10 @@ void HiResFluxBasedLSM<TGridFunction>::mark_CoIE
 			for (size_t i = 0; i < elem->num_vertices (); i++)
 				aaCoIE[elem->vertex (i)] = true;
 	}
+	
+#	ifdef UG_PARALLEL
+	AttachmentAllReduce (grid, aCoIE, PCL_RO_LOR);
+#	endif
 }
 
 /**
@@ -629,7 +637,8 @@ void HiResFluxBasedLSM<TGridFunction>::compute_volumes
 (
 	TGridFunction& u, ///< grid function to get the grid and the surface view
 	DimFV1Geometry<dim>& geo, ///< FV geometry object
-	t_aaVol& aaVolume ///< where to save the volumes
+	ANumber& aVolume, ///< where to save the volumes
+	t_aaVol& aaVolume ///< accessor for the attachment
 )
 {
 //	get domain
@@ -674,6 +683,10 @@ void HiResFluxBasedLSM<TGridFunction>::compute_volumes
 				aaVolume[vVrt[i]] += geo.scv(i).volume ();
 		}
 	}
+	
+#	ifdef UG_PARALLEL
+	AttachmentAllReduce (grid, aVolume, PCL_RO_SUM);
+#	endif
 }
 
 /**
@@ -744,7 +757,8 @@ void HiResFluxBasedLSM<TGridFunction>::compute_vertex_grad
 	TGridFunction& u, ///< gradient of this function
 	DimFV1Geometry<dim>& geo, ///< FV geometry object
 	t_aaVol& aaVolume, ///< the volumes
-	t_aaGrad& aaGradient, ///< where to save
+	ADimVector& aGradient, ///< where to save
+	t_aaGrad& aaGradient, ///< accessor for the attachment
 	CplUserData<number,dim> * if_val_data ///< computes the values at the interface (if not NOLL)
 )
 {
@@ -831,6 +845,10 @@ void HiResFluxBasedLSM<TGridFunction>::compute_vertex_grad
 			}
 		}
 	}
+	
+#	ifdef UG_PARALLEL
+	AttachmentAllReduce (grid, aGradient, PCL_RO_SUM);
+#	endif
 
 //	divide the gradients by the volumes
 	for (int si = 0; si < u.num_subsets (); si++)
@@ -1156,7 +1174,7 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 		geo.add_boundary_subset (m_neumann_sg[i]);
 
 //	calculate scv volume
-	compute_volumes (uNew, geo, aaVolume);
+	compute_volumes (uNew, geo, aScvVolume, aaVolume);
 	
 //	attachment for the gradient used for the velocity
 	if (m_spVelPot.valid () && m_spVelPot != m_oldSol)
@@ -1164,7 +1182,7 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 	//	attach, access and compute
 		grid.attach_to_vertices (aVelGrad);
 		aaVelGrad.access (grid, aVelGrad);
-		compute_vertex_grad (*m_spVelPot, geo, aaVolume, aaVelGrad, NULL);
+		compute_vertex_grad (*m_spVelPot, geo, aaVolume, aVelGrad, aaVelGrad);
 		if (m_limiter)
 			limit_grad (*m_spVelPot, aaVelGrad);
 	}
@@ -1198,7 +1216,7 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 		//	attach, access and compute the gradient
 			grid.attach_to_vertices (aSDFGrad);
 			aaSDFGrad.access (grid, aSDFGrad);
-			compute_vertex_grad (*m_spSDF, geo, aaVolume, aaSDFGrad, NULL);
+			compute_vertex_grad (*m_spSDF, geo, aaVolume, aSDFGrad, aaSDFGrad);
 			if (m_limiter)
 				limit_grad (*m_spSDF, aaSDFGrad);
 		//	attach and access the update
@@ -1208,7 +1226,7 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 	}
 	
 //	mark the corners of the intersected elements
-	mark_CoIE (grid, aaCoIE);
+	mark_CoIE (grid, aCoIE, aaCoIE);
 
     MathVector<dim> coord;
 	std::vector<DoFIndex> ind;
@@ -1228,7 +1246,7 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 		bool wrong_sgn_at_if_A = false, wrong_sgn_at_if_B = false;
 		
 	//	compute scv volume and the gradient
-	    compute_vertex_grad (uOld, geo, aaVolume, aaGradient, m_imInterfaceVal.get ());
+	    compute_vertex_grad (uOld, geo, aaVolume, aGradient, aaGradient, m_imInterfaceVal.get ());
 	    if (m_limiter)
 	    	limit_grad (uOld, aaGradient);
 	    
@@ -1240,11 +1258,6 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 	//	loop over subsets to compute the new solution
 	    for (int si = 0; si < uOld.num_subsets (); si++)
 	    {
-	    //TODO: Remove this! These are full-dimensional elements!
-	    //	skip boundaries
-		//	if (m_dirichlet_sg.size() != 0) if (m_dirichlet_sg.contains (si)) continue;
-	    //	if (m_neumann_sg.size() != 0) if (m_neumann_sg.contains (si)) continue;
-	        
 		//	loop elements compute the update of the solution
 		    ElemIterator iterEnd = uNew.template end<ElemType> (si);
 		    for (ElemIterator iter = uNew.template begin<ElemType> (si); iter != iterEnd; ++iter)
@@ -1294,7 +1307,17 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 				}
 	    }
 	    
+#		ifdef UG_PARALLEL
+		AttachmentAllReduce (grid, aUpdate, PCL_RO_SUM);
+		AttachmentAllReduce (grid, aSDFUpdate, PCL_RO_SUM);
+		{
+			pcl::ProcessCommunicator procComm;
+			m_curCFL = procComm.allreduce (m_curCFL, PCL_RO_MAX);
+		}
+#		endif
+	    
 	//	check the CFL
+	//TODO (parallelization): This should happen only on the master!
 		if (m_time_control && m_curCFL > 1e-10 && (m_curCFL < m_minCFL || m_curCFL > m_maxCFL))
 		{
 			number old_dt = m_dt;
@@ -1453,13 +1476,13 @@ void HiResFluxBasedLSM<TGridFunction>::compute_normal_vel
 	ANumber aScvVolume;
 	grid.attach_to_vertices (aScvVolume);
 	t_aaVol aaVolume (grid, aScvVolume);
-	compute_volumes (*m_newSol, geo, aaVolume);
+	compute_volumes (*m_newSol, geo, aScvVolume, aaVolume);
 	
 //	attach, access and compute the gradient
 	ADimVector aGradient;
 	grid.attach_to_vertices (aGradient);
 	t_aaGrad aaGradient (grid, aGradient);
-	compute_vertex_grad (*m_newSol, geo, aaVolume, aaGradient, NULL);
+	compute_vertex_grad (*m_newSol, geo, aaVolume, aGradient, aaGradient);
 	if (m_limiter)
 		limit_grad (*m_newSol, aaGradient);
 		
@@ -1518,6 +1541,12 @@ void HiResFluxBasedLSM<TGridFunction>::compute_normal_vel
 			}
 		}
 	}
+	
+#	ifdef UG_PARALLEL
+	AttachmentAllReduce (grid, aScvVolume, PCL_RO_SUM);
+	spNormVel->set_storage_type (PST_ADDITIVE);
+	spNormVel->change_storage_type (PST_CONSISTENT);
+#	endif
 	
 //	loop over subsets to divide the normal velocities by the volumes
 	for (int si = 0; si < m_newSol->num_subsets (); si++)
@@ -1581,13 +1610,13 @@ void HiResFluxBasedLSM<TGridFunction>::append_to_normal_vel
 	ANumber aScvVolume;
 	grid.attach_to_vertices (aScvVolume);
 	t_aaVol aaVolume (grid, aScvVolume);
-	compute_volumes (*m_newSol, geo, aaVolume);
+	compute_volumes (*m_newSol, geo, aScvVolume, aaVolume);
 	
 //	attach, access and compute the gradient
 	ADimVector aGradient;
 	grid.attach_to_vertices (aGradient);
 	t_aaGrad aaGradient (grid, aGradient);
-	compute_vertex_grad (*m_newSol, geo, aaVolume, aaGradient, NULL);
+	compute_vertex_grad (*m_newSol, geo, aaVolume, aGradient, aaGradient);
 	if (m_limiter)
 		limit_grad (*m_newSol, aaGradient);
 		
@@ -1642,6 +1671,12 @@ void HiResFluxBasedLSM<TGridFunction>::append_to_normal_vel
 			}
 		}
 	}
+	
+#	ifdef UG_PARALLEL
+	AttachmentAllReduce (grid, aScvVolume, PCL_RO_SUM);
+	spNormVel->set_storage_type (PST_ADDITIVE);
+	spNormVel->change_storage_type (PST_CONSISTENT);
+#	endif
 	
 //	loop over subsets to divide the normal velocities by the volumes
 	for (int si = 0; si < m_newSol->num_subsets (); si++)
