@@ -3,7 +3,6 @@
  *
  * Mar. 26, 2015	created
  * Nov. 04, 2015	the source by the antiderivatives
- * Authors: C. Wehner, D. Logashenko
  */
 
 // ug4 headers

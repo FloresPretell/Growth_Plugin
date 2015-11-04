@@ -2,7 +2,6 @@
  * High-resolution flux-based level set method
  *
  * Mar. 26, 2015	created
- * Authors: C. Wehner, D. Logashenko
  */
 #ifndef __H__UG__PLUGINS__LEVEL_SET__HR_FB_LSM_DISCR_H__
 #define __H__UG__PLUGINS__LEVEL_SET__HR_FB_LSM_DISCR_H__

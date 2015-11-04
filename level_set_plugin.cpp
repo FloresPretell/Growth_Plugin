@@ -1,9 +1,3 @@
-/**
- * LevelSet plugin
- *
- * created by Christian Wehner
- */
-
 // ug4 headers
 #include "bridge/util.h"
 #include "bridge/util_domain_algebra_dependent.h"
