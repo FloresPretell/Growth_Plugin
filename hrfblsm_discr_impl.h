@@ -2,6 +2,7 @@
  * High-resolution flux-based level set method: Implementation
  *
  * Mar. 26, 2015	created
+ * Nov. 04, 2015	the source by the antiderivatives
  * Authors: C. Wehner, D. Logashenko
  */
 
@@ -16,6 +17,9 @@
 
 namespace ug{
 namespace LevelSet{
+
+// Define for the classic ghost fluid method
+#define LS_CLASSIC_GHOST_FLUID
 
 /**
  * get the sign of the LSF in an element:
@@ -140,31 +144,59 @@ inline void HiResFluxBasedLSM<TGridFunction>::sol_update
 	const MathVector<dim>& grad_up, ///< gradient at the upwind corner
 	const MathVector<dim>& vel_up, ///< velocity at the upwind corner
 //	Data at the downwind corner
+	const MathVector<dim>& x_down, ///< coordinates of the upwind corner
 	number u_down, ///< solution at the downwind corner
 	const MathVector<dim>& grad_down, ///< gradient at the downwind corner
 	const MathVector<dim>& vel_down, ///< velocity at the downwind corner
 //	Computed update
 	number& corr_up, ///< update for the upwind corner
-	number& corr_down ///< update for the downwind corner
+	number& corr_down, ///< update for the downwind corner
+	number& src_up, ///< source factor for the upwind corner
+	number& src_down ///< source factor at the downwind corner
 )
 {
-//	due to the convection
-//	conv_corr = u_{ip}^{n+0.5}, where u_{ip}^{n+0.5} is interpolated along the characteristic
-	MathVector<dim> distVec;
-	VecSubtract (distVec, ip, x_up);
-	corr_up = u_up - 0.5 * m_dt * (grad_up * vel_up);
-	if (! redOrder)
-		corr_up += grad_up * distVec;
-	corr_down = corr_up;
-	
-//	due to the divergence
-	if (! m_divFree)
+	if (! m_firstOrder) // the High-Resolution Flux-Based Level-Set method
 	{
-	//	div_corr_up = u_{co_up}^{n+0.5}, where u_{co_up}^{n+0.5} is interpolated along the characteristic
-		corr_up -= u_up - 0.5 * m_dt * (grad_up * vel_up);
+	//	due to the convection:
+	//	conv_corr = u_{ip}^{n+0.5}, where u_{ip}^{n+0.5} is interpolated along the characteristic
+		MathVector<dim> distVec;
+		VecSubtract (distVec, ip, x_up);
+		corr_up = u_up - 0.5 * m_dt * (grad_up * vel_up);
+		if (! redOrder)
+			corr_up += grad_up * distVec;
+		corr_down = corr_up;
 	
-	//	div_corr_down = u_{co_down}^{n+0.5}, where u_{co_up}^{n+0.5} is interpolated along the characteristic
-		corr_down -= u_down - 0.5 * m_dt * (grad_down * vel_down);
+	//	due to the divergence:
+		if (! m_divFree)
+		{
+		//	div_corr_up = u_{co_up}^{n+0.5}, where u_{co_up}^{n+0.5} is interpolated along the characteristic
+			corr_up -= u_up - 0.5 * m_dt * (grad_up * vel_up);
+	
+		//	div_corr_down = u_{co_down}^{n+0.5}, where u_{co_up}^{n+0.5} is interpolated along the characteristic
+			corr_down -= u_down - 0.5 * m_dt * (grad_down * vel_down);
+		}
+	}
+	else // the classic (first-order) upwind method
+	{
+	//	due to the convection
+		corr_down = corr_up = u_up;
+	
+	//	due to the divergence
+		if (! m_divFree)
+		{
+			corr_up -= u_up;
+			corr_down -= u_down;
+		}
+	}
+	
+	if (! m_antiderivSrc) // the usual discretization
+		src_up = src_down = 0; // we do not assemble the source factors here
+	else
+	{ // approximate the mesh size
+		MathVector<dim> hVec;
+		VecSubtract (hVec, x_down, x_up);
+		src_up = 0;
+		src_down = vel_down * hVec;
 	}
 }
 
@@ -185,18 +217,30 @@ inline void HiResFluxBasedLSM<TGridFunction>::bnd_sol_update
 	number& corr ///< update for the corner
 )
 {
-//	due to the convection
-//	conv_corr = u_{bip}^{n+0.5}, where u_{bip}^{n+0.5} is interpolated along the characteristic
-	MathVector<dim> distVec;
-	VecSubtract (distVec, bip, x);
-	corr = u - 0.5 * m_dt * (grad * vel);
-	if (! redOrder)
-		corr += grad * distVec;
+	if (! m_firstOrder) // the High-Resolution Flux-Based Level-Set method
+	{
+	//	due to the convection:
+	//	conv_corr = u_{bip}^{n+0.5}, where u_{bip}^{n+0.5} is interpolated along the characteristic
+		MathVector<dim> distVec;
+		VecSubtract (distVec, bip, x);
+		corr = u - 0.5 * m_dt * (grad * vel);
+		if (! redOrder)
+			corr += grad * distVec;
 	
-//	due to the divergence
-	if (! m_divFree)
-	//	div_corr = u_{co}^{n+0.5}, where u_{co}^{n+0.5} is interpolated along the characteristic
-		corr -= u - 0.5 * m_dt * (grad * vel);
+	//	due to the divergence
+		if (! m_divFree)
+		//	div_corr = u_{co}^{n+0.5}, where u_{co}^{n+0.5} is interpolated along the characteristic
+			corr -= u - 0.5 * m_dt * (grad * vel);
+	}
+	else // the classic (first-order) upwind method
+	{
+	//	due to the convection
+		corr = u;
+	
+	//	due to the divergence
+		if (! m_divFree)
+			corr -= u;
+	}
 }
 
 /**
@@ -282,7 +326,8 @@ void HiResFluxBasedLSM<TGridFunction>::assemble_element
 	t_aaGrad& aaVelGrad, ///< computed gradient at vertices for the computation of the velocity
 	t_aaVol& aaVolume, ///< volumes of the SCVs (assigned to vertices)
 	int sign, ///< sign of the LSF in the element (or 0 if no LSF specified)
-	t_aaUpd& aaUpdate //< to accumulate the update
+	t_aaUpd& aaUpdate, ///< to accumulate the advective update
+	t_aaUpd* aaSrc ///< to accumulate the factor of the update due to the source (if needed)
 )
 {
 //	get position accessor
@@ -356,9 +401,9 @@ void HiResFluxBasedLSM<TGridFunction>::assemble_element
 	{
 	//	get current SCVF
 	    const typename DimFV1Geometry<dim>::SCVF& scvf = geo.scvf (ip);
-	    MathVector<dim>	ipCoord = scvf.global_ip ();
 	    size_t from = scvf.from ();
 	    size_t to   = scvf.to ();
+	    const MathVector<dim>& ipCoord = scvf.global_ip ();
 	    
 	//  compute the ip velocity from the corner velocity by the linear interpolation
 		MathVector<dim> ipVelocity;
@@ -382,18 +427,26 @@ void HiResFluxBasedLSM<TGridFunction>::assemble_element
 		
 	//	assemble the fluxes
 		number corr_up, corr_down;
+		number src_up, src_down;
 		sol_update (outBndCo[up_co], // reduce the order at the outflow boundary
 			ipCoord, coCoord[up_co], uValue[up_co], grad[up_co], coVelocity[up_co],
-				uValue[down_co], grad[down_co], coVelocity[down_co],
-					corr_up, corr_down);
+				coCoord[down_co], uValue[down_co], grad[down_co], coVelocity[down_co],
+					corr_up, corr_down, src_up, src_down);
+		
 		aaUpdate[ vVrt[up_co] ] -= ipNormalVel * corr_up / aaVolume[ vVrt[up_co] ];
 		aaUpdate[ vVrt[down_co] ] += ipNormalVel * corr_down / aaVolume[ vVrt[down_co] ];
+		
+		if (aaSrc != NULL)
+		{
+			(*aaSrc)[ vVrt[up_co] ] -= ipNormalVel * src_up / aaVolume[ vVrt[up_co] ];
+			(*aaSrc)[ vVrt[down_co] ] += ipNormalVel * src_down / aaVolume[ vVrt[down_co] ];
+		}
 		
 	// the local Courant-number
 		number localCFL = std::max
         	(
-        		m_dt * ipNormalVel / aaVolume[ vVrt[from] ],
-        		m_dt * ipNormalVel / aaVolume[ vVrt[to] ]
+        		m_dt * ipNormalVel / aaVolume[ vVrt[up_co] ],
+        		m_dt * ipNormalVel / aaVolume[ vVrt[down_co] ]
         	);
 		if (localCFL > m_curCFL)
 			m_curCFL = localCFL;
@@ -519,7 +572,10 @@ int HiResFluxBasedLSM<TGridFunction>::assemble_cut_element
 	t_aaGrad& aaGradient, ///< computed gradient at vertices
 	t_aaGrad& aaVelGrad, ///< computed gradient at vertices for the computation of the velocity
 	t_aaVol& aaVolume, ///< volumes of the SCVs (assigned to vertices)
-	t_aaUpd& aaUpdate ///< to accumulate the update
+	t_aaUpd& aaUpdate, ///< to accumulate the convective update
+	t_aaUpd* aaSrc, ///< to accumulate the factors of the update due to the source
+	CplUserData<number,dim> * if_val_data, ///< computes the values at the interface (if not NOLL)
+	int si ///< subset index (only used if if_val_data != NULL)
 )
 {
 //	get position accessor
@@ -589,14 +645,16 @@ int HiResFluxBasedLSM<TGridFunction>::assemble_cut_element
 		}
 	}
 	
-//	fluxes through the inner scvfaces
+#	ifndef LS_CLASSIC_GHOST_FLUID
+
+//	fluxes through the inner scv faces
 	for (size_t ip = 0; ip < geo.num_scvf (); ip++)
 	{
-		number corr, t;
+		number corr, src, t;
 		
 	//	get current SCVF
 	    const typename DimFV1Geometry<dim>::SCVF& scvf = geo.scvf (ip);
-	    MathVector<dim>	ipCoord = scvf.global_ip ();
+	    const MathVector<dim>& ipCoord = scvf.global_ip ();
 	    size_t from = scvf.from ();
 	    size_t to   = scvf.to ();
 	    
@@ -608,13 +666,17 @@ int HiResFluxBasedLSM<TGridFunction>::assemble_cut_element
 	
 	//	assemble the flux for the from-corner
 		sol_update (false, ipCoord, coCoord[from], uValue[from], grad[from], from_co_vel,
-			uValue[to], grad[to], to_co_vel, corr, t);
+			coCoord[to], uValue[to], grad[to], to_co_vel, corr, t, src, t);
 		aaUpdate[ vVrt[from] ] -= from_flux * corr / aaVolume[ vVrt[from] ];
+		if (aaSrc != NULL)
+			(*aaSrc) [ vVrt[from] ] -= from_flux * src / aaVolume[ vVrt[from] ];
 		
 	//	assemble the flux for the to-corner
 		sol_update (false, ipCoord, coCoord[to], uValue[to], grad[to], to_co_vel,
-			uValue[from], grad[from], from_co_vel, corr, t);
+			coCoord[from], uValue[from], grad[from], from_co_vel, corr, t, src, t);
 		aaUpdate[ vVrt[to] ] += to_flux * corr / aaVolume[ vVrt[to] ];
+		if (aaSrc != NULL)
+			(*aaSrc) [ vVrt[to] ] += to_flux * src / aaVolume[ vVrt[to] ];
 		
 	// the local Courant-number
 		number localCFL = std::max
@@ -625,6 +687,83 @@ int HiResFluxBasedLSM<TGridFunction>::assemble_cut_element
 		if (localCFL > m_curCFL)
 			m_curCFL = localCFL;
 	}
+	
+#	else // LS_CLASSIC_GHOST_FLUID
+
+//	loop the base corner for the extrapolation
+	for (size_t base_co = 0; base_co < noc; base_co++)
+	{
+	//	extrapolate the solution
+		number extValue [maxNumCo];
+		extrapolate_by_lsf (if_val_data, si, geo, uValue, lsf, base_co, extValue);
+		
+	//	fluxes through the inner scvfaces
+		for (size_t ip = 0; ip < geo.num_scvf (); ++ip)
+		{
+		//	get current SCVF
+			const typename DimFV1Geometry<dim>::SCVF& scvf = geo.scvf (ip);
+			size_t from = scvf.from ();
+			size_t to   = scvf.to ();
+			if (from != base_co && to != base_co)
+				continue; // not the current case
+			
+			const MathVector<dim>& ipCoord = scvf.global_ip ();
+		
+		//  compute the velocities
+			MathVector<dim> from_co_vel, to_co_vel;
+			number from_ipNormalVel, to_ipNormalVel;
+			get_scvf_vel_on_if (geo, scvf, vel_pot, vel_grad, lsf,
+				from_co_vel, from_ipNormalVel, to_co_vel, to_ipNormalVel);
+	
+		//	normal ip-velocity (depending on the corner we assemble):
+			number ipNormalVel = (base_co == from)? from_ipNormalVel : to_ipNormalVel;
+		
+		//	upwinding
+			size_t up_co, down_co;
+			MathVector<dim> up_co_vel, down_co_vel;
+			if (ipNormalVel > 0)
+			{
+				up_co = from; down_co = to;
+				up_co_vel = from_co_vel; down_co_vel = to_co_vel;
+			}
+			else
+			{
+				up_co = to; down_co = from; ipNormalVel = - ipNormalVel;
+				up_co_vel = to_co_vel; down_co_vel = from_co_vel;
+			}
+		
+		//	assemble the fluxes
+			number corr_up, corr_down;
+			number src_up, src_down;
+			sol_update (false,
+				ipCoord, coCoord[up_co], extValue[up_co], grad[up_co], up_co_vel,
+					coCoord[down_co], extValue[down_co], grad[down_co], down_co_vel,
+						corr_up, corr_down, src_up, src_down);
+			if (base_co == up_co)
+			{
+				aaUpdate[ vVrt[base_co] ] -= ipNormalVel * corr_up / aaVolume[ vVrt[up_co] ];
+				if (aaSrc != NULL)
+					(*aaSrc) [ vVrt[base_co] ] -= ipNormalVel * src_up / aaVolume[ vVrt[up_co] ];
+			}
+			else
+			{
+				aaUpdate[ vVrt[base_co] ] += ipNormalVel * corr_down / aaVolume[ vVrt[down_co] ];
+				if (aaSrc != NULL)
+					(*aaSrc) [ vVrt[base_co] ] += ipNormalVel * src_down / aaVolume[ vVrt[down_co] ];
+			}
+		
+		// the local Courant-number
+			number localCFL = std::max
+				(
+					m_dt * ipNormalVel / aaVolume[ vVrt[from] ],
+					m_dt * ipNormalVel / aaVolume[ vVrt[to] ]
+				);
+			if (localCFL > m_curCFL)
+				m_curCFL = localCFL;
+		}
+	}
+	
+#	endif
 	
 	return 0;
 }
@@ -1140,8 +1279,9 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 	ADimVector aVelGrad; // gradient used for the velocity (if any)
 	ADimVector aSDFGrad; // gradient of the signed-distance function (if any)
 	
-//	attachment for the update of the solution
+//	attachments for the updates of the solution (due to the avective terms and the source)
 	ANumber aUpdate;
+	ANumber aSrc;
 	
 //	attachment for the update of the SDF (if needed)
 	ANumber aSDFUpdate;
@@ -1153,12 +1293,14 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 	grid.attach_to_vertices (aScvVolume);
 	grid.attach_to_vertices (aGradient);
 	grid.attach_to_vertices (aUpdate);
+	grid.attach_to_vertices (aSrc);
 	grid.attach_to_vertices (aCoIE);
 
 //	get attachment accessor to access values
 	t_aaVol aaVolume (grid, aScvVolume);
 	t_aaGrad aaGradient (grid, aGradient);
 	t_aaUpd aaUpdate (grid, aUpdate);
+	t_aaUpd aaSrc (grid, aSrc);
 	t_aaCoIE aaCoIE (grid, aCoIE);
 	t_aaGrad aaVelGrad;
 	t_aaGrad aaSDFGrad;
@@ -1252,6 +1394,7 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 	    
 	//	initialize attachment values
 		SetAttachmentValues (aaUpdate, grid.vertices_begin (), grid.vertices_end (), 0);
+		SetAttachmentValues (aaSrc, grid.vertices_begin (), grid.vertices_end (), 0);
 		if (m_spLSF.valid () && m_spSDF != m_oldSol)
 			SetAttachmentValues (aaSDFUpdate, grid.vertices_begin (), grid.vertices_end (), 0);
 
@@ -1268,16 +1411,16 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 		    	
 		    	GetLocalVector (locOldU, uOld);
 		    	if (m_spLSF.invalid ())
-			    	assemble_element (elem, geo, domain, locOldU, aaGradient, aaVelGrad, aaVolume, 0, aaUpdate);
+			    	assemble_element (elem, geo, domain, locOldU, aaGradient, aaVelGrad, aaVolume, 0, aaUpdate, &aaSrc);
 			    else
 			    {
 			    	locLSF.resize (locInd); locVelPot.resize (locInd);
 		    		int sign = assemble_cut_element
 		    			(elem, geo, domain, locOldU, locLSF, locVelPot,
-		    				aaGradient, aaVelGrad, aaVolume, aaUpdate);
+		    				aaGradient, aaVelGrad, aaVolume, aaUpdate, &aaSrc, m_imInterfaceVal.get (), si);
 		    		if (sign != 0)
 			    		assemble_element (elem, geo, domain, locOldU,
-			    			aaGradient, aaVelGrad, aaVolume, sign, aaUpdate);
+			    			aaGradient, aaVelGrad, aaVolume, sign, aaUpdate, &aaSrc);
 			    }
 			}
 			
@@ -1297,10 +1440,10 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 						GetLocalVector (locOldU, *m_spSDF);
 						int sign = assemble_cut_element
 							(elem, geo, domain, locOldU, locLSF, locVelPot,
-								aaSDFGrad, aaVelGrad, aaVolume, aaSDFUpdate);
+								aaSDFGrad, aaVelGrad, aaVolume, aaSDFUpdate, NULL, NULL, si);
 						if (sign != 0)
 							assemble_element (elem, geo, domain, locOldU,
-								aaSDFGrad, aaVelGrad, aaVolume, sign, aaSDFUpdate);
+								aaSDFGrad, aaVelGrad, aaVolume, sign, aaSDFUpdate, NULL);
 						
 						break;
 					}
@@ -1309,6 +1452,7 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 	    
 #		ifdef UG_PARALLEL
 		AttachmentAllReduce (grid, aUpdate, PCL_RO_SUM);
+		AttachmentAllReduce (grid, aSrc, PCL_RO_SUM);
 		AttachmentAllReduce (grid, aSDFUpdate, PCL_RO_SUM);
 		{
 			pcl::ProcessCommunicator procComm;
@@ -1346,6 +1490,7 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 						co_source = (DoFRef (*m_spLSF, ind[0]) >= 0)? m_source_pos : m_source_neg;
 					else
 						co_source = m_source_pos;
+					if (m_antiderivSrc) co_source *= aaSrc[vrt];
 					DoFRef (uNew, ind[0]) += m_dt * (aaUpdate[vrt] + co_source);
 				}
 				else
@@ -1363,7 +1508,11 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 							DoFRef (uNew, ind[0]) += m_dt * m_source_pos; // only the source term
 						}
 						else
-							DoFRef (uNew, ind[0]) += dt_eff * (aaUpdate[vrt] + m_source_pos);
+						{
+							number co_source = m_source_pos;
+							if (m_antiderivSrc) co_source *= aaSrc[vrt];
+							DoFRef (uNew, ind[0]) += dt_eff * (aaUpdate[vrt] + co_source);
+						}
 					}
 					else if (lsf_val < - lsf_threshold ())
 					{
@@ -1373,7 +1522,11 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 							DoFRef (uNew, ind[0]) += m_dt * m_source_neg; // only the source term
 						}
 						else
-							DoFRef (uNew, ind[0]) += dt_eff * (aaUpdate[vrt] + m_source_neg);
+						{
+							number co_source = m_source_neg;
+							if (m_antiderivSrc) co_source *= aaSrc[vrt];
+							DoFRef (uNew, ind[0]) += dt_eff * (aaUpdate[vrt] + co_source);
+						}
 					}
 					else // we consider the vertex as lying directly at the interface
 					{
@@ -1435,6 +1588,7 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 			grid.detach_from_vertices (aSDFGrad);
 	}
 	grid.detach_from_vertices (aCoIE);
+	grid.detach_from_vertices (aSrc);
 	grid.detach_from_vertices (aUpdate);
 	grid.detach_from_vertices (aGradient);
 	grid.detach_from_vertices (aScvVolume);

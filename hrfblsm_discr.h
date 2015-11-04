@@ -110,6 +110,7 @@ public:
 	:	m_bVerbose (false), m_dt (0), m_nrOfSteps (1),
 		m_time_control (false), m_maxCFL (0.95), m_minCFL (0.85),
 		m_gamma (1), m_delta (0), m_divFree (false),
+		m_firstOrder (false), m_antiderivSrc (false),
 		m_limiter (false),
 		m_time (0),
 		m_curCFL (0), m_CFL (0)
@@ -175,6 +176,12 @@ public:
 	
 ///	sets the divergence free flag
 	void set_divfree (bool b) { m_divFree = b; }
+	
+///	switches the first order upwind method on/off
+	void set_first_order (bool b) { m_firstOrder = b; }
+	
+///	sets the use of the antiderivative in the discretization of the source term
+	void set_antideriv_src (bool b) { m_antiderivSrc = b; }
 	
 ///	sets whether to use the slope limiter
 	void set_limiter (bool b) { m_limiter = b; }
@@ -304,11 +311,14 @@ private:
 		number u_up,
 		const MathVector<dim>& grad_up,
 		const MathVector<dim>& vel_up,
+		const MathVector<dim>& x_down,
 		number u_down,
 		const MathVector<dim>& grad_down,
 		const MathVector<dim>& vel_down,
 		number& corr_up,
-		number& curr_down
+		number& curr_down,
+		number& src_up,
+		number& src_down
 	);
 ///	computes the bf-update of the solution in an element
 	inline void bnd_sol_update
@@ -343,7 +353,8 @@ private:
 		t_aaGrad& aaVelGrad,
 		t_aaVol& aaVolume,
 		int sign,
-		t_aaUpd& aaUpdate
+		t_aaUpd& aaUpdate,
+		t_aaUpd* aaSrc
 	);
 ///	get the velocity for a given SCVF in an element intersected by the interface
 	void get_scvf_vel_on_if
@@ -381,7 +392,10 @@ private:
 		t_aaGrad& aaGradient,
 		t_aaGrad& aaVelGrad,
 		t_aaVol& aaVolume,
-		t_aaUpd& aaUpdate
+		t_aaUpd& aaUpdate,
+		t_aaUpd* aaSrc,
+		CplUserData<number,dim> * if_val_data,
+		int si
 	);
 
 /// compute CV volumes
@@ -471,6 +485,9 @@ private:
 	number m_gamma; ///< scaling factor for the user-given velocity (if it is given by the user data)
 	number m_delta; ///< scaling factor for the gradient of the potential in the velocity (if it is used for the velocity)
 	bool m_divFree; ///< if the velocity field is divergence free
+	
+	bool m_firstOrder; ///< if to use the classic (first order) upwind method
+	bool m_antiderivSrc; ///< if to use the antiderivative to discretize the source
 	
 	bool m_limiter; ///< whether to use the slope limiter
 	
