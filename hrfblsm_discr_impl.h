@@ -1481,7 +1481,9 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 #		ifdef UG_PARALLEL
 		AttachmentAllReduce (grid, aUpdate, PCL_RO_SUM);
 		AttachmentAllReduce (grid, aSrc, PCL_RO_SUM);
-		AttachmentAllReduce (grid, aSDFUpdate, PCL_RO_SUM);
+		if (m_spLSF.valid () && m_spSDF != m_oldSol)
+			AttachmentAllReduce (grid, aSDFUpdate, PCL_RO_SUM);
+		
 		{
 			pcl::ProcessCommunicator procComm;
 			m_curCFL = procComm.allreduce (m_curCFL, PCL_RO_MAX);
