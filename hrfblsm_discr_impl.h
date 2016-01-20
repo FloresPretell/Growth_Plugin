@@ -113,7 +113,7 @@ void HiResFluxBasedLSM<TGridFunction>::mark_CoIE
 	}
 	
 #	ifdef UG_PARALLEL
-	AttachmentAllReduce (grid, aCoIE, PCL_RO_LOR);
+	AttachmentAllReduce<Vertex> (grid, aCoIE, PCL_RO_LOR);
 #	endif
 }
 
@@ -852,7 +852,7 @@ void HiResFluxBasedLSM<TGridFunction>::compute_volumes
 	}
 	
 #	ifdef UG_PARALLEL
-	AttachmentAllReduce (grid, aVolume, PCL_RO_SUM);
+	AttachmentAllReduce<Vertex> (grid, aVolume, PCL_RO_SUM);
 #	endif
 }
 
@@ -1014,7 +1014,7 @@ void HiResFluxBasedLSM<TGridFunction>::compute_vertex_grad
 	}
 	
 #	ifdef UG_PARALLEL
-	AttachmentAllReduce (grid, aGradient, PCL_RO_SUM);
+	AttachmentAllReduce<Vertex> (grid, aGradient, PCL_RO_SUM);
 #	endif
 
 //	divide the gradients by the volumes
@@ -1479,10 +1479,10 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 	    }
 	    
 #		ifdef UG_PARALLEL
-		AttachmentAllReduce (grid, aUpdate, PCL_RO_SUM);
-		AttachmentAllReduce (grid, aSrc, PCL_RO_SUM);
+		AttachmentAllReduce<Vertex> (grid, aUpdate, PCL_RO_SUM);
+		AttachmentAllReduce<Vertex> (grid, aSrc, PCL_RO_SUM);
 		if (m_spLSF.valid () && m_spSDF != m_oldSol)
-			AttachmentAllReduce (grid, aSDFUpdate, PCL_RO_SUM);
+			AttachmentAllReduce<Vertex> (grid, aSDFUpdate, PCL_RO_SUM);
 		
 		{
 			pcl::ProcessCommunicator procComm;
@@ -1727,7 +1727,7 @@ void HiResFluxBasedLSM<TGridFunction>::compute_normal_vel
 	}
 	
 #	ifdef UG_PARALLEL
-	AttachmentAllReduce (grid, aScvVolume, PCL_RO_SUM);
+	AttachmentAllReduce<Vertex> (grid, aScvVolume, PCL_RO_SUM);
 	spNormVel->set_storage_type (PST_ADDITIVE);
 	spNormVel->change_storage_type (PST_CONSISTENT);
 #	endif
@@ -1857,7 +1857,7 @@ void HiResFluxBasedLSM<TGridFunction>::append_to_normal_vel
 	}
 	
 #	ifdef UG_PARALLEL
-	AttachmentAllReduce (grid, aScvVolume, PCL_RO_SUM);
+	AttachmentAllReduce<Vertex> (grid, aScvVolume, PCL_RO_SUM);
 	spNormVel->set_storage_type (PST_ADDITIVE);
 	spNormVel->change_storage_type (PST_CONSISTENT);
 #	endif
