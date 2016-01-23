@@ -1,0 +1,268 @@
+/*
+ * Copyright (c) 2015:  G-CSC, Goethe University Frankfurt
+ * Authors: Christian Wehner, Dmitry Logashenko
+ * 
+ * This file is part of UG4.
+ * 
+ * UG4 is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU Lesser General Public License version 3 (as published by the
+ * Free Software Foundation) with the following additional attribution
+ * requirements (according to LGPL/GPL v3 §7):
+ * 
+ * (1) The following notice must be displayed in the Appropriate Legal Notices
+ * of covered and combined works: "Based on UG4 (www.ug4.org/license)".
+ * 
+ * (2) The following notice must be displayed at a prominent place in the
+ * terminal output of covered works: "Based on UG4 (www.ug4.org/license)".
+ * 
+ * (3) The following bibliography is recommended for citation and must be
+ * preserved in all covered files:
+ * "Reiter, S., Vogel, A., Heppner, I., Rupp, M., and Wittum, G. A massively
+ *   parallel geometric multigrid solver on hierarchically distributed grids.
+ *   Computing and visualization in science 16, 4 (2013), 151-164"
+ * "Vogel, A., Reiter, S., Rupp, M., Nägel, A., and Wittum, G. UG4 -- a novel
+ *   flexible software system for simulating pde based models on high performance
+ *   computers. Computing and visualization in science 16, 4 (2013), 165-179"
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ */
+
+/**
+ * Measuring volumes of the parts separaterd by the level set.
+ */
+#ifndef __H__UG__PLUGINS__LEVEL_SET__LS_VOLUME_H__
+#define __H__UG__PLUGINS__LEVEL_SET__LS_VOLUME_H__
+
+// ug4 headers
+#include "common/common.h"
+#include "lib_grid/grid_objects/grid_objects.h"
+#include "lib_grid/grid_objects/tetrahedron_rules.h"
+#include "lib_disc/common/geometry_util.h"
+
+namespace ug{
+namespace LevelSet{
+
+/**
+ * A class for computation of the volume of the parts of the domain
+ * separated by the level set.
+ *
+ * \tparam TGridFunc	type of the grid function for the LSF
+ */
+template <typename TGridFunc>
+class LSVolume
+{
+public:
+
+///	'this' type
+	typedef LSVolume<TGridFunc> this_type;
+
+///	grid function type
+	typedef TGridFunc grid_func_type;
+
+///	domain type
+	typedef typename grid_func_type::domain_type domain_type;
+	
+///	algebra type
+	typedef typename grid_func_type::algebra_type algebra_type;
+
+/// type of the position accessor
+	typedef typename domain_type::position_accessor_type position_accessor_type;
+	
+///	world dimension
+	static const int dim = domain_type::dim;
+	
+public:
+
+///	class constructor
+	LSVolume
+	(
+		SmartPtr<grid_func_type> spLSF ///< the grid function with the LSF
+	)
+	:	m_spLSF (spLSF),
+		m_volume_plus (-1), m_volume_minus (-1) // dummy values
+	{};
+	
+///	returns the volume in the positive part
+	number volume_plus () {return m_volume_plus;}
+	
+/// returns the volume of the negative part
+	number volume_minus () {return m_volume_minus;}
+	
+///	computes the volumes
+	void compute ();
+	
+private:
+
+///	adds contributions of all elements of a given type
+	template <typename TElem>
+	void add_volumes_of_all 
+	(
+		const grid_func_type & lsf ///< grid function for the LSF
+	);
+	
+///	helper class for the computation of the volumes
+	struct AddVolumes
+	{
+		this_type * m_pThis;
+		const grid_func_type & m_LSF;
+		
+		AddVolumes
+		(
+			this_type * pThis, ///< pointer to the master class
+			const grid_func_type & lsf ///< grid function for the LSF
+		)
+		: m_pThis (pThis), m_LSF (lsf) {}
+		
+		template <typename TElem> void operator() (TElem)
+		{
+			m_pThis->template add_volumes_of_all<TElem> (m_LSF);
+		}
+	};
+
+private:
+
+	SmartPtr<TGridFunc> m_spLSF; ///< the specified LSF
+	
+	number m_volume_plus; ///< computed volume in the "positive part" of the domain
+	number m_volume_minus; ///< computed volume in the "negative part" of the domain
+};
+
+/**
+ * A class for the computation of the volumes of the parts of an element
+ * intersected by the level-set. Note that the level set is considered as
+ * planar in the element.
+ *
+ * \tparam TElem	type of the element
+ * \tparam WDim		dimension of the world
+ */
+template <typename TElem, int WDim>
+class LSElementSize
+{
+public:
+	
+	typedef TElem element_type; ///< type of the element
+	static const int dim = WDim; ///< dimension of the world
+	
+public:
+
+///	computation of the volumes
+	static void compute
+	(
+		const MathVector<WDim> * corner, ///< coordinates of the corners
+		const number * lsf, ///< values of the LSF at the corners
+		number & vol_plus, ///< volume of the 'positive' part of the element
+		number & vol_minus ///< volume of the 'negative' part of the element
+	)
+	{
+		UG_THROW ("LSElementSize: Generic version not implemented");
+	}
+};
+
+/**
+ * Specialization of LSElementSize for edges
+ * \see LSElementSize
+ */
+template <int WDim>
+class LSElementSize<ReferenceEdge, WDim>
+{
+public:
+	
+	typedef ReferenceEdge element_type; ///< type of the element
+	static const int dim = WDim; ///< dimension of the world
+	
+public:
+
+///	computation of the volumes (for an edge)
+	static void compute
+	(
+		const MathVector<WDim> * corner, ///< coordinates of the corners
+		const number * lsf, ///< values of the LSF at the corners
+		number & vol_plus, ///< volume of the 'positive' part of the element
+		number & vol_minus ///< volume of the 'negative' part of the element
+	);
+};
+
+/**
+ * Specialization of LSElementSize for triangles
+ * \see LSElementSize
+ */
+template <int WDim>
+class LSElementSize<ReferenceTriangle, WDim>
+{
+public:
+	
+	typedef ReferenceTriangle element_type; ///< type of the element
+	static const int dim = WDim; ///< dimension of the world
+	
+public:
+
+///	computation of the volumes (for a triangle)
+	static void compute
+	(
+		const MathVector<WDim> * corner, ///< coordinates of the corners
+		const number * lsf, ///< values of the LSF at the corners
+		number & vol_plus, ///< volume of the 'positive' part of the element
+		number & vol_minus ///< volume of the 'negative' part of the element
+	);
+};
+
+/**
+ * Specialization of LSElementSize for tetrahedra
+ * \see LSElementSize
+ */
+template <int WDim>
+class LSElementSize<ReferenceTetrahedron, WDim>
+{
+public:
+	
+	typedef ReferenceTetrahedron element_type; ///< type of the element
+	static const int dim = WDim; ///< dimension of the world
+	
+public:
+
+///	computation of the volumes (for a tetrahedrod)
+	static void compute
+	(
+		const MathVector<WDim> * corner, ///< coordinates of the corners
+		const number * lsf, ///< values of the LSF at the corners
+		number & vol_plus, ///< volume of the 'positive' part of the element
+		number & vol_minus ///< volume of the 'negative' part of the element
+	);
+};
+		
+/**
+ * Specialization of LSElementSize for prisms
+ * \see LSElementSize
+ */
+template <int WDim>
+class LSElementSize<ReferencePrism, WDim>
+{
+public:
+	
+	typedef ReferencePrism element_type; ///< type of the element
+	static const int dim = WDim; ///< dimension of the world
+	
+public:
+
+///	computation of the volumes (for a prism)
+	static void compute
+	(
+		const MathVector<WDim> * corner, ///< coordinates of the corners
+		const number * lsf, ///< values of the LSF at the corners
+		number & vol_plus, ///< volume of the 'positive' part of the element
+		number & vol_minus ///< volume of the 'negative' part of the element
+	);
+};
+
+} // end namespace LevelSet
+} // end namespace ug
+
+// include implementation
+#include "ls_volume_impl.h"
+
+#endif // __H__UG__PLUGINS__LEVEL_SET__LS_VOLUME_H__
+
+/* End of File */

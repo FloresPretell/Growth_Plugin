@@ -42,6 +42,8 @@
 #include "ls_analytic.h"
 //#include "ls_curvature2d.h"
 #include "hrfblsm_discr.h"
+#include "ls_volume.h"
+#include "ls_init.h"
 
 using namespace std;
 using namespace ug::bridge;
@@ -305,6 +307,33 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.add_method("compare_lsf_with", static_cast<void (T::*)(SmartPtr<function_type>, number)>(&T::compare_lsf_with))
 			.set_construct_as_smart_pointer(true);
 		reg.add_class_to_group(name, "HiResFluxBasedLSM", tag);
+	}
+	
+//	LSVolume
+	{
+		typedef LSVolume<function_type> T;
+		string name = string("LSVolume").append(suffix);
+		reg.add_class_<T>(name, grp)
+			.template add_constructor<void (*) (SmartPtr<function_type>)> ("LSF")
+			.add_method ("volume_plus", static_cast<number (T::*)()> (&T::volume_plus), "", "Volume of the positive part")
+			.add_method ("volume_minus", static_cast<number (T::*)()> (&T::volume_minus), "", "Volume of the negative part")
+			.add_method ("compute", static_cast<void (T::*)()> (&T::compute), "", "Compute the volumes")
+			.set_construct_as_smart_pointer(true);
+		reg.add_class_to_group(name, "LSVolume", tag);
+	}
+	
+//	LSFbyRaster
+	{
+		typedef LSFbyRaster<function_type> T;
+		string name = string("LSFbyRaster").append(suffix);
+		reg.add_class_<T>(name, grp)
+			.template add_constructor<void (*) (const char*)> ("FileName")
+			.add_method ("interpolate_to", static_cast<void (T::*)(SmartPtr<function_type>)> (&T::interpolate_to), "LSF", "Compute the LSF")
+			.add_method ("set_relative_to", static_cast<void (T::*)(const char*)> (&T::set_relative_to), "subsets", "Consider raster values as relative to the top")
+			.add_method ("set_rel_tolerance", static_cast<void (T::*)(number)> (&T::set_rel_tolerance), "tolerance", "Tolerance for the top ray tracer")
+			.add_method ("set_rel_default", static_cast<void (T::*)(number)> (&T::set_rel_default), "value", "Default value for the z-coord. of the top")
+			.set_construct_as_smart_pointer(true);
+		reg.add_class_to_group(name, "LSFbyRaster", tag);
 	}
 } // end Domain Algebra
 
