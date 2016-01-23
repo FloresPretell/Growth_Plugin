@@ -34,6 +34,7 @@
  * Measuring volumes of the parts separaterd by the level set: implementation.
  */
 
+#include "lib_disc/reference_element/reference_element_traits.h"
 #ifdef UG_PARALLEL
 #include "pcl/pcl_process_communicator.h"
 #endif
@@ -75,8 +76,9 @@ void LSVolume<TGridFunc>::add_volumes_of_all
 )
 {
 	typedef typename grid_func_type::template traits<TElem>::const_iterator ElemIter;
+	typedef typename reference_element_traits<TElem>::reference_element_type ref_elem_t;
 
-	static const size_t num_corners = TElem::NUM_VERTICES;
+	static const size_t num_corners = ref_elem_t::numCorners;
 	const position_accessor_type & aaPos = lsf.domain()->position_accessor ();
 	std::vector<DoFIndex> ind (1);
 	MathVector<dim> corners [num_corners];
@@ -99,7 +101,7 @@ void LSVolume<TGridFunc>::add_volumes_of_all
 		
 	//	compute the volumes
 		number vol_plus, vol_minus;
-		LSElementSize<TElem, dim>::compute (corners, lsf_values, vol_plus, vol_minus);
+		LSElementSize<ref_elem_t, dim>::compute (corners, lsf_values, vol_plus, vol_minus);
 		m_volume_plus += vol_plus; m_volume_minus += vol_minus;
 	}
 }
@@ -122,7 +124,7 @@ void LSElementSize<ReferenceEdge, WDim>::compute
 	
 	if (lsf[0] * lsf[1] > 0)
 	{
-		vol_0 = ElementSize<element_type> (corner);
+		vol_0 = ElementSize<ref_element_type, dim> (corner);
 		vol_1 = 0;
 	}
 	else
@@ -132,8 +134,8 @@ void LSElementSize<ReferenceEdge, WDim>::compute
 		pnt[0] = corner[0];
 		VecScaleAdd (pnt[1], t, corner[0], 1 - t, corner[1]);
 		pnt[2] = corner[1];
-		vol_0 = ElementSize<element_type> (pnt);
-		vol_1 = ElementSize<element_type> (pnt + 1);
+		vol_0 = ElementSize<ref_element_type, dim> (pnt);
+		vol_1 = ElementSize<ref_element_type, dim> (pnt + 1);
 	}
 	
 	if (lsf[0] >= 0)
@@ -158,7 +160,7 @@ void LSElementSize<ReferenceTriangle, WDim>::compute
 	number & vol_minus ///< volume of the 'negative' part of the element
 )
 {
-	number vol = ElementSize<element_type> (corner);
+	number vol = ElementSize<ref_element_type, dim> (corner);
 	
 //	look for 'positive' and 'negative' corners
 	int i_pos = -1, i_neg = -1;
@@ -198,7 +200,7 @@ void LSElementSize<ReferenceTriangle, WDim>::compute
 	VecScaleAdd (cut_tri [2], t, corner[i_0], 1 - t, corner[i_2]);
 	
 //	get the cut volume
-	number cut_vol = ElementSize<ReferenceTriangle> (cut_tri);
+	number cut_vol = ElementSize<ReferenceTriangle, dim> (cut_tri);
 	
 //	get the volumes
 	if (i_0 == i_neg) // i_0 is either i_pos or i_neg
@@ -223,7 +225,7 @@ void LSElementSize<ReferenceTetrahedron, WDim>::compute
 	number & vol_minus ///< volume of the 'negative' part of the element
 )
 {
-	number vol = ElementSize<element_type> (corner);
+	number vol = ElementSize<ref_element_type, dim> (corner);
 	
 //	look for 'positive' and 'negative' corners
 	int i_pos[2], i_neg[2];
@@ -267,7 +269,7 @@ void LSElementSize<ReferenceTetrahedron, WDim>::compute
 				VecScaleAdd (cut_tet [i], t, corner[i_0], 1 - t, corner[i]);
 			}
 		// Note: The orientation of cut_tet should be the same as for the original shape, i.e. correct.
-		number cut_vol = ElementSize<ReferenceTetrahedron> (cut_tet);
+		number cut_vol = ElementSize<ReferenceTetrahedron, dim> (cut_tet);
 		if (i_0 == i_neg[0]) // i_0 is either i_pos[0] or i_neg[0]
 		{
 			vol_minus = cut_vol; vol_plus = vol - cut_vol;
@@ -306,7 +308,7 @@ void LSElementSize<ReferenceTetrahedron, WDim>::compute
 			VecScaleAdd (neg_prism [3 * k + l + 1], t, corner[i_0], 1 - t, corner[i]);
 		}
 	}
-	vol_minus = ElementSize<ReferencePrism> (neg_prism);
+	vol_minus = ElementSize<ReferencePrism, dim> (neg_prism);
 	vol_plus = vol - vol_minus;
 }
 
@@ -322,7 +324,7 @@ void LSElementSize<ReferencePrism, WDim>::compute
 	number & vol_minus ///< volume of the 'negative' part of the element
 )
 {
-	number vol = ElementSize<element_type> (corner);
+	number vol = ElementSize<ref_element_type, dim> (corner);
 	
 //	look for 'positive' and 'negative' corners
 	int i_pos[3], i_neg[3];
@@ -388,7 +390,7 @@ void LSElementSize<ReferencePrism, WDim>::compute
 		int i_1 = (i_0 + 3) % 6; // connected corner of the opposite base
 		number t_1 = lsf[i_1] / (lsf[i_1] - lsf[i_0]);
 		VecScaleAdd (cut_tet [3], t_1, corner[i_0], 1 - t_1, corner[i_1]);
-		number cut_vol = ElementSize<ReferenceTetrahedron> (cut_tet);
+		number cut_vol = ElementSize<ReferenceTetrahedron, dim> (cut_tet);
 		if (i_0 == i_neg[0]) // i_0 is either i_pos[0] or i_neg[0]
 		{
 			vol_minus = cut_vol; vol_plus = vol - cut_vol;
@@ -460,7 +462,7 @@ void LSElementSize<ReferencePrism, WDim>::compute
 			t = lsf[i_1a] / (lsf[i_1a] - lsf[i_1]);
 			VecScaleAdd (cut_prism [5], t, corner[i_1], 1 - t, corner[i_1a]);
 			
-			number cut_vol = ElementSize<ReferencePrism> (cut_prism);
+			number cut_vol = ElementSize<ReferencePrism, dim> (cut_prism);
 			if (num_neg == 2)
 			{
 				vol_minus = cut_vol;
@@ -501,7 +503,7 @@ void LSElementSize<ReferencePrism, WDim>::compute
 				t = lsf[j] / (lsf[j] - lsf[i_1]);
 				VecScaleAdd (cut_prism [5], t, corner[i_1], 1 - t, corner[j]);
 			}
-			number cut_vol = ElementSize<ReferencePrism> (cut_prism);
+			number cut_vol = ElementSize<ReferencePrism, dim> (cut_prism);
 			if (num_neg == 2)
 			{
 				vol_minus = cut_vol;
@@ -570,7 +572,7 @@ void LSElementSize<ReferencePrism, WDim>::compute
 			number t = lsf[j] / (lsf[j] - lsf[i]);
 			VecScaleAdd (cut_prism [j], t, corner [i], 1 - t, corner [j]);
 		}
-		cut_vol = ElementSize<ReferencePrism> (cut_prism);
+		cut_vol = ElementSize<ReferencePrism, dim> (cut_prism);
 		
 		if (i_neg[0] == 0)
 		{

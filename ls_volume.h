@@ -135,15 +135,15 @@ private:
  * intersected by the level-set. Note that the level set is considered as
  * planar in the element.
  *
- * \tparam TElem	type of the element
- * \tparam WDim		dimension of the world
+ * \tparam TRefElem		type of the reference element
+ * \tparam WDim			dimension of the world
  */
-template <typename TElem, int WDim>
+template <typename TRefElem, int WDim>
 class LSElementSize
 {
 public:
 	
-	typedef TElem element_type; ///< type of the element
+	typedef TRefElem ref_element_type; ///< type of the reference element
 	static const int dim = WDim; ///< dimension of the world
 	
 public:
@@ -170,7 +170,7 @@ class LSElementSize<ReferenceEdge, WDim>
 {
 public:
 	
-	typedef ReferenceEdge element_type; ///< type of the element
+	typedef ReferenceEdge ref_element_type; ///< type of the reference element
 	static const int dim = WDim; ///< dimension of the world
 	
 public:
@@ -194,7 +194,7 @@ class LSElementSize<ReferenceTriangle, WDim>
 {
 public:
 	
-	typedef ReferenceTriangle element_type; ///< type of the element
+	typedef ReferenceTriangle ref_element_type; ///< type of the reference element
 	static const int dim = WDim; ///< dimension of the world
 	
 public:
@@ -218,7 +218,7 @@ class LSElementSize<ReferenceTetrahedron, WDim>
 {
 public:
 	
-	typedef ReferenceTetrahedron element_type; ///< type of the element
+	typedef ReferenceTetrahedron ref_element_type; ///< type of the reference element
 	static const int dim = WDim; ///< dimension of the world
 	
 public:
@@ -242,7 +242,7 @@ class LSElementSize<ReferencePrism, WDim>
 {
 public:
 	
-	typedef ReferencePrism element_type; ///< type of the element
+	typedef ReferencePrism ref_element_type; ///< type of the reference element
 	static const int dim = WDim; ///< dimension of the world
 	
 public:
