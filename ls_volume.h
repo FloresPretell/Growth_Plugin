@@ -85,46 +85,49 @@ public:
 		m_volume_plus (-1), m_volume_minus (-1) // dummy values
 	{};
 	
-///	returns the volume in the positive part
-	number volume_plus () {return m_volume_plus;}
-	
-/// returns the volume of the negative part
-	number volume_minus () {return m_volume_minus;}
+///	sets the subsets to restrict the computation on
+	void on_subsets
+	(
+		const char * ss_names ///< names of the subsets
+	);
 	
 ///	computes the volumes
 	void compute ();
+	
+///	returns the volume in the positive part
+	number volume_plus () const {return m_volume_plus;}
+	
+/// returns the volume of the negative part
+	number volume_minus () const {return m_volume_minus;}
 	
 private:
 
 ///	adds contributions of all elements of a given type
 	template <typename TElem>
-	void add_volumes_of_all 
-	(
-		const grid_func_type & lsf ///< grid function for the LSF
-	);
+	void add_volumes_of_all ();
 	
 ///	helper class for the computation of the volumes
 	struct AddVolumes
 	{
 		this_type * m_pThis;
-		const grid_func_type & m_LSF;
 		
 		AddVolumes
 		(
-			this_type * pThis, ///< pointer to the master class
-			const grid_func_type & lsf ///< grid function for the LSF
+			this_type * pThis ///< pointer to the master class
 		)
-		: m_pThis (pThis), m_LSF (lsf) {}
+		: m_pThis (pThis) {}
 		
 		template <typename TElem> void operator() (TElem)
 		{
-			m_pThis->template add_volumes_of_all<TElem> (m_LSF);
+			m_pThis->template add_volumes_of_all<TElem> ();
 		}
 	};
 
 private:
 
 	SmartPtr<TGridFunc> m_spLSF; ///< the specified LSF
+	
+	SubsetGroup m_ssGrp; ///< the subset group (if subsets specified)
 	
 	number m_volume_plus; ///< computed volume in the "positive part" of the domain
 	number m_volume_minus; ///< computed volume in the "negative part" of the domain

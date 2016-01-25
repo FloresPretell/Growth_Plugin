@@ -45,6 +45,20 @@ namespace LevelSet{
 /*---- Class 'LSVolume': ----*/
 
 /**
+ * Initializes the subsets group to restrict the computation to the specified
+ * subsets.
+ */
+template <typename TGridFunc>
+void LSVolume<TGridFunc>::on_subsets
+(
+	const char * ss_names ///< names of the subsets
+)
+{
+	m_ssGrp.set_subset_handler (m_spLSF->domain()->subset_handler ());
+	m_ssGrp.add (TokenizeString (ss_names));
+}
+
+/**
  * Sums up the (partial) volumes of all the elements of all the types.
  */
 template <typename TGridFunc>
@@ -55,7 +69,7 @@ void LSVolume<TGridFunc>::compute ()
 
 //	sum up all the volumes
 	m_volume_plus = m_volume_minus = 0;
-	boost::mpl::for_each<ElemList> (AddVolumes (this, *m_spLSF));
+	boost::mpl::for_each<ElemList> (AddVolumes (this));
 	
 #ifdef UG_PARALLEL
 //	sum up the volumes from different processes
@@ -70,39 +84,62 @@ void LSVolume<TGridFunc>::compute ()
  */
 template <typename TGridFunc>
 template <typename TElem>
-void LSVolume<TGridFunc>::add_volumes_of_all
-(
-	const grid_func_type & lsf ///< grid function for the LSF
-)
+void LSVolume<TGridFunc>::add_volumes_of_all ()
 {
 	typedef typename grid_func_type::template traits<TElem>::const_iterator ElemIter;
 	typedef typename reference_element_traits<TElem>::reference_element_type ref_elem_t;
 
 	static const size_t num_corners = ref_elem_t::numCorners;
+	
+	const grid_func_type & lsf = * m_spLSF;
 	const position_accessor_type & aaPos = lsf.domain()->position_accessor ();
 	std::vector<DoFIndex> ind (1);
 	MathVector<dim> corners [num_corners];
 	number lsf_values [num_corners];
 	
-	ElemIter iterEnd = lsf.template end<TElem> ();
-	for (ElemIter iter = lsf.template begin<TElem> (); iter != iterEnd; ++iter)
+	for (int si = 0; si < lsf.num_subsets (); si++)
 	{
-		TElem * elem = *iter;
+		if (m_ssGrp.subset_handler().valid () && ! m_ssGrp.contains (si))
+			continue; // skip this subset: it is not mentioned in the specified list
 		
-	//	get the corner coordinates ans the values of the LSF
-		for (size_t i = 0; i < num_corners; i++)
+		ElemIter iterEnd = lsf.template end<TElem> (si);
+		for (ElemIter iter = lsf.template begin<TElem> (si); iter != iterEnd; ++iter)
 		{
-			Vertex * vrt = elem->vertex (i);
-			corners [i] = aaPos [vrt];
-			if (lsf.inner_dof_indices (vrt, 0, ind) != 1)
-				UG_THROW ("LSVolume: Not a scalar grid function for the LSF!");
-			lsf_values [i] = DoFRef (lsf, ind [0]);
-		}
+			TElem * elem = *iter;
+			
+		//	get the corner coordinates ans the values of the LSF
+			for (size_t i = 0; i < num_corners; i++)
+			{
+				Vertex * vrt = elem->vertex (i);
+				corners [i] = aaPos [vrt];
+				if (lsf.inner_dof_indices (vrt, 0, ind) != 1)
+					UG_THROW ("LSVolume: Not a scalar grid function for the LSF!");
+				lsf_values [i] = DoFRef (lsf, ind [0]);
+			}
 		
-	//	compute the volumes
-		number vol_plus, vol_minus;
-		LSElementSize<ref_elem_t, dim>::compute (corners, lsf_values, vol_plus, vol_minus);
-		m_volume_plus += vol_plus; m_volume_minus += vol_minus;
+		//	compute the volumes
+			number vol_plus, vol_minus;
+			LSElementSize<ref_elem_t, dim>::compute (corners, lsf_values, vol_plus, vol_minus);
+			m_volume_plus += vol_plus; m_volume_minus += vol_minus;
+			
+			/*-- For debugging only: --*
+			number test_vol_plus, test_vol_minus;
+			number test_vol_max = (vol_plus > vol_minus)? vol_plus : vol_minus;
+			for (size_t i = 0; i < num_corners; i++)
+				lsf_values [i] = - lsf_values [i];
+			LSElementSize<ref_elem_t, dim>::compute (corners, lsf_values, test_vol_minus, test_vol_plus);
+			if (std::abs (test_vol_minus - vol_minus) / test_vol_max >= 1e-8)
+			{
+				UG_LOG ("---- LSVolume: Inconsistent values of the volumes:\n");
+				UG_LOG ("-- V_(-) = " << vol_minus << " or " << test_vol_minus << ", diff = " << vol_minus - test_vol_minus << "\n");
+				for (size_t i = 0; i < num_corners; i++)
+				{
+					UG_LOG ("-- co " << i << ": " << corners[i] << ", lsf = " << - lsf_values [i] << "\n");
+				}
+				UG_THROW ("LSVolume: Inaccurate computation of the volumes.");
+			}
+			 *--*/
+		}
 	}
 }
 

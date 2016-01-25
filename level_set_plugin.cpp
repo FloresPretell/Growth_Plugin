@@ -315,9 +315,10 @@ static void DomainAlgebra(Registry& reg, string grp)
 		string name = string("LSVolume").append(suffix);
 		reg.add_class_<T>(name, grp)
 			.template add_constructor<void (*) (SmartPtr<function_type>)> ("LSF")
-			.add_method ("volume_plus", static_cast<number (T::*)()> (&T::volume_plus), "", "Volume of the positive part")
-			.add_method ("volume_minus", static_cast<number (T::*)()> (&T::volume_minus), "", "Volume of the negative part")
+			.add_method ("on_subsets", static_cast<void (T::*)(const char*)> (&T::on_subsets), "subsets", "Restrict to subsets")
 			.add_method ("compute", static_cast<void (T::*)()> (&T::compute), "", "Compute the volumes")
+			.add_method ("volume_plus", static_cast<number (T::*)() const> (&T::volume_plus), "", "Volume of the positive part")
+			.add_method ("volume_minus", static_cast<number (T::*)() const> (&T::volume_minus), "", "Volume of the negative part")
 			.set_construct_as_smart_pointer(true);
 		reg.add_class_to_group(name, "LSVolume", tag);
 	}
