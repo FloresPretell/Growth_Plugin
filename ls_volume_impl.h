@@ -408,7 +408,7 @@ void LSElementSize<ReferencePrism, WDim>::compute
 		{
 			int i = k + shift;
 			if (i == i_0)
-				cut_tet [i] = corner [i];
+				cut_tet [k] = corner [i];
 			else
 			{
 				number t = lsf[i] / (lsf[i] - lsf[i_0]);
