@@ -116,7 +116,7 @@ void LSVolume<TGridFunc>::add_volumes_of_all ()
 					UG_THROW ("LSVolume: Not a scalar grid function for the LSF!");
 				lsf_values [i] = DoFRef (lsf, ind [0]);
 			}
-		
+			
 		//	compute the volumes
 			number vol_plus, vol_minus;
 			LSElementSize<ref_elem_t, dim>::compute (corners, lsf_values, vol_plus, vol_minus);
@@ -124,14 +124,16 @@ void LSVolume<TGridFunc>::add_volumes_of_all ()
 			
 			/*-- For debugging only: --*
 			number test_vol_plus, test_vol_minus;
-			number test_vol_max = (vol_plus > vol_minus)? vol_plus : vol_minus;
 			for (size_t i = 0; i < num_corners; i++)
 				lsf_values [i] = - lsf_values [i];
 			LSElementSize<ref_elem_t, dim>::compute (corners, lsf_values, test_vol_minus, test_vol_plus);
-			if (std::abs (test_vol_minus - vol_minus) / test_vol_max >= 1e-8)
+			if (test_vol_minus < 0 || test_vol_plus < 0 || vol_minus < 0 || vol_plus < 0
+				|| std::abs (test_vol_minus - vol_minus) / (vol_plus + vol_minus) >= 1e-12
+					|| std::abs (test_vol_plus - vol_plus) / (vol_plus + vol_minus) >= 1e-12)
 			{
-				UG_LOG ("---- LSVolume: Inconsistent values of the volumes:\n");
+				UG_LOG ("---- LSVolume: Inconsistent values of the volumes for elem id " << elem->grid_data_index () << ":\n");
 				UG_LOG ("-- V_(-) = " << vol_minus << " or " << test_vol_minus << ", diff = " << vol_minus - test_vol_minus << "\n");
+				UG_LOG ("-- V_(+) = " << vol_plus << " or " << test_vol_plus << ", diff = " << vol_plus - test_vol_plus << "\n");
 				for (size_t i = 0; i < num_corners; i++)
 				{
 					UG_LOG ("-- co " << i << ": " << corners[i] << ", lsf = " << - lsf_values [i] << "\n");
@@ -461,7 +463,7 @@ void LSElementSize<ReferencePrism, WDim>::compute
 			int i_2 = -1; // the 3rd corner of the base
 			for (int k = 0; k < 3; k++)
 			{
-				int i_2 = k + shift;
+				i_2 = k + shift;
 				if (i_2 != i_0 && i_2 != i_1) break;
 			}
 			int i_0a = (i_0 + 3) % 6; // corner connected to i_0 on the opposite base
@@ -478,9 +480,9 @@ void LSElementSize<ReferencePrism, WDim>::compute
 			// Note however that we should provide the correct orientation
 			// of the prism. Thus we should provide (i_0 + 1) % 3 == i_1
 			// if the bottom base of the original prism is cut, and
-			// i_0 == (i_1 + 1) % 3 for the top base. To this end, we swap
+			// i_0a == (i_1a + 1) % 3 for the top base. To this end, we swap
 			// i_0 with i_1 (and i_0a with i_1a respectively) if necessary.
-			if ((i_1 < 3 && (i_0 + 1) % 3 != i_1) || (i_0 > 3 && i_0 != (i_1 + 1) % 3))
+			if ((i_1 < 3 && (i_0 + 1) % 3 != i_1) || (i_0 >= 3 && i_0a != (i_1a + 1) % 3))
 			{
 				int i;
 				i = i_0; i_0 = i_1; i_1 = i;
