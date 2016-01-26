@@ -83,9 +83,9 @@ class LSFbyRaster
 /// vertex base iterator
 	typedef typename TGridFunc::template traits<Vertex>::const_iterator VertexConstIterator;
 	
-	typedef lg_ntree<dim, dim, Triangle> top_tracer_tree_t;
+	typedef lg_ntree<dim, dim, Face> top_tracer_tree_t;
 	
-	typedef RayElemIntersectionRecord<Triangle*> top_intersection_record_t;
+	typedef RayElemIntersectionRecord<Face*> top_intersection_record_t;
 	
 public:
 	

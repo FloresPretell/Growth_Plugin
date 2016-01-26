@@ -92,7 +92,7 @@ SmartPtr<typename LSFbyRaster<TGridFunc>::top_tracer_tree_t> LSFbyRaster<TGridFu
 {
 	MultiGrid & mg = * domain.grid ();
 	MGSubsetHandler & sh = * domain.subset_handler ();
-	std::vector<Triangle*> tris;
+	std::vector<Face*> tris;
 	
 //	parse the subset names
 	SubsetGroup ssGrp (domain.subset_handler ());
@@ -108,10 +108,10 @@ SmartPtr<typename LSFbyRaster<TGridFunc>::top_tracer_tree_t> LSFbyRaster<TGridFu
 		int si = ssGrp [i];
 		for (int lvl = 0; lvl < (int) sh.num_levels(); lvl++)
 		{
-			for (TriangleIterator it = sh.begin<Triangle> (si, lvl);
-									it != sh.end<Triangle> (si, lvl); ++it)
+			for (FaceIterator it = sh.begin<Face> (si, lvl);
+									it != sh.end<Face> (si, lvl); ++it)
 			{
-				Triangle * t = *it;
+				Face * t = *it;
 				if (! mg.has_children (t))
 					tris.push_back (t);
 			}
@@ -129,10 +129,10 @@ SmartPtr<typename LSFbyRaster<TGridFunc>::top_tracer_tree_t> LSFbyRaster<TGridFu
 			int si = ssGrp [i];
 			for (int lvl = 0; lvl < (int) sh.num_levels(); lvl++)
 			{
-				for (TriangleIterator it = sh.begin<Triangle> (si, lvl);
-										it != sh.end<Triangle> (si, lvl); ++it)
+				for (FaceIterator it = sh.begin<Face> (si, lvl);
+										it != sh.end<Face> (si, lvl); ++it)
 				{
-					Triangle * t = *it;
+					Face * t = *it;
 					if (! mg.has_children (t))
 						sel.select (t);
 				}
@@ -146,7 +146,7 @@ SmartPtr<typename LSFbyRaster<TGridFunc>::top_tracer_tree_t> LSFbyRaster<TGridFu
 		(GeomObjAttachmentSerializer<Vertex, position_attachment_type>::create (mg, domain.position_attachment ()));
 	Grid top_grid;
 	BroadcastGrid (top_grid, sel, serializer, rootProc);
-	for (TriangleIterator it = top_grid.begin<Triangle> (); it != top_grid.end<Triangle> (); ++it)
+	for (FaceIterator it = top_grid.begin<Face> (); it != top_grid.end<Face> (); ++it)
 		tris.push_back (*it);
 	
 //	create the tree
