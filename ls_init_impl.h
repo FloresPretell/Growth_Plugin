@@ -92,7 +92,7 @@ SmartPtr<typename LSFbyRaster<TGridFunc>::top_tracer_tree_t> LSFbyRaster<TGridFu
 {
 	MultiGrid & mg = * domain.grid ();
 	MGSubsetHandler & sh = * domain.subset_handler ();
-	std::vector<Face*> tris;
+	std::vector<Face*> top_faces;
 	
 //	parse the subset names
 	SubsetGroup ssGrp (domain.subset_handler ());
@@ -106,16 +106,20 @@ SmartPtr<typename LSFbyRaster<TGridFunc>::top_tracer_tree_t> LSFbyRaster<TGridFu
 	for (size_t i = 0; i < ssGrp.size (); i++)
 	{
 		int si = ssGrp [i];
-		for (int lvl = 0; lvl < (int) sh.num_levels(); lvl++)
-		{
-			for (FaceIterator it = sh.begin<Face> (si, lvl);
-									it != sh.end<Face> (si, lvl); ++it)
-			{
-				Face * t = *it;
-				if (! mg.has_children (t))
-					tris.push_back (t);
-			}
-		}
+		
+		if (m_rt_gl >= 0) // if the grid level for the top is specified
+			for (FaceIterator it = sh.begin<Face> (si, m_rt_gl);
+									it != sh.end<Face> (si, m_rt_gl); ++it)
+				top_faces.push_back (*it);
+		else
+			for (int lvl = 0; lvl < (int) sh.num_levels(); lvl++)
+				for (FaceIterator it = sh.begin<Face> (si, lvl);
+										it != sh.end<Face> (si, lvl); ++it)
+				{
+					Face * t = *it;
+					if (! mg.has_children (t))
+						top_faces.push_back (t);
+				}
 	}
 #else
 	const int rootProc = 0;
@@ -127,16 +131,20 @@ SmartPtr<typename LSFbyRaster<TGridFunc>::top_tracer_tree_t> LSFbyRaster<TGridFu
 		for (size_t i = 0; i < ssGrp.size (); i++)
 		{
 			int si = ssGrp [i];
-			for (int lvl = 0; lvl < (int) sh.num_levels(); lvl++)
-			{
-				for (FaceIterator it = sh.begin<Face> (si, lvl);
-										it != sh.end<Face> (si, lvl); ++it)
-				{
-					Face * t = *it;
-					if (! mg.has_children (t))
-						sel.select (t);
-				}
-			}
+			
+			if (m_rt_gl >= 0) // if the grid level for the top is specified
+				for (FaceIterator it = sh.begin<Face> (si, m_rt_gl);
+										it != sh.end<Face> (si, m_rt_gl); ++it)
+					sel.select (*it);
+			else
+				for (int lvl = 0; lvl < (int) sh.num_levels(); lvl++)
+					for (FaceIterator it = sh.begin<Face> (si, lvl);
+											it != sh.end<Face> (si, lvl); ++it)
+					{
+						Face * t = *it;
+						if (! mg.has_children (t))
+							sel.select (t);
+					}
 		}
 	}
 	
@@ -147,14 +155,14 @@ SmartPtr<typename LSFbyRaster<TGridFunc>::top_tracer_tree_t> LSFbyRaster<TGridFu
 	Grid top_grid;
 	BroadcastGrid (top_grid, sel, serializer, rootProc);
 	for (FaceIterator it = top_grid.begin<Face> (); it != top_grid.end<Face> (); ++it)
-		tris.push_back (*it);
+		top_faces.push_back (*it);
 	
 //	create the tree
 	SmartPtr<top_tracer_tree_t> sp_top_tracer_tree (new top_tracer_tree_t (top_grid, domain.position_attachment ()));
 #endif // UG_PARALLEL
 	
 //	compose the tree
-	sp_top_tracer_tree->create_tree (tris.begin (), tris.end ());
+	sp_top_tracer_tree->create_tree (top_faces.begin (), top_faces.end ());
 	
 	return sp_top_tracer_tree;
 }

@@ -331,6 +331,7 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.template add_constructor<void (*) (const char*)> ("FileName")
 			.add_method ("interpolate_to", static_cast<void (T::*)(SmartPtr<function_type>)> (&T::interpolate_to), "LSF", "Compute the LSF")
 			.add_method ("set_relative_to", static_cast<void (T::*)(const char*)> (&T::set_relative_to), "subsets", "Consider raster values as relative to the top")
+			.add_method ("set_relative_to", static_cast<void (T::*)(const char*,int)> (&T::set_relative_to), "subsets#gridLevel", "Consider raster values as relative to the top")
 			.add_method ("set_rel_tolerance", static_cast<void (T::*)(number)> (&T::set_rel_tolerance), "tolerance", "Tolerance for the top ray tracer")
 			.add_method ("set_rel_default", static_cast<void (T::*)(number)> (&T::set_rel_default), "value", "Default value for the z-coord. of the top")
 			.set_construct_as_smart_pointer(true);

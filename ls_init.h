@@ -94,7 +94,7 @@ public:
 	(
 		const char * raster_file ///< ASCII raster file
 	)
-	:	m_bRelative (false), m_rt_tol (1e-6), m_bDefaultTop (false)
+	:	m_bRelative (false), m_rt_gl (-1), m_rt_tol (1e-6), m_bDefaultTop (false)
 	{
 		LoadHeightfieldFromASC (m_hfRaster, raster_file);
 	}
@@ -112,6 +112,18 @@ public:
 	)
 	{
 		m_top_ss_names = top_ss_names;
+		m_bRelative = true;
+	}
+	
+///	sets the top subset
+	void set_relative_to
+	(
+		const char * top_ss_names, ///< names of the top subsets
+		int grid_level ///< grid level of the top subset
+	)
+	{
+		m_top_ss_names = top_ss_names;
+		m_rt_gl = grid_level;
 		m_bRelative = true;
 	}
 	
@@ -160,6 +172,9 @@ private:
 	
 ///	top subsets (if specified)
 	std::string m_top_ss_names;
+	
+///	grid level of the top surface (or -1 if the surface)
+	int m_rt_gl;
 	
 ///	tolerance for the ray tracing (to the top surfaces)
 	number m_rt_tol;
