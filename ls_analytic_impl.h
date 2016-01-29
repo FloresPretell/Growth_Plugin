@@ -147,7 +147,7 @@ bool LevelSetAnalytic<TGridFunction>::init_function(TGridFunction& u)
 	domain_type& domain = *u.domain().get();
 
 //	get grid type of domain
-	typedef typename domain_type::grid_type grid_type;
+	// typedef typename domain_type::grid_type grid_type;
 
 	typedef typename domain_type::position_accessor_type position_accessor_type;
 

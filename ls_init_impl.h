@@ -149,11 +149,18 @@ SmartPtr<typename LSFbyRaster<TGridFunc>::top_tracer_tree_t> LSFbyRaster<TGridFu
 	}
 	
 //	copy the top faces into a new grid
+	Grid top_grid;
+	
 	GridDataSerializationHandler serializer;
 	serializer.add
 		(GeomObjAttachmentSerializer<Vertex, position_attachment_type>::create (mg, domain.position_attachment ()));
-	Grid top_grid;
-	BroadcastGrid (top_grid, sel, serializer, rootProc);
+		
+	GridDataSerializationHandler deserializer;
+	deserializer.add
+		(GeomObjAttachmentSerializer<Vertex, position_attachment_type>::create (top_grid, domain.position_attachment ()));
+
+	BroadcastGrid (top_grid, sel, serializer, deserializer, rootProc);
+
 	for (FaceIterator it = top_grid.begin<Face> (); it != top_grid.end<Face> (); ++it)
 		top_faces.push_back (*it);
 	

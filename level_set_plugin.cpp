@@ -73,16 +73,16 @@ static void DomainAlgebra(Registry& reg, string grp)
 	string suffix = GetDomainAlgebraSuffix<TDomain,TAlgebra>();
 	string tag = GetDomainAlgebraTag<TDomain,TAlgebra>();
 
-	typedef typename TAlgebra::vector_type vector_type;
-	typedef typename TAlgebra::matrix_type matrix_type;
-	typedef ApproximationSpace<TDomain> approximation_space_type;
+	// typedef typename TAlgebra::vector_type vector_type;
+	// typedef typename TAlgebra::matrix_type matrix_type;
+	// typedef ApproximationSpace<TDomain> approximation_space_type;
 	typedef GridFunction<TDomain, TAlgebra> function_type;
 	static const int dim = TDomain::dim;
 
 // 	FV1LevelSetDisc
 	{
 		typedef FV1LevelSetDisc<function_type> T;
-		typedef typename function_type::domain_type domain_type;
+		// typedef typename function_type::domain_type domain_type;
 		string name = string("FV1LevelSetDisc").append(suffix);
 		reg.add_class_<T>(name, grp)
 			.add_constructor()
@@ -146,7 +146,7 @@ static void DomainAlgebra(Registry& reg, string grp)
 	// level set analytic functions
 	{
 		typedef LevelSetAnalytic<function_type> T;
-		typedef typename function_type::domain_type domain_type;
+		// typedef typename function_type::domain_type domain_type;
 		string name = string("LevelSetAnalytic").append(suffix);
 		reg.add_class_<T>(name, grp)
 			.add_constructor()
@@ -251,7 +251,7 @@ static void DomainAlgebra(Registry& reg, string grp)
 // 	HiResFluxBasedLSM
 	{
 		typedef HiResFluxBasedLSM<function_type> T;
-		typedef typename function_type::domain_type domain_type;
+		// typedef typename function_type::domain_type domain_type;
 		string name = string("HiResFluxBasedLSM").append(suffix);
 		reg.add_class_<T>(name, grp)
 			.add_constructor()
