@@ -59,6 +59,9 @@ namespace LevelSet{
 template <typename TGridFunc>
 class LSFbyRaster
 {
+///	this type
+	typedef LSFbyRaster<TGridFunc> this_type;
+	
 ///	grid function type
 	typedef TGridFunc grid_func_type;
 	
@@ -82,10 +85,6 @@ class LSFbyRaster
 	
 /// vertex base iterator
 	typedef typename TGridFunc::template traits<Vertex>::const_iterator VertexConstIterator;
-	
-	typedef lg_ntree<dim, dim, Face> top_tracer_tree_t;
-	
-	typedef RayElemIntersectionRecord<Face*> top_intersection_record_t;
 	
 public:
 	
@@ -148,22 +147,6 @@ public:
 	
 private:
 
-///	creates and fills the top tracer tree
-	SmartPtr<top_tracer_tree_t> create_tt_tree
-	(
-		domain_type & domain ///< the domain
-	);
-	
-/// Gets the minimum z-coordinate of the top subset over a given point
-	number get_min_top_z
-	(
-		const MathVector<dim> & over, ///< to look over this point
-		const top_tracer_tree_t & tt_tree, ///< the top tracer tree
-		std::vector<top_intersection_record_t> & top_intersection_records ///< array to store all the intersections
-	);
-	
-private:
-
 ///	the raster of the heights
 	Heightfield m_hfRaster;
 	
@@ -184,6 +167,64 @@ private:
 	
 ///	whether the default position of the top is specified
 	bool m_bDefaultTop;
+	
+/// an auxiliary class for the computation of the relative height
+	class z_ray_tracer_t
+	{
+		typedef lg_ntree<dim-1, dim, Face> top_tracer_tree_t;
+	
+		typedef RayElemIntersectionRecord<Face*> top_intersection_record_t;
+		
+	public:
+	
+	///	class constructor
+		z_ray_tracer_t
+		(
+			SmartPtr<domain_type> sp_domain, ///< the domain
+			const std::string & top_ss_names ///< top surface subset names
+		)
+		:	m_sp_domain (sp_domain),
+			m_top_ss_grp (sp_domain->subset_handler (), TokenizeString (top_ss_names)),
+#			ifndef UG_PARALLEL
+			m_top_tracer_tree (* sp_domain->grid (), sp_domain->position_attachment ())
+#			else
+			m_top_tracer_tree (m_top_grid, sp_domain->position_attachment ())
+#			endif
+		{};
+		
+	///	initializer: creates the tree
+		void init
+		(
+			int grid_level ///< grid level to take the faces from (or -1 if the top surface)
+		);
+		
+	///	computes the minimum z-coordiate of the top (returns true if the top found, false otherwise)
+		bool get_min_at
+		(
+			const MathVector<dim> & over, ///< to look over this point
+			number tolerance, ///< the tolerance of the ray tracer
+			number & z ///< the result
+		);
+	
+	private:
+	
+	///	multigrid of the domain
+		SmartPtr<domain_type> m_sp_domain;
+
+	///	subset group of the top faces
+		SubsetGroup m_top_ss_grp;
+
+#	ifdef UG_PARALLEL
+	///	auxiliary grid of the top faces
+		Grid m_top_grid;
+#	endif
+	///	tracer tree of the top faces
+		top_tracer_tree_t m_top_tracer_tree;
+		
+	///	array to store all the intersections
+		std::vector<top_intersection_record_t> m_top_intersection_records;
+	};
+	
 };
 
 } // end namespace LevelSet

@@ -51,15 +51,16 @@ void LSFbyRaster<TGridFunc>::interpolate_to
 	SmartPtr<TGridFunc> spLSF ///< the level-set function to compute
 )
 {
-	domain_type & domain = * spLSF->domain().get ();
-	position_accessor_type aaPos = domain.position_accessor ();
+	position_accessor_type aaPos = spLSF->domain()->position_accessor ();
 	std::vector<DoFIndex> ind (1);
 
 //	top tracer tree
-	SmartPtr<top_tracer_tree_t> sp_top_tracer_tree;
-	std::vector<top_intersection_record_t> top_intersection_records;
+	SmartPtr<z_ray_tracer_t> sp_top_z;
 	if (m_bRelative)
-		sp_top_tracer_tree = create_tt_tree (domain);
+	{
+		sp_top_z = SmartPtr<z_ray_tracer_t> (new this_type::z_ray_tracer_t (spLSF->domain (), m_top_ss_names));
+		sp_top_z->init (m_rt_gl);
+	}
 		
 //	interpolate the values
 	for (VertexConstIterator iter = spLSF->template begin<Vertex> ();
@@ -72,8 +73,16 @@ void LSFbyRaster<TGridFunc>::interpolate_to
 		number raster_val = m_hfRaster.interpolate (coord[0], coord[1]); //TODO: this excludes 1d!
 		
 	//	correct the raster if relative
-		if (sp_top_tracer_tree.valid ())
-			raster_val += get_min_top_z (coord, *sp_top_tracer_tree, top_intersection_records);
+		if (sp_top_z.valid ())
+		{
+			number top_z;
+			if (sp_top_z->get_min_at (coord, m_rt_tol, top_z))
+				raster_val += top_z;
+			else if (m_bDefaultTop)
+				raster_val += m_rt_default;
+			else
+				UG_THROW ("LSFbyRaster: Point " << coord << " is not covered by the top subset.");
+		}
 	
 	//	get indices of the dofs and set the value
 		spLSF->inner_dof_indices (vrt, 0, ind);
@@ -85,31 +94,25 @@ void LSFbyRaster<TGridFunc>::interpolate_to
  * Creates and fills the tree with the elements of the 'top' subset.
  */
 template <typename TGridFunc>
-SmartPtr<typename LSFbyRaster<TGridFunc>::top_tracer_tree_t> LSFbyRaster<TGridFunc>::create_tt_tree
+void LSFbyRaster<TGridFunc>::z_ray_tracer_t::init
 (
-	domain_type & domain ///< the domain
+	int grid_level
 )
 {
-	MultiGrid & mg = * domain.grid ();
-	MGSubsetHandler & sh = * domain.subset_handler ();
+	MultiGrid & mg = * m_sp_domain->grid ();
+	MGSubsetHandler & sh = * m_sp_domain->subset_handler ();
 	std::vector<Face*> top_faces;
 	
-//	parse the subset names
-	SubsetGroup ssGrp (domain.subset_handler ());
-	ssGrp.add (TokenizeString (m_top_ss_names));
-	
 #ifndef UG_PARALLEL
-//	create the tree
-	SmartPtr<top_tracer_tree_t> sp_top_tracer_tree (new top_tracer_tree_t (mg, domain.position_attachment ()));
 	
 //	get all the elements to collect
-	for (size_t i = 0; i < ssGrp.size (); i++)
+	for (size_t i = 0; i < m_top_ss_grp.size (); i++)
 	{
-		int si = ssGrp [i];
+		int si = m_top_ss_grp [i];
 		
-		if (m_rt_gl >= 0) // if the grid level for the top is specified
-			for (FaceIterator it = sh.begin<Face> (si, m_rt_gl);
-									it != sh.end<Face> (si, m_rt_gl); ++it)
+		if (grid_level >= 0) // if the grid level for the top is specified
+			for (FaceIterator it = sh.begin<Face> (si, grid_level);
+									it != sh.end<Face> (si, grid_level); ++it)
 				top_faces.push_back (*it);
 		else
 			for (int lvl = 0; lvl < (int) sh.num_levels(); lvl++)
@@ -121,20 +124,22 @@ SmartPtr<typename LSFbyRaster<TGridFunc>::top_tracer_tree_t> LSFbyRaster<TGridFu
 						top_faces.push_back (t);
 				}
 	}
+	
 #else
+	
 	const int rootProc = 0;
 	
 //	select the faces on the top
 	Selector sel (mg);
 	if (pcl::ProcRank () == rootProc)
 	{
-		for (size_t i = 0; i < ssGrp.size (); i++)
+		for (size_t i = 0; i < m_top_ss_grp.size (); i++)
 		{
-			int si = ssGrp [i];
+			int si = m_top_ss_grp [i];
 			
-			if (m_rt_gl >= 0) // if the grid level for the top is specified
-				for (FaceIterator it = sh.begin<Face> (si, m_rt_gl);
-										it != sh.end<Face> (si, m_rt_gl); ++it)
+			if (grid_level >= 0) // if the grid level for the top is specified
+				for (FaceIterator it = sh.begin<Face> (si, grid_level);
+										it != sh.end<Face> (si, grid_level); ++it)
 					sel.select (*it);
 			else
 				for (int lvl = 0; lvl < (int) sh.num_levels(); lvl++)
@@ -149,69 +154,60 @@ SmartPtr<typename LSFbyRaster<TGridFunc>::top_tracer_tree_t> LSFbyRaster<TGridFu
 	}
 	
 //	copy the top faces into a new grid
-	Grid top_grid;
-	
 	GridDataSerializationHandler serializer;
 	serializer.add
-		(GeomObjAttachmentSerializer<Vertex, position_attachment_type>::create (mg, domain.position_attachment ()));
+		(GeomObjAttachmentSerializer<Vertex, position_attachment_type>::create (mg, m_sp_domain->position_attachment ()));
 		
 	GridDataSerializationHandler deserializer;
 	deserializer.add
-		(GeomObjAttachmentSerializer<Vertex, position_attachment_type>::create (top_grid, domain.position_attachment ()));
+		(GeomObjAttachmentSerializer<Vertex, position_attachment_type>::create (m_top_grid, m_sp_domain->position_attachment ()));
 
-	BroadcastGrid (top_grid, sel, serializer, deserializer, rootProc);
+	BroadcastGrid (m_top_grid, sel, serializer, deserializer, rootProc);
 
-	for (FaceIterator it = top_grid.begin<Face> (); it != top_grid.end<Face> (); ++it)
+	for (FaceIterator it = m_top_grid.begin<Face> (); it != m_top_grid.end<Face> (); ++it)
 		top_faces.push_back (*it);
 	
-//	create the tree
-	SmartPtr<top_tracer_tree_t> sp_top_tracer_tree (new top_tracer_tree_t (top_grid, domain.position_attachment ()));
 #endif // UG_PARALLEL
 	
 //	compose the tree
-	sp_top_tracer_tree->create_tree (top_faces.begin (), top_faces.end ());
-	
-	return sp_top_tracer_tree;
+	m_top_tracer_tree.create_tree (top_faces.begin (), top_faces.end ());
 }
 
 /**
  * Gets the minimum z-coordinate of the top subset over a given point
  */
 template <typename TGridFunc>
-number LSFbyRaster<TGridFunc>::get_min_top_z
+bool LSFbyRaster<TGridFunc>::z_ray_tracer_t::get_min_at
 (
 	const MathVector<dim> & over, ///< to look over this point
-	const top_tracer_tree_t & tt_tree, ///< the top tracer tree
-	std::vector<top_intersection_record_t> & top_intersection_records ///< array to store all the intersections
+	number tolerance, ///< the tolerance of the ray tracer
+	number & z ///< the result
 )
 {
 //	find all the intersections
 	MathVector<dim> up_dir;
 	up_dir = 0;
 	up_dir [dim - 1] = 1;
-	top_intersection_records.clear ();
-	RayElementIntersections (top_intersection_records, tt_tree, over, up_dir, m_rt_tol);
+	m_top_intersection_records.clear ();
+	RayElementIntersections (m_top_intersection_records, m_top_tracer_tree, over, up_dir, tolerance);
 	
 //	check if there are intersections at all
-	if (top_intersection_records.size () == 0)
-	{
-		if (m_bDefaultTop)
-			return m_rt_default;
-		UG_THROW ("LSFbyRaster: Point " << over << " is not covered by the top subset.");
-	}
+	if (m_top_intersection_records.size () == 0)
+		return false;
 	
 //	find the lowest point
-	MathVector<dim> x = PointOnRay (over, up_dir, top_intersection_records[0].smin);
+	MathVector<dim> x = PointOnRay (over, up_dir, m_top_intersection_records[0].smin);
 	number z_min = x [dim - 1];
-	for (size_t i = 1; i < top_intersection_records.size (); i++)
+	for (size_t i = 1; i < m_top_intersection_records.size (); i++)
 	{
-		top_intersection_record_t & r = top_intersection_records [i];
+		top_intersection_record_t & r = m_top_intersection_records [i];
 		x = PointOnRay (over, up_dir, r.smin);
 		if (x [dim - 1] < z_min)
 			z_min = x [dim - 1];
 	}
 	
-	return z_min;
+	z = z_min;
+	return true;
 }
 
 } // end namespace LevelSet
