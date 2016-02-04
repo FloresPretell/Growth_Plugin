@@ -58,7 +58,10 @@ void LSFbyRaster<TGridFunc>::interpolate_to
 	SmartPtr<z_ray_tracer_t> sp_top_z;
 	if (m_bRelative)
 	{
-		sp_top_z = SmartPtr<z_ray_tracer_t> (new this_type::z_ray_tracer_t (spLSF->domain (), m_top_ss_names));
+		sp_top_z = SmartPtr<this_type::z_ray_tracer_t>
+			(
+				new this_type::z_ray_tracer_t (spLSF->domain (), m_top_ss_names)
+			);
 		sp_top_z->init (m_rt_gl);
 	}
 		
