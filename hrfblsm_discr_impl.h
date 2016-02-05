@@ -1563,7 +1563,7 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 						if (m_imInterfaceVal.invalid ())
 							DoFRef (uNew, ind[0]) = 0;
 						else
-							(* m_imInterfaceVal) (&(DoFRef (uNew, ind[0])), &(aaPos[vrt]), m_time, si, 1);
+							(* m_imInterfaceVal) (DoFRef (uNew, ind[0]), aaPos[vrt], m_time, si, vrt);
 					}
 				}
 			}
