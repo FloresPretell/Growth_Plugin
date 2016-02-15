@@ -658,7 +658,7 @@ void LSElementSize<ReferencePrism, WDim>::compute
 			VecScaleAdd (part_prism [base_i], t, corner [i], 1 - t, corner [j]);
 		}
 	}
-	UG_ASSERT (base_i > 0, "LSElementSize<ReferencePrism, dim>::compute: internal error");
+	UG_ASSERT (base_i >= 0, "LSElementSize<ReferencePrism, dim>::compute: internal error");
 	number part_prism_vol_plus, part_prism_vol_minus;
 	LSElementSize<ReferencePrism, dim>::compute (part_prism, part_lsf,
 		part_prism_vol_plus, part_prism_vol_minus);
