@@ -82,7 +82,8 @@ public:
 		SmartPtr<grid_func_type> spLSF ///< the grid function with the LSF
 	)
 	:	m_spLSF (spLSF),
-		m_volume_plus (-1), m_volume_minus (-1) // dummy values
+		m_volume_plus (-1), m_volume_minus (-1), // dummy values
+		m_bDetails (false)
 	{};
 	
 ///	sets the subsets to restrict the computation on
@@ -90,6 +91,9 @@ public:
 	(
 		const char * ss_names ///< names of the subsets
 	);
+	
+///	sets whether the details should be computed
+	void set_details (bool s) {m_bDetails = s;}
 	
 ///	computes the volumes
 	void compute ();
@@ -99,6 +103,9 @@ public:
 	
 /// returns the volume of the negative part
 	number volume_minus () const {return m_volume_minus;}
+	
+///	prints the details
+	void print_details () const;
 	
 private:
 
@@ -111,16 +118,30 @@ private:
 	{
 		this_type * m_pThis;
 		
+	///	constructor
 		AddVolumes
 		(
 			this_type * pThis ///< pointer to the master class
 		)
 		: m_pThis (pThis) {}
 		
+	///	computation of the volume for all elements of the given type
 		template <typename TElem> void operator() (TElem)
 		{
 			m_pThis->template add_volumes_of_all<TElem> ();
 		}
+	};
+	
+private:
+
+///	helper class for the details
+	struct subset_volumes
+	{
+		number vol_plus; ///< computed volume in the "positive part" of the subset
+		number vol_minus; ///< computed volume in the "negative part" of the subset
+		
+	///	constructor
+		subset_volumes () : vol_plus (0), vol_minus (0) {}
 	};
 
 private:
@@ -131,6 +152,9 @@ private:
 	
 	number m_volume_plus; ///< computed volume in the "positive part" of the domain
 	number m_volume_minus; ///< computed volume in the "negative part" of the domain
+	
+	bool m_bDetails; ///< if volumes in the subsets should be computed
+	SmartPtr<std::map<int, subset_volumes> > m_spDetails; ///< volumes in the subsets (if not SPNULL)
 };
 
 /**

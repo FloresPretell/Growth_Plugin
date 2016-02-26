@@ -69,6 +69,9 @@ void LSVolume<TGridFunc>::compute ()
 
 //	sum up all the volumes
 	m_volume_plus = m_volume_minus = 0;
+	if (m_bDetails)
+		m_spDetails = SmartPtr<std::map<int, subset_volumes> > (new std::map<int, subset_volumes>);
+	else m_spDetails = SPNULL;
 	boost::mpl::for_each<ElemList> (AddVolumes (this));
 	
 #ifdef UG_PARALLEL
@@ -76,6 +79,17 @@ void LSVolume<TGridFunc>::compute ()
 	pcl::ProcessCommunicator procComm;
 	m_volume_minus = procComm.allreduce (m_volume_minus, PCL_RO_SUM);
 	m_volume_plus = procComm.allreduce (m_volume_plus, PCL_RO_SUM);
+	
+	if (m_spDetails.valid ())
+	{
+		typedef typename std::map<int, subset_volumes>::iterator sv_iter;
+		for (sv_iter it = m_spDetails->begin (); it != m_spDetails->end (); ++it)
+		{
+			subset_volumes & sv = it->second;
+			sv.vol_minus = procComm.allreduce (sv.vol_minus, PCL_RO_SUM);
+			sv.vol_plus = procComm.allreduce (sv.vol_plus, PCL_RO_SUM);
+		}
+	}
 #endif
 }
 
@@ -120,7 +134,17 @@ void LSVolume<TGridFunc>::add_volumes_of_all ()
 		//	compute the volumes
 			number vol_plus, vol_minus;
 			LSElementSize<ref_elem_t, dim>::compute (corners, lsf_values, vol_plus, vol_minus);
+			
+		//	add them to the total volumes
 			m_volume_plus += vol_plus; m_volume_minus += vol_minus;
+			
+		//	add them to the details
+			if (m_spDetails.valid ())
+			{
+				subset_volumes & sv = (* m_spDetails) [si];
+				sv.vol_plus += vol_plus;
+				sv.vol_minus += vol_minus;
+			}
 			
 			/*-- For debugging only: --*
 			number test_vol_plus, test_vol_minus;
@@ -143,6 +167,35 @@ void LSVolume<TGridFunc>::add_volumes_of_all ()
 			 *--*/
 		}
 	}
+}
+
+/**
+ * Prints the details over the subsets
+ */
+template <typename TGridFunc>
+void LSVolume<TGridFunc>::print_details () const
+{
+	typedef typename std::map<int, subset_volumes>::const_iterator sv_iter;
+	
+	if (! m_bDetails)
+		return;
+	
+	if (! m_spDetails.valid ())
+		UG_THROW ("LSVolume: No details computed yet!\n");
+		
+	ConstSmartPtr<domain_type> spDom = m_spLSF->domain ();
+	
+	UG_LOG ("Volumes of the subset:\n" << std::fixed);
+	number vol_plus = 0, vol_minus = 0;
+	for (sv_iter it = m_spDetails->begin (); it != m_spDetails->end (); ++it)
+	{
+		int si = it->first;
+		const subset_volumes & sv = it->second;
+		vol_plus += sv.vol_plus; vol_minus += sv.vol_minus;
+		UG_LOG (spDom->subset_handler()->get_subset_name (si) << " (" << si
+					<< "): V(+) = " << sv.vol_plus << ", V(-) = " << sv.vol_minus << "\n");
+	}
+	UG_LOG ("Totally: V(+) = " << vol_plus << ", V(-) = " << vol_minus << "\n");
 }
 
 /*---- Class 'LSElementSize': ----*/
