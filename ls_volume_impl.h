@@ -642,7 +642,7 @@ void LSElementSize<ReferencePrism, WDim>::compute
 			vol_plus = pos_vol;
 			
 			tmp_lsf [i_pos[0]] = lsf [i_pos[0]];
-			tmp_lsf [i_pos[1]] = 1; // correct the second positive corner
+			tmp_lsf [i_pos[1]] = -1; // correct the second positive corner
 			LSElementSize<ReferencePrism, dim>::compute (corner, tmp_lsf, pos_vol, tmp_vol);
 			vol_plus += pos_vol;
 			
