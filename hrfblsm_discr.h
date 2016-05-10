@@ -288,21 +288,25 @@ public:
 	);
 		
 ///	appends a vertical vector the the normal velocity (using a user-data object)
-	void append_to_normal_vel
+	void append_vertical_to_normal_vel
 	(
 		SmartPtr<CplUserData<number, dim> > spNVelField,
 		SmartPtr<TGridFunction> spNormVel
 	);
 	
 ///	appends a vertical vector the the normal velocity (using a user-data object)
-	void append_to_normal_vel
+	void append_vertical_to_normal_vel
 	(
 		SmartPtr<TGridFunction> spNVelGF,
 		const char * cmp,
 		SmartPtr<TGridFunction> spNormVel
 	)
 	{
-		append_to_normal_vel (SmartPtr<CplUserData<number, dim> > (new GridFunctionNumberData<TGridFunction> (spNVelGF, cmp)), spNormVel);
+		append_vertical_to_normal_vel
+		(
+			SmartPtr<CplUserData<number, dim> > (new GridFunctionNumberData<TGridFunction> (spNVelGF, cmp)),
+			spNormVel
+		);
 	}
 	
 #ifdef UG_FOR_LUA

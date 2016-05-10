@@ -294,8 +294,8 @@ static void DomainAlgebra(Registry& reg, string grp)
 #ifdef UG_FOR_LUA
 			.add_method("compute_normal_vel", static_cast<void (T::*)(const char*, SmartPtr<function_type>)>(&T::compute_normal_vel), "VelField#NormalVel", "Compute normal velocity")
 #endif
-			.add_method("append_to_normal_vel", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim> >, SmartPtr<function_type>)>(&T::append_to_normal_vel), "NormVelField#NormalVel", "Appends a horizontal part to the normal velocity")
-			.add_method("append_to_normal_vel", static_cast<void (T::*)(SmartPtr<function_type>, const char *, SmartPtr<function_type>)>(&T::append_to_normal_vel), "NormVelGF#cmp#NormalVel", "Appends a horizontal part to the normal velocity")
+			.add_method("append_vertical_to_normal_vel", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim> >, SmartPtr<function_type>)>(&T::append_vertical_to_normal_vel), "ZVelField#NormalVel", "Appends a vertical part to the normal velocity")
+			.add_method("append_vertical_to_normal_vel", static_cast<void (T::*)(SmartPtr<function_type>, const char *, SmartPtr<function_type>)>(&T::append_vertical_to_normal_vel), "ZVelGF#cmp#NormalVel", "Appends a vertical part to the normal velocity")
 			.add_method("set_outflow_boundary", &T::set_outflow_boundary)
 			.add_method("set_dirichlet_boundary", &T::set_dirichlet_boundary)
 			.add_method("set_dirichlet_data", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim> >)>(&T::set_dirichlet_data), "", "Dirichlet BC")

@@ -1753,13 +1753,13 @@ void HiResFluxBasedLSM<TGridFunction>::compute_normal_vel
 }
 
 /**
- * compute the normal velocity using a user-data object
+ * Appends a vertical vector the the normal velocity (using a user-data object)
  */
 template<typename TGridFunction>
-void HiResFluxBasedLSM<TGridFunction>::append_to_normal_vel
+void HiResFluxBasedLSM<TGridFunction>::append_vertical_to_normal_vel
 (
-	SmartPtr<CplUserData<number, dim> > spNVelField, ///< user data for the velocity vector field
-	SmartPtr<TGridFunction> spNormVel ///< to save the normal velocity
+	SmartPtr<CplUserData<number, dim> > spZVelField, ///< user data for the vertical velocity field
+	SmartPtr<TGridFunction> spNormVel ///< the normal velocity to append to
 )
 {
 //	we need the solution
@@ -1841,7 +1841,7 @@ void HiResFluxBasedLSM<TGridFunction>::append_to_normal_vel
 			
 		//	get the nodal velocity
 			number co_nVel[maxNumCo];
-			(*spNVelField) (co_nVel, geo.scv_global_ips (), m_time, si,
+			(*spZVelField) (co_nVel, geo.scv_global_ips (), m_time, si,
 				elem, geo.corners (), geo.scv_local_ips (), noc, NULL);
 		
 		//	compute the normal velocity
