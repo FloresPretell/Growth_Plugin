@@ -41,7 +41,7 @@
 
 // ug4 headers
 #include "common/common.h"
-#include "lib_grid/algorithms/heightfield_util.h"
+#include "common/util/raster.h"
 #include "lib_grid/algorithms/space_partitioning/lg_ntree.h"
 #include "lib_disc/function_spaces/grid_function.h"
 
@@ -95,7 +95,7 @@ public:
 	)
 	:	m_bRelative (false), m_rt_gl (-1), m_rt_tol (1e-6), m_bDefaultTop (false)
 	{
-		LoadHeightfieldFromASC (m_hfRaster, raster_file);
+		m_raster.load_from_asc(raster_file);
 	}
 	
 ///	computes the level-set function
@@ -148,7 +148,8 @@ public:
 private:
 
 ///	the raster of the heights
-	Heightfield m_hfRaster;
+	typedef Raster<number, dim - 1> raster_t;
+	raster_t m_raster;
 	
 ///	whether relative to the top
 	bool m_bRelative;

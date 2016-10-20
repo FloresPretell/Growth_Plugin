@@ -73,7 +73,10 @@ void LSFbyRaster<TGridFunc>::interpolate_to
 		
 	//	interpolate the raster
 		MathVector<dim> coord = aaPos [vrt];
-		number raster_val = m_hfRaster.interpolate (coord[0], coord[1]); //TODO: this excludes 1d!
+		typename raster_t::Coordinate rc;
+		for (int i = 0; i < dim - 1; ++i)
+			rc[i] = coord[i];
+		number raster_val = m_raster.interpolate(rc, 1);
 		
 	//	correct the raster if relative
 		if (sp_top_z.valid ())
