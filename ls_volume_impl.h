@@ -69,9 +69,7 @@ void LSVolume<TGridFunc>::compute ()
 
 //	sum up all the volumes
 	m_volume_plus = m_volume_minus = 0;
-	if (m_bDetails)
-		m_spDetails = SmartPtr<std::map<int, subset_volumes> > (new std::map<int, subset_volumes>);
-	else m_spDetails = SPNULL;
+	m_details.clear ();
 	boost::mpl::for_each<ElemList> (AddVolumes (this));
 	
 #ifdef UG_PARALLEL
@@ -80,15 +78,12 @@ void LSVolume<TGridFunc>::compute ()
 	m_volume_minus = procComm.allreduce (m_volume_minus, PCL_RO_SUM);
 	m_volume_plus = procComm.allreduce (m_volume_plus, PCL_RO_SUM);
 	
-	if (m_spDetails.valid ())
+	typedef typename std::map<int, subset_volumes>::iterator sv_iter;
+	for (sv_iter it = m_details.begin (); it != m_details.end (); ++it)
 	{
-		typedef typename std::map<int, subset_volumes>::iterator sv_iter;
-		for (sv_iter it = m_spDetails->begin (); it != m_spDetails->end (); ++it)
-		{
-			subset_volumes & sv = it->second;
-			sv.vol_minus = procComm.allreduce (sv.vol_minus, PCL_RO_SUM);
-			sv.vol_plus = procComm.allreduce (sv.vol_plus, PCL_RO_SUM);
-		}
+		subset_volumes & sv = it->second;
+		sv.vol_minus = procComm.allreduce (sv.vol_minus, PCL_RO_SUM);
+		sv.vol_plus = procComm.allreduce (sv.vol_plus, PCL_RO_SUM);
 	}
 #endif
 }
@@ -116,10 +111,13 @@ void LSVolume<TGridFunc>::add_volumes_of_all ()
 		if (m_ssGrp.subset_handler().valid () && ! m_ssGrp.contains (si))
 			continue; // skip this subset: it is not mentioned in the specified list
 		
+		bool ss_mentioned = false; // to avoid empty and low-dim. subsets
+		number ss_vol_plus = 0, ss_vol_minus = 0;
 		ElemIter iterEnd = lsf.template end<TElem> (si);
 		for (ElemIter iter = lsf.template begin<TElem> (si); iter != iterEnd; ++iter)
 		{
 			TElem * elem = *iter;
+			ss_mentioned = true;
 			
 		//	get the corner coordinates ans the values of the LSF
 			for (size_t i = 0; i < num_corners; i++)
@@ -138,13 +136,9 @@ void LSVolume<TGridFunc>::add_volumes_of_all ()
 		//	add them to the total volumes
 			m_volume_plus += vol_plus; m_volume_minus += vol_minus;
 			
-		//	add them to the details
-			if (m_spDetails.valid ())
-			{
-				subset_volumes & sv = (* m_spDetails) [si];
-				sv.vol_plus += vol_plus;
-				sv.vol_minus += vol_minus;
-			}
+		//	add them to the subset
+			ss_vol_plus += vol_plus;
+			ss_vol_minus += vol_minus;
 			
 			/*-- For debugging only: --*
 			number test_vol_plus, test_vol_minus;
@@ -166,6 +160,41 @@ void LSVolume<TGridFunc>::add_volumes_of_all ()
 			}
 			 *--*/
 		}
+		if (ss_mentioned)
+		{
+			subset_volumes & sv = m_details [si];
+			sv.vol_plus += ss_vol_plus;
+			sv.vol_minus += ss_vol_minus;
+		}
+	}
+}
+
+/**
+ * Extracts the volumes enclosed in given subsets
+ */
+template <typename TGridFunc>
+void LSVolume<TGridFunc>::volume_in_subsets
+(
+	const char * ss_names, ///< name of the subset
+	number & vol_plus, ///< the "positive" volume
+	number & vol_minus ///< the "negative" volume
+) const
+{
+	typedef typename std::map<int, subset_volumes>::const_iterator sv_iter;
+	
+	sv_iter iter, iter_end = m_details.end ();
+	SubsetGroup ss_grp (m_spLSF->domain()->subset_handler ());
+	ss_grp.add (TokenizeString (ss_names));
+	
+	vol_plus = vol_minus = 0;
+	for (size_t i = 0; i < ss_grp.size (); i++)
+	{
+		int si = ss_grp [i];
+		if ((iter = m_details.find (si)) == iter_end)
+			continue;
+		const subset_volumes & sv = iter->second;
+		vol_plus += sv.vol_plus;
+		vol_minus += sv.vol_minus;
 	}
 }
 
@@ -177,17 +206,11 @@ void LSVolume<TGridFunc>::print_details () const
 {
 	typedef typename std::map<int, subset_volumes>::const_iterator sv_iter;
 	
-	if (! m_bDetails)
-		return;
-	
-	if (! m_spDetails.valid ())
-		UG_THROW ("LSVolume: No details computed yet!\n");
-		
 	ConstSmartPtr<domain_type> spDom = m_spLSF->domain ();
 	
 	UG_LOG ("Volumes of the subset:\n" << std::fixed);
 	number vol_plus = 0, vol_minus = 0;
-	for (sv_iter it = m_spDetails->begin (); it != m_spDetails->end (); ++it)
+	for (sv_iter it = m_details.begin (); it != m_details.end (); ++it)
 	{
 		int si = it->first;
 		const subset_volumes & sv = it->second;

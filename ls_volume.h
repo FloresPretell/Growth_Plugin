@@ -82,8 +82,7 @@ public:
 		SmartPtr<grid_func_type> spLSF ///< the grid function with the LSF
 	)
 	:	m_spLSF (spLSF),
-		m_volume_plus (-1), m_volume_minus (-1), // dummy values
-		m_bDetails (false)
+		m_volume_plus (-1), m_volume_minus (-1) // dummy values
 	{};
 	
 ///	sets the subsets to restrict the computation on
@@ -92,17 +91,44 @@ public:
 		const char * ss_names ///< names of the subsets
 	);
 	
-///	sets whether the details should be computed
-	void set_details (bool s) {m_bDetails = s;}
-	
 ///	computes the volumes
 	void compute ();
+	
+///	extracts the volumes enclosed in given subsets
+	void volume_in_subsets
+	(
+		const char * ss_names, ///< name of the subset
+		number & vol_plus, ///< the "positive" volume
+		number & vol_minus ///< the "negative" volume
+	) const;
 	
 ///	returns the volume in the positive part
 	number volume_plus () const {return m_volume_plus;}
 	
+///	returns the volume in the positive part of subsets
+	number volume_plus_in_subsets
+	(
+		const char * ss_names ///< name of the subset
+	) const
+	{
+		number vol_plus, vol_minus;
+		volume_in_subsets (ss_names, vol_plus, vol_minus);
+		return vol_plus;
+	}
+	
 /// returns the volume of the negative part
 	number volume_minus () const {return m_volume_minus;}
+	
+///	returns the volume in the negative part of subsets
+	number volume_minus_in_subsets
+	(
+		const char * ss_names ///< name of the subset
+	) const
+	{
+		number vol_plus, vol_minus;
+		volume_in_subsets (ss_names, vol_plus, vol_minus);
+		return vol_minus;
+	}
 	
 ///	prints the details
 	void print_details () const;
@@ -153,8 +179,7 @@ private:
 	number m_volume_plus; ///< computed volume in the "positive part" of the domain
 	number m_volume_minus; ///< computed volume in the "negative part" of the domain
 	
-	bool m_bDetails; ///< if volumes in the subsets should be computed
-	SmartPtr<std::map<int, subset_volumes> > m_spDetails; ///< volumes in the subsets (if not SPNULL)
+	std::map<int, subset_volumes> m_details; ///< volumes in the subsets
 };
 
 /**

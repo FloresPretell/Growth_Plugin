@@ -318,8 +318,9 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.add_method ("on_subsets", static_cast<void (T::*)(const char*)> (&T::on_subsets), "subsets", "Restrict to subsets")
 			.add_method ("compute", static_cast<void (T::*)()> (&T::compute), "", "Compute the volumes")
 			.add_method ("volume_plus", static_cast<number (T::*)() const> (&T::volume_plus), "", "Volume of the positive part")
+			.add_method ("volume_plus_in_subsets", static_cast<number (T::*)(const char *) const> (&T::volume_plus_in_subsets), "subsets", "Volume of the positive part in subsets")
 			.add_method ("volume_minus", static_cast<number (T::*)() const> (&T::volume_minus), "", "Volume of the negative part")
-			.add_method ("set_details", static_cast<void (T::*)(bool)> (&T::set_details), "truefalse", "Switches computation of the details on/off")
+			.add_method ("volume_minus_in_subsets", static_cast<number (T::*)(const char *) const> (&T::volume_minus_in_subsets), "subsets", "Volume of the negative part in subsets")
 			.add_method ("print_details", static_cast<void (T::*)() const> (&T::print_details), "", "Prints the detailed volumes")
 			.set_construct_as_smart_pointer(true);
 		reg.add_class_to_group(name, "LSVolume", tag);
