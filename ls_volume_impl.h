@@ -66,10 +66,13 @@ void LSVolume<TGridFunc>::compute ()
 {
 //	The full-dim. grid element types for this dimension:
 	typedef typename domain_traits<dim>::DimElemList ElemList;
+	
+	int n_ss = m_spLSF->num_subsets ();
 
 //	sum up all the volumes
 	m_volume_plus = m_volume_minus = 0;
-	m_details.clear ();
+	m_ss_vol_plus.resize (n_ss); m_ss_vol_minus.resize (n_ss);
+	for (int si = 0; si < n_ss; si++) m_ss_vol_plus[si] = m_ss_vol_minus[si] = 0;
 	boost::mpl::for_each<ElemList> (AddVolumes (this));
 	
 #ifdef UG_PARALLEL
@@ -78,12 +81,10 @@ void LSVolume<TGridFunc>::compute ()
 	m_volume_minus = procComm.allreduce (m_volume_minus, PCL_RO_SUM);
 	m_volume_plus = procComm.allreduce (m_volume_plus, PCL_RO_SUM);
 	
-	typedef typename std::map<int, subset_volumes>::iterator sv_iter;
-	for (sv_iter it = m_details.begin (); it != m_details.end (); ++it)
+	for (int si = 0; si < n_ss; si++)
 	{
-		subset_volumes & sv = it->second;
-		sv.vol_minus = procComm.allreduce (sv.vol_minus, PCL_RO_SUM);
-		sv.vol_plus = procComm.allreduce (sv.vol_plus, PCL_RO_SUM);
+		m_ss_vol_minus[si] = procComm.allreduce (m_ss_vol_minus[si], PCL_RO_SUM);
+		m_ss_vol_plus[si] = procComm.allreduce (m_ss_vol_plus[si], PCL_RO_SUM);
 	}
 #endif
 }
@@ -111,13 +112,11 @@ void LSVolume<TGridFunc>::add_volumes_of_all ()
 		if (m_ssGrp.subset_handler().valid () && ! m_ssGrp.contains (si))
 			continue; // skip this subset: it is not mentioned in the specified list
 		
-		bool ss_mentioned = false; // to avoid empty and low-dim. subsets
 		number ss_vol_plus = 0, ss_vol_minus = 0;
 		ElemIter iterEnd = lsf.template end<TElem> (si);
 		for (ElemIter iter = lsf.template begin<TElem> (si); iter != iterEnd; ++iter)
 		{
 			TElem * elem = *iter;
-			ss_mentioned = true;
 			
 		//	get the corner coordinates ans the values of the LSF
 			for (size_t i = 0; i < num_corners; i++)
@@ -137,8 +136,7 @@ void LSVolume<TGridFunc>::add_volumes_of_all ()
 			m_volume_plus += vol_plus; m_volume_minus += vol_minus;
 			
 		//	add them to the subset
-			ss_vol_plus += vol_plus;
-			ss_vol_minus += vol_minus;
+			ss_vol_plus += vol_plus; ss_vol_minus += vol_minus;
 			
 			/*-- For debugging only: --*
 			number test_vol_plus, test_vol_minus;
@@ -160,12 +158,7 @@ void LSVolume<TGridFunc>::add_volumes_of_all ()
 			}
 			 *--*/
 		}
-		if (ss_mentioned)
-		{
-			subset_volumes & sv = m_details [si];
-			sv.vol_plus += ss_vol_plus;
-			sv.vol_minus += ss_vol_minus;
-		}
+		m_ss_vol_plus[si] += ss_vol_plus; m_ss_vol_minus[si] += ss_vol_minus;
 	}
 }
 
@@ -180,9 +173,6 @@ void LSVolume<TGridFunc>::volume_in_subsets
 	number & vol_minus ///< the "negative" volume
 ) const
 {
-	typedef typename std::map<int, subset_volumes>::const_iterator sv_iter;
-	
-	sv_iter iter, iter_end = m_details.end ();
 	SubsetGroup ss_grp (m_spLSF->domain()->subset_handler ());
 	ss_grp.add (TokenizeString (ss_names));
 	
@@ -190,11 +180,8 @@ void LSVolume<TGridFunc>::volume_in_subsets
 	for (size_t i = 0; i < ss_grp.size (); i++)
 	{
 		int si = ss_grp [i];
-		if ((iter = m_details.find (si)) == iter_end)
-			continue;
-		const subset_volumes & sv = iter->second;
-		vol_plus += sv.vol_plus;
-		vol_minus += sv.vol_minus;
+		vol_plus += m_ss_vol_plus[si];
+		vol_minus += m_ss_vol_minus[si];
 	}
 }
 
@@ -204,19 +191,15 @@ void LSVolume<TGridFunc>::volume_in_subsets
 template <typename TGridFunc>
 void LSVolume<TGridFunc>::print_details () const
 {
-	typedef typename std::map<int, subset_volumes>::const_iterator sv_iter;
-	
 	ConstSmartPtr<domain_type> spDom = m_spLSF->domain ();
 	
 	UG_LOG ("Volumes of the subset:\n" << std::fixed);
 	number vol_plus = 0, vol_minus = 0;
-	for (sv_iter it = m_details.begin (); it != m_details.end (); ++it)
+	for (int si = 0; si < m_spLSF->num_subsets (); si++)
 	{
-		int si = it->first;
-		const subset_volumes & sv = it->second;
-		vol_plus += sv.vol_plus; vol_minus += sv.vol_minus;
+		vol_plus += m_ss_vol_plus[si]; vol_minus += m_ss_vol_minus[si];
 		UG_LOG (spDom->subset_handler()->get_subset_name (si) << " (" << si
-					<< "): V(+) = " << sv.vol_plus << ", V(-) = " << sv.vol_minus << "\n");
+					<< "): V(+) = " << m_ss_vol_plus[si] << ", V(-) = " << m_ss_vol_minus[si] << "\n");
 	}
 	UG_LOG ("Totally: V(+) = " << vol_plus << ", V(-) = " << vol_minus << "\n");
 }

@@ -160,18 +160,6 @@ private:
 	
 private:
 
-///	helper class for the details
-	struct subset_volumes
-	{
-		number vol_plus; ///< computed volume in the "positive part" of the subset
-		number vol_minus; ///< computed volume in the "negative part" of the subset
-		
-	///	constructor
-		subset_volumes () : vol_plus (0), vol_minus (0) {}
-	};
-
-private:
-
 	SmartPtr<TGridFunc> m_spLSF; ///< the specified LSF
 	
 	SubsetGroup m_ssGrp; ///< the subset group (if subsets specified)
@@ -179,7 +167,8 @@ private:
 	number m_volume_plus; ///< computed volume in the "positive part" of the domain
 	number m_volume_minus; ///< computed volume in the "negative part" of the domain
 	
-	std::map<int, subset_volumes> m_details; ///< volumes in the subsets
+	std::vector<number> m_ss_vol_plus; ///< 'positive' volumes in the subsets
+	std::vector<number> m_ss_vol_minus; ///< 'negative' volumes in the subsets
 };
 
 /**
