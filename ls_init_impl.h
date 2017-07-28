@@ -34,8 +34,12 @@
  * Initialization of the level-set function: implementation
  */
 
+//	FOR DEBUGGING ONLY
+// #include "lib_grid/file_io/file_io.h"
+
 #ifdef UG_PARALLEL
-#include "lib_grid/parallelization/broadcast.h" 
+#include "lib_grid/parallelization/gather_grid.h"
+#include "lib_grid/parallelization/distributed_grid.h"
 #endif
 
 namespace ug{
@@ -133,30 +137,27 @@ void LSFbyRaster<TGridFunc>::z_ray_tracer_t::init
 	
 #else
 	
-	const int rootProc = 0;
-	
+	DistributedGridManager* dgm = mg.distributed_grid_manager();
+
 //	select the faces on the top
 	Selector sel (mg);
-	if (pcl::ProcRank () == rootProc)
+	for (size_t i = 0; i < m_top_ss_grp.size (); i++)
 	{
-		for (size_t i = 0; i < m_top_ss_grp.size (); i++)
-		{
-			int si = m_top_ss_grp [i];
-			
-			if (grid_level >= 0) // if the grid level for the top is specified
-				for (FaceIterator it = sh.begin<Face> (si, grid_level);
-										it != sh.end<Face> (si, grid_level); ++it)
-					sel.select (*it);
-			else
-				for (int lvl = 0; lvl < (int) sh.num_levels(); lvl++)
-					for (FaceIterator it = sh.begin<Face> (si, lvl);
-											it != sh.end<Face> (si, lvl); ++it)
-					{
-						Face * t = *it;
-						if (! mg.has_children (t))
-							sel.select (t);
-					}
-		}
+		int si = m_top_ss_grp [i];
+		
+		if (grid_level >= 0) // if the grid level for the top is specified
+			for (FaceIterator it = sh.begin<Face> (si, grid_level);
+									it != sh.end<Face> (si, grid_level); ++it)
+				sel.select (*it);
+		else
+			for (int lvl = 0; lvl < (int) sh.num_levels(); lvl++)
+				for (FaceIterator it = sh.begin<Face> (si, lvl);
+										it != sh.end<Face> (si, lvl); ++it)
+				{
+					Face * t = *it;
+					if (! (mg.has_children (t) || (dgm && dgm->is_ghost(t))))
+						sel.select (t);
+				}
 	}
 	
 //	copy the top faces into a new grid
@@ -168,11 +169,14 @@ void LSFbyRaster<TGridFunc>::z_ray_tracer_t::init
 	deserializer.add
 		(GeomObjAttachmentSerializer<Vertex, position_attachment_type>::create (m_top_grid, m_sp_domain->position_attachment ()));
 
-	BroadcastGrid (m_top_grid, sel, serializer, deserializer, rootProc);
+	AllGatherGrid (m_top_grid, sel, serializer, deserializer);
 
 	for (FaceIterator it = m_top_grid.begin<Face> (); it != m_top_grid.end<Face> (); ++it)
 		top_faces.push_back (*it);
 	
+	// UG_LOG("DEBUG: SAVING allgathered m_top_grid to file in ls_init...\n");
+	// SaveGridToFile(m_top_grid, mkstr("top_grid_p" << pcl::ProcRank() << ".ugx").c_str(),
+	//                m_sp_domain->position_attachment());
 #endif // UG_PARALLEL
 	
 //	compose the tree
