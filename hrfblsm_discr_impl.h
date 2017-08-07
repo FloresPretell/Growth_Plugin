@@ -1858,8 +1858,7 @@ void HiResFluxBasedLSM<TGridFunction>::append_vertical_to_normal_vel
 	
 #	ifdef UG_PARALLEL
 	AttachmentAllReduce<Vertex> (grid, aScvVolume, PCL_RO_SUM);
-	spNormVel->set_storage_type (PST_ADDITIVE);
-	spNormVel->change_storage_type (PST_CONSISTENT);
+	AttachmentAllReduce<Vertex> (grid, aNVelocity, PCL_RO_SUM);
 #	endif
 	
 //	loop over subsets to divide the normal velocities by the volumes
