@@ -327,6 +327,15 @@ public:
 		SmartPtr<TGridFunction> spLSF2, ///< the second level-set function
 		number eps ///< tolerance
 	);
+	
+///	specifies a grid function to save the Courant number to
+	void save_CourantNumber_to
+	(
+		SmartPtr<TGridFunction> spCN ///< a grid function for the Current numbers
+	)
+	{
+		m_spCourant = spCN;
+	}
 
 private:
 
@@ -504,6 +513,8 @@ private:
 	SmartPtr<TGridFunction> m_spLSF; ///< Level-Set Function data (if any)
 	SmartPtr<TGridFunction> m_spSDF; ///< Signed-Distance Function (for computations of the eff. dt at the interface)
 	SmartPtr<TGridFunction> m_spVelPot; ///< vert.-centred potential for the computation of the velocity (or SPNULL)
+	
+	SmartPtr<TGridFunction> m_spCourant; ///< a grid function for the local Courant numbers (optional)
 	
 //	Parameters of the method:
 

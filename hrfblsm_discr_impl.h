@@ -417,10 +417,20 @@ void HiResFluxBasedLSM<TGridFunction>::assemble_element
 				grad[nodeID], coVelocity[nodeID], corr);
 			aaUpdate[ vVrt[nodeID] ] -= bipNormalVel * corr / aaVolume[ vVrt[nodeID] ];
 		
-		// the local Courant-number
+		//	the local Courant-number
 			number localCFL = m_dt * bipNormalVel / aaVolume[ vVrt[nodeID] ];
 			if (localCFL > m_curCFL)
 				m_curCFL = localCFL;
+			
+			if (m_spCourant.valid ())
+			{
+				const LocalIndices& ind = uOld.get_indices ();
+				const size_t index = ind.index (0, nodeID);
+				const size_t comp = ind.comp (0, nodeID);
+				number& CFL_entry = BlockRef ((* m_spCourant) [index], comp);
+				if (CFL_entry < localCFL)
+					CFL_entry = localCFL;
+			}
 		}
 	}
 	
@@ -478,6 +488,22 @@ void HiResFluxBasedLSM<TGridFunction>::assemble_element
         	);
 		if (localCFL > m_curCFL)
 			m_curCFL = localCFL;
+		
+		if (m_spCourant.valid ())
+		{
+			const LocalIndices& ind = uOld.get_indices ();
+			size_t index, comp;
+			
+			index = ind.index (0, up_co); comp = ind.comp (0, up_co);
+			number& CFL_entry_1 = BlockRef ((* m_spCourant) [index], comp);
+			if (CFL_entry_1 < localCFL)
+				CFL_entry_1 = localCFL;
+			
+			index = ind.index (0, down_co); comp = ind.comp (0, down_co);
+			number& CFL_entry_2 = BlockRef ((* m_spCourant) [index], comp);
+			if (CFL_entry_2 < localCFL)
+				CFL_entry_2 = localCFL;
+		}
 	}
 }
 
@@ -670,6 +696,16 @@ int HiResFluxBasedLSM<TGridFunction>::assemble_cut_element
 			number localCFL = m_dt * flux / aaVolume[ vVrt[nodeID] ];
 			if (localCFL > m_curCFL)
 				m_curCFL = localCFL;
+			
+			if (m_spCourant.valid ())
+			{
+				const LocalIndices& ind = uOld.get_indices ();
+				const size_t index = ind.index (0, nodeID);
+				const size_t comp = ind.comp (0, nodeID);
+				number& CFL_entry = BlockRef ((* m_spCourant) [index], comp);
+				if (CFL_entry < localCFL)
+					CFL_entry = localCFL;
+			}
 		}
 	}
 	
@@ -714,6 +750,22 @@ int HiResFluxBasedLSM<TGridFunction>::assemble_cut_element
         	);
 		if (localCFL > m_curCFL)
 			m_curCFL = localCFL;
+		
+		if (m_spCourant.valid ())
+		{
+			const LocalIndices& ind = uOld.get_indices ();
+			size_t index, comp;
+			
+			index = ind.index (0, from); comp = ind.comp (0, from);
+			number& CFL_entry_1 = BlockRef ((* m_spCourant) [index], comp);
+			if (CFL_entry_1 < localCFL)
+				CFL_entry_1 = localCFL;
+			
+			index = ind.index (0, to); comp = ind.comp (0, to);
+			number& CFL_entry_2 = BlockRef ((* m_spCourant) [index], comp);
+			if (CFL_entry_2 < localCFL)
+				CFL_entry_2 = localCFL;
+		}
 	}
 	
 #	else // LS_CLASSIC_GHOST_FLUID
@@ -788,6 +840,22 @@ int HiResFluxBasedLSM<TGridFunction>::assemble_cut_element
 				);
 			if (localCFL > m_curCFL)
 				m_curCFL = localCFL;
+		
+			if (m_spCourant.valid ())
+			{
+				const LocalIndices& ind = uOld.get_indices ();
+				size_t index, comp;
+			
+				index = ind.index (0, from); comp = ind.comp (0, from);
+				number& CFL_entry_1 = BlockRef ((* m_spCourant) [index], comp);
+				if (CFL_entry_1 < localCFL)
+					CFL_entry_1 = localCFL;
+			
+				index = ind.index (0, to); comp = ind.comp (0, to);
+				number& CFL_entry_2 = BlockRef ((* m_spCourant) [index], comp);
+				if (CFL_entry_2 < localCFL)
+					CFL_entry_2 = localCFL;
+			}
 		}
 	}
 	
@@ -1411,6 +1479,10 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 	{
 	//	the CFL number to compute
 		m_curCFL = 0;
+	
+	//	set the Courant number for OUTPUT to 0
+		if (m_spCourant.valid ())
+			(* m_spCourant) = 0.0;
 	
 	//	indicators of wrong signes of the gradient
 		bool wrong_sgn_at_if_A = false, wrong_sgn_at_if_B = false;

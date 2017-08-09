@@ -305,6 +305,7 @@ static void DomainAlgebra(Registry& reg, string grp)
 #endif
 			.add_method("set_limiter", static_cast<void (T::*)(bool)>(&T::set_limiter))
 			.add_method("compare_lsf_with", static_cast<void (T::*)(SmartPtr<function_type>, number)>(&T::compare_lsf_with))
+			.add_method("save_CourantNumber_to", static_cast<void (T::*)(SmartPtr<function_type>)>(&T::save_CourantNumber_to))
 			.set_construct_as_smart_pointer(true);
 		reg.add_class_to_group(name, "HiResFluxBasedLSM", tag);
 	}
