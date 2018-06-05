@@ -85,6 +85,12 @@ class LSFbyRaster
 	
 /// vertex base iterator
 	typedef typename TGridFunc::template traits<Vertex>::const_iterator VertexConstIterator;
+
+///	element type
+	typedef typename grid_dim_traits<dim>::element_type elem_t;
+
+///	side type
+	typedef typename grid_dim_traits<dim-1>::element_type side_t;
 	
 public:
 	
@@ -93,7 +99,7 @@ public:
 	(
 		const char * raster_file ///< ASCII raster file
 	)
-	:	m_bRelative (false), m_rt_gl (-1), m_rt_tol (1e-6), m_bDefaultTop (false)
+	:	m_bRelative (false), m_rt_gl (-1), m_rt_tol (1e-6), m_bDefaultTop (false), m_localTopFacesOnly (false)
 	{
 		m_raster.load_from_asc(raster_file);
 	}
@@ -144,6 +150,15 @@ public:
 		m_rt_default = default_top_z;
 		m_bDefaultTop = true;
 	}
+
+///	if relative values are used, tells whether the value can be obtained by local top faces only
+
+	void set_local_top_faces_only(
+		bool localTopFacesOnly
+	)
+	{
+		m_localTopFacesOnly = localTopFacesOnly;
+	}
 	
 private:
 
@@ -168,13 +183,16 @@ private:
 	
 ///	whether the default position of the top is specified
 	bool m_bDefaultTop;
+
+	bool m_localTopFacesOnly;
+	
 	
 /// an auxiliary class for the computation of the relative height
 	class z_ray_tracer_t
 	{
-		typedef lg_ntree<dim-1, dim, Face> top_tracer_tree_t;
+		typedef lg_ntree<dim-1, dim, side_t> top_tracer_tree_t;
 	
-		typedef RayElemIntersectionRecord<Face*> top_intersection_record_t;
+		typedef RayElemIntersectionRecord<side_t*> top_intersection_record_t;
 		
 	public:
 	
@@ -185,18 +203,19 @@ private:
 			const std::string & top_ss_names ///< top surface subset names
 		)
 		:	m_sp_domain (sp_domain),
-			m_top_ss_grp (sp_domain->subset_handler (), TokenizeString (top_ss_names)),
-#			ifndef UG_PARALLEL
-			m_top_tracer_tree (* sp_domain->grid (), sp_domain->position_attachment ())
-#			else
-			m_top_tracer_tree (m_top_grid, sp_domain->position_attachment ())
-#			endif
+			m_top_ss_grp (sp_domain->subset_handler (), TokenizeString (top_ss_names))
 		{};
 		
 	///	initializer: creates the tree
 		void init
 		(
 			int grid_level ///< grid level to take the faces from (or -1 if the top surface)
+		);
+
+		void init
+		(
+			int grid_level, ///< grid level to take the faces from (or -1 if the top surface)
+			bool useLocalTopFacesOnly
 		);
 		
 	///	computes the minimum z-coordiate of the top (returns true if the top found, false otherwise)

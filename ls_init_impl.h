@@ -55,6 +55,7 @@ void LSFbyRaster<TGridFunc>::interpolate_to
 	SmartPtr<TGridFunc> spLSF ///< the level-set function to compute
 )
 {
+	// UG_LOG("<dbg> Interplate to called!\n");
 	position_accessor_type aaPos = spLSF->domain()->position_accessor ();
 	std::vector<DoFIndex> ind (1);
 
@@ -62,11 +63,12 @@ void LSFbyRaster<TGridFunc>::interpolate_to
 	SmartPtr<z_ray_tracer_t> sp_top_z;
 	if (m_bRelative)
 	{
+		// UG_LOG("<dbg> relative\n");
 		sp_top_z = SmartPtr<z_ray_tracer_t>
 			(
 				new z_ray_tracer_t (spLSF->domain (), m_top_ss_names)
 			);
-		sp_top_z->init (m_rt_gl);
+		sp_top_z->init (m_rt_gl, m_localTopFacesOnly);
 	}
 		
 //	interpolate the values
@@ -109,78 +111,100 @@ void LSFbyRaster<TGridFunc>::z_ray_tracer_t::init
 	int grid_level
 )
 {
+	init(grid_level, false);
+}
+
+template <typename TGridFunc>
+void LSFbyRaster<TGridFunc>::z_ray_tracer_t::init
+(
+	int grid_level,
+	bool localTopSidesOnly
+)
+{
+	#ifndef UG_PARALLEL
+		localTopSidesOnly = true;
+	#endif
+
+	typedef typename Grid::traits<side_t>::iterator SideIterator;
+
 	MultiGrid & mg = * m_sp_domain->grid ();
 	MGSubsetHandler & sh = * m_sp_domain->subset_handler ();
-	std::vector<Face*> top_faces;
-	
-#ifndef UG_PARALLEL
+	std::vector<side_t*> topSides;
 	
 //	get all the elements to collect
-	for (size_t i = 0; i < m_top_ss_grp.size (); i++)
-	{
-		int si = m_top_ss_grp [i];
-		
-		if (grid_level >= 0) // if the grid level for the top is specified
-			for (FaceIterator it = sh.begin<Face> (si, grid_level);
-									it != sh.end<Face> (si, grid_level); ++it)
-				top_faces.push_back (*it);
-		else
-			for (int lvl = 0; lvl < (int) sh.num_levels(); lvl++)
-				for (FaceIterator it = sh.begin<Face> (si, lvl);
-										it != sh.end<Face> (si, lvl); ++it)
-				{
-					Face * t = *it;
-					if (! mg.has_children (t))
-						top_faces.push_back (t);
+	if(localTopSidesOnly){
+		m_top_tracer_tree.set_grid(*m_sp_domain->grid (), m_sp_domain->position_attachment ());
+		for (size_t i = 0; i < m_top_ss_grp.size (); i++)
+		{
+			int si = m_top_ss_grp [i];
+			
+			if (grid_level >= 0){ // if the grid level for the top is specified
+				for (SideIterator it = sh.begin<side_t> (si, grid_level);
+										it != sh.end<side_t> (si, grid_level); ++it)
+					topSides.push_back (*it);
+			}
+			else{
+				for (int lvl = 0; lvl < (int) sh.num_levels(); lvl++){
+					for (SideIterator it = sh.begin<side_t> (si, lvl);
+											it != sh.end<side_t> (si, lvl); ++it)
+					{
+						side_t* t = *it;
+						if (! mg.has_children (t))
+							topSides.push_back (t);
+					}
 				}
+			}
+		}
 	}
-	
-#else
-	
-	DistributedGridManager* dgm = mg.distributed_grid_manager();
+	else {
+		#ifdef UG_PARALLEL
+			m_top_tracer_tree.set_grid(m_top_grid, m_sp_domain->position_attachment ());
+			
+			DistributedGridManager* dgm = mg.distributed_grid_manager();
 
-//	select the faces on the top
-	Selector sel (mg);
-	for (size_t i = 0; i < m_top_ss_grp.size (); i++)
-	{
-		int si = m_top_ss_grp [i];
-		
-		if (grid_level >= 0) // if the grid level for the top is specified
-			for (FaceIterator it = sh.begin<Face> (si, grid_level);
-									it != sh.end<Face> (si, grid_level); ++it)
-				sel.select (*it);
-		else
-			for (int lvl = 0; lvl < (int) sh.num_levels(); lvl++)
-				for (FaceIterator it = sh.begin<Face> (si, lvl);
-										it != sh.end<Face> (si, lvl); ++it)
-				{
-					Face * t = *it;
-					if (! (mg.has_children (t) || (dgm && dgm->is_ghost(t))))
-						sel.select (t);
-				}
+		//	select the Sides on the top
+			Selector sel (mg);
+			for (size_t i = 0; i < m_top_ss_grp.size (); i++)
+			{
+				int si = m_top_ss_grp [i];
+				
+				if (grid_level >= 0) // if the grid level for the top is specified
+					for (SideIterator it = sh.begin<side_t> (si, grid_level);
+											it != sh.end<side_t> (si, grid_level); ++it)
+						sel.select (*it);
+				else
+					for (int lvl = 0; lvl < (int) sh.num_levels(); lvl++)
+						for (SideIterator it = sh.begin<side_t> (si, lvl);
+												it != sh.end<side_t> (si, lvl); ++it)
+						{
+							side_t* t = *it;
+							if (! (mg.has_children (t) || (dgm && dgm->is_ghost(t))))
+								sel.select (t);
+						}
+			}
+			
+		//	copy the top Sides into a new grid
+			GridDataSerializationHandler serializer;
+			serializer.add
+				(GeomObjAttachmentSerializer<Vertex, position_attachment_type>::create (mg, m_sp_domain->position_attachment ()));
+				
+			GridDataSerializationHandler deserializer;
+			deserializer.add
+				(GeomObjAttachmentSerializer<Vertex, position_attachment_type>::create (m_top_grid, m_sp_domain->position_attachment ()));
+
+			AllGatherGrid (m_top_grid, sel, serializer, deserializer);
+
+			for (SideIterator it = m_top_grid.begin<side_t> (); it != m_top_grid.end<side_t> (); ++it)
+				topSides.push_back (*it);
+			
+			// UG_LOG("DEBUG: SAVING allgathered m_top_grid to file in ls_init...\n");
+			// SaveGridToFile(m_top_grid, mkstr("top_grid_p" << pcl::ProcRank() << ".ugx").c_str(),
+			//                m_sp_domain->position_attachment());
+		#endif
 	}
-	
-//	copy the top faces into a new grid
-	GridDataSerializationHandler serializer;
-	serializer.add
-		(GeomObjAttachmentSerializer<Vertex, position_attachment_type>::create (mg, m_sp_domain->position_attachment ()));
-		
-	GridDataSerializationHandler deserializer;
-	deserializer.add
-		(GeomObjAttachmentSerializer<Vertex, position_attachment_type>::create (m_top_grid, m_sp_domain->position_attachment ()));
 
-	AllGatherGrid (m_top_grid, sel, serializer, deserializer);
-
-	for (FaceIterator it = m_top_grid.begin<Face> (); it != m_top_grid.end<Face> (); ++it)
-		top_faces.push_back (*it);
-	
-	// UG_LOG("DEBUG: SAVING allgathered m_top_grid to file in ls_init...\n");
-	// SaveGridToFile(m_top_grid, mkstr("top_grid_p" << pcl::ProcRank() << ".ugx").c_str(),
-	//                m_sp_domain->position_attachment());
-#endif // UG_PARALLEL
-	
 //	compose the tree
-	m_top_tracer_tree.create_tree (top_faces.begin (), top_faces.end ());
+	m_top_tracer_tree.create_tree (topSides.begin (), topSides.end ());
 }
 
 /**
@@ -201,6 +225,9 @@ bool LSFbyRaster<TGridFunc>::z_ray_tracer_t::get_min_at
 	m_top_intersection_records.clear ();
 	RayElementIntersections (m_top_intersection_records, m_top_tracer_tree, over, up_dir, tolerance);
 	
+	// UG_LOG("<dbg> over: " << over << ", up_dir: " << up_dir << std::endl);
+	// UG_LOG("<dbg> num intersections: " << m_top_intersection_records.size () << std::endl);
+
 //	check if there are intersections at all
 	if (m_top_intersection_records.size () == 0)
 		return false;
@@ -208,6 +235,7 @@ bool LSFbyRaster<TGridFunc>::z_ray_tracer_t::get_min_at
 //	find the lowest point
 	MathVector<dim> x = PointOnRay (over, up_dir, m_top_intersection_records[0].smin);
 	number z_min = x [dim - 1];
+	// UG_LOG("<dbg>  x: " << x << std::endl);
 	for (size_t i = 1; i < m_top_intersection_records.size (); i++)
 	{
 		top_intersection_record_t & r = m_top_intersection_records [i];

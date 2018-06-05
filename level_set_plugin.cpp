@@ -338,6 +338,7 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.add_method ("set_relative_to", static_cast<void (T::*)(const char*,int)> (&T::set_relative_to), "subsets#gridLevel", "Consider raster values as relative to the top")
 			.add_method ("set_rel_tolerance", static_cast<void (T::*)(number)> (&T::set_rel_tolerance), "tolerance", "Tolerance for the top ray tracer")
 			.add_method ("set_rel_default", static_cast<void (T::*)(number)> (&T::set_rel_default), "value", "Default value for the z-coord. of the top")
+			.add_method("set_local_top_faces_only", &T::set_local_top_faces_only, "enable", "In parallel computations, only local top faces are used for relative initalizations")
 			.set_construct_as_smart_pointer(true);
 		reg.add_class_to_group(name, "LSFbyRaster", tag);
 	}
