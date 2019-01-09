@@ -36,8 +36,11 @@
 #ifndef __H__UG__PLUGINS__LEVEL_SET__HR_FB_LSM_DISCR_H__
 #define __H__UG__PLUGINS__LEVEL_SET__HR_FB_LSM_DISCR_H__
 
+#include <string>
+
 // ug4 headers
 #include "common/common.h"
+#include "lib_algebra/operator/debug_writer.h"
 #include "lib_disc/function_spaces/grid_function.h"
 #include "lib_disc/function_spaces/grid_function_user_data.h"
 #ifdef UG_FOR_LUA
@@ -82,6 +85,7 @@ namespace LevelSet{
  */
 template<typename TGridFunction>
 class HiResFluxBasedLSM
+:	public DebugWritingObject<typename TGridFunction::algebra_type>
 {
 ///	domain type
 	typedef typename TGridFunction::domain_type domain_type;

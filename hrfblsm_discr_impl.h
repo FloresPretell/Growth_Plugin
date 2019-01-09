@@ -1472,6 +1472,11 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 //	local indices and values
 	LocalIndices locInd; LocalVector locOldU, locLSF, locVelPot;
 	
+	if (this->debug_writer_valid())
+	{
+		this->write_debug (uNew, "HR-FB-LSM-sol_step_0");
+	}
+	
 //	computation of the time steps
 	size_t step = 1;
 	VecAssign (uOld, uNew);
@@ -1662,6 +1667,13 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 			UG_LOG ("step length: " << m_dt << " (step # " << step << ")\n");
 			UG_LOG ("time: " << m_time << "\n");
 			UG_LOG ("CFL in step: " << m_curCFL << "\n");
+		}
+	
+		if (this->debug_writer_valid())
+		{
+			char debug_file_name [128];
+			sprintf (debug_file_name, "HR-FB-LSM-sol_step_%d", (int) step);
+			this->write_debug (uNew, debug_file_name);
 		}
         
     //	is that all?

@@ -251,9 +251,11 @@ static void DomainAlgebra(Registry& reg, string grp)
 // 	HiResFluxBasedLSM
 	{
 		typedef HiResFluxBasedLSM<function_type> T;
+		typedef DebugWritingObject<TAlgebra> TBase;
+		
 		// typedef typename function_type::domain_type domain_type;
 		string name = string("HiResFluxBasedLSM").append(suffix);
-		reg.add_class_<T>(name, grp)
+		reg.add_class_<T, TBase>(name, grp)
 			.add_constructor()
 			.add_method("advect", static_cast<void (T::*) ()>(&T::advect), "", "Compute the time steps of the method")
 			.add_method("set_solutions", static_cast<void (T::*)(SmartPtr<function_type>,SmartPtr<function_type>)>(&T::set_solutions), "old#new", "Solutions at the time levels")
