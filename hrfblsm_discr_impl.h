@@ -418,18 +418,21 @@ void HiResFluxBasedLSM<TGridFunction>::assemble_element
 			aaUpdate[ vVrt[nodeID] ] -= bipNormalVel * corr / aaVolume[ vVrt[nodeID] ];
 		
 		//	the local Courant-number
-			number localCFL = m_dt * bipNormalVel / aaVolume[ vVrt[nodeID] ];
-			if (localCFL > m_curCFL)
-				m_curCFL = localCFL;
-			
 			if (m_spCourant.valid ())
 			{
+				number localCFL = m_dt * bipNormalVel / aaVolume[ vVrt[nodeID] ];
 				const LocalIndices& ind = uOld.get_indices ();
-				const size_t index = ind.index (0, nodeID);
-				const size_t comp = ind.comp (0, nodeID);
+				const size_t index = ind.index (0, nodeID), comp = ind.comp (0, nodeID);
 				number& CFL_entry = BlockRef ((* m_spCourant) [index], comp);
-				if (CFL_entry < localCFL)
-					CFL_entry = localCFL;
+				if (m_divFree)
+				{ // we consider the outflow faces
+					if (bipNormalVel > 0)
+						CFL_entry += localCFL;
+				}
+				else
+				{ // actually, CFL should NOT be regarded here...
+					CFL_entry += std::fabs (localCFL);
+				}
 			}
 		}
 	}
@@ -481,28 +484,25 @@ void HiResFluxBasedLSM<TGridFunction>::assemble_element
 		}
 		
 	// the local Courant-number
-		number localCFL = std::max
-        	(
-        		m_dt * ipNormalVel / aaVolume[ vVrt[up_co] ],
-        		m_dt * ipNormalVel / aaVolume[ vVrt[down_co] ]
-        	);
-		if (localCFL > m_curCFL)
-			m_curCFL = localCFL;
-		
 		if (m_spCourant.valid ())
 		{
 			const LocalIndices& ind = uOld.get_indices ();
 			size_t index, comp;
 			
-			index = ind.index (0, up_co); comp = ind.comp (0, up_co);
-			number& CFL_entry_1 = BlockRef ((* m_spCourant) [index], comp);
-			if (CFL_entry_1 < localCFL)
-				CFL_entry_1 = localCFL;
-			
-			index = ind.index (0, down_co); comp = ind.comp (0, down_co);
-			number& CFL_entry_2 = BlockRef ((* m_spCourant) [index], comp);
-			if (CFL_entry_2 < localCFL)
-				CFL_entry_2 = localCFL;
+			if (m_divFree)
+			{	// consider the outflow faces:
+				number localCFL = m_dt * ipNormalVel / aaVolume[ vVrt[up_co] ];
+				index = ind.index (0, up_co); comp = ind.comp (0, up_co);
+				number& CFL_entry = BlockRef ((* m_spCourant) [index], comp);
+				CFL_entry += localCFL;
+			}
+			else
+			{	// consider inflow faces
+				number localCFL = m_dt * ipNormalVel / aaVolume[ vVrt[down_co] ];
+				index = ind.index (0, down_co); comp = ind.comp (0, down_co);
+				number& CFL_entry = BlockRef ((* m_spCourant) [index], comp);
+				CFL_entry += localCFL;
+			}
 		}
 	}
 }
@@ -687,24 +687,23 @@ int HiResFluxBasedLSM<TGridFunction>::assemble_cut_element
 			get_bf_vel_on_if (geo, bf, vel_pot, vel_grad, lsf, co_vel, flux);
 			
 		//	assemble the fluxes
-			aaUpdate[ vVrt[nodeID] ] -= flux * uValue[nodeID] / aaVolume[ vVrt[nodeID] ]; // first order approximation
-			if (!m_divFree)
-				aaUpdate[ vVrt[nodeID] ] += flux
-					* (uValue[nodeID] ) / aaVolume[ vVrt[nodeID] ]; // first order approximation
+			if (m_divFree) // otherwise we do not consider any flux for the first order approx.
+				aaUpdate[ vVrt[nodeID] ] -= flux * uValue[nodeID] / aaVolume[ vVrt[nodeID] ]; // first order approximation
 		
 		// the local Courant-number
-			number localCFL = m_dt * flux / aaVolume[ vVrt[nodeID] ];
-			if (localCFL > m_curCFL)
-				m_curCFL = localCFL;
-			
 			if (m_spCourant.valid ())
 			{
-				const LocalIndices& ind = uOld.get_indices ();
-				const size_t index = ind.index (0, nodeID);
-				const size_t comp = ind.comp (0, nodeID);
-				number& CFL_entry = BlockRef ((* m_spCourant) [index], comp);
-				if (CFL_entry < localCFL)
-					CFL_entry = localCFL;
+				if (m_divFree) // otherwise there are no contribution
+				{
+					if (flux > 0) // we consider only outflow faces
+					{
+						number localCFL = m_dt * flux / aaVolume[ vVrt[nodeID] ];
+						const LocalIndices& ind = uOld.get_indices ();
+						const size_t index = ind.index (0, nodeID), comp = ind.comp (0, nodeID);
+						number& CFL_entry = BlockRef ((* m_spCourant) [index], comp);
+						CFL_entry += localCFL;
+					}
+				}
 			}
 		}
 	}
@@ -743,28 +742,25 @@ int HiResFluxBasedLSM<TGridFunction>::assemble_cut_element
 			(*aaSrc) [ vVrt[to] ] += to_flux * src / aaVolume[ vVrt[to] ];
 		
 	// the local Courant-number
-		number localCFL = std::max
-        	(
-        		m_dt * std::abs (from_flux) / aaVolume[ vVrt[from] ],
-        		m_dt * std::abs (to_flux) / aaVolume[ vVrt[to] ]
-        	);
-		if (localCFL > m_curCFL)
-			m_curCFL = localCFL;
-		
 		if (m_spCourant.valid ())
 		{
 			const LocalIndices& ind = uOld.get_indices ();
 			size_t index, comp;
 			
-			index = ind.index (0, from); comp = ind.comp (0, from);
-			number& CFL_entry_1 = BlockRef ((* m_spCourant) [index], comp);
-			if (CFL_entry_1 < localCFL)
-				CFL_entry_1 = localCFL;
-			
-			index = ind.index (0, to); comp = ind.comp (0, to);
-			number& CFL_entry_2 = BlockRef ((* m_spCourant) [index], comp);
-			if (CFL_entry_2 < localCFL)
-				CFL_entry_2 = localCFL;
+			if (m_divFree)
+			{	// consider the outflow faces:
+				number localCFL = m_dt * std::abs (from_flux) / aaVolume[ vVrt[from] ];
+				index = ind.index (0, from); comp = ind.comp (0, from);
+				number& CFL_entry = BlockRef ((* m_spCourant) [index], comp);
+				CFL_entry += localCFL;
+			}
+			else
+			{	// consider inflow faces
+				number localCFL = m_dt * std::abs (to_flux) / aaVolume[ vVrt[to] ];
+				index = ind.index (0, to); comp = ind.comp (0, to);
+				number& CFL_entry_2 = BlockRef ((* m_spCourant) [index], comp);
+				CFL_entry += localCFL;
+			}
 		}
 	}
 	
@@ -833,28 +829,25 @@ int HiResFluxBasedLSM<TGridFunction>::assemble_cut_element
 			}
 		
 		// the local Courant-number
-			number localCFL = std::max
-				(
-					m_dt * ipNormalVel / aaVolume[ vVrt[from] ],
-					m_dt * ipNormalVel / aaVolume[ vVrt[to] ]
-				);
-			if (localCFL > m_curCFL)
-				m_curCFL = localCFL;
-		
 			if (m_spCourant.valid ())
 			{
 				const LocalIndices& ind = uOld.get_indices ();
 				size_t index, comp;
 			
-				index = ind.index (0, from); comp = ind.comp (0, from);
-				number& CFL_entry_1 = BlockRef ((* m_spCourant) [index], comp);
-				if (CFL_entry_1 < localCFL)
-					CFL_entry_1 = localCFL;
-			
-				index = ind.index (0, to); comp = ind.comp (0, to);
-				number& CFL_entry_2 = BlockRef ((* m_spCourant) [index], comp);
-				if (CFL_entry_2 < localCFL)
-					CFL_entry_2 = localCFL;
+				if (m_divFree)
+				{	// consider the outflow faces:
+					number localCFL = m_dt * ipNormalVel / aaVolume[ vVrt[from] ];
+					index = ind.index (0, from); comp = ind.comp (0, from);
+					number& CFL_entry = BlockRef ((* m_spCourant) [index], comp);
+					CFL_entry += localCFL;
+				}
+				else
+				{	// consider inflow faces
+					number localCFL = m_dt * ipNormalVel / aaVolume[ vVrt[to] ];
+					index = ind.index (0, to); comp = ind.comp (0, to);
+					number& CFL_entry = BlockRef ((* m_spCourant) [index], comp);
+					CFL_entry += localCFL;
+				}
 			}
 		}
 	}
@@ -1350,7 +1343,6 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 {
 //	should we compute anything?
 	if (m_nrOfSteps <= 0) return;
-	m_CFL = 0;
 	
 //	get the grid functions
 	if (m_oldSol.invalid () || m_newSol.invalid ())
@@ -1480,14 +1472,23 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 //	computation of the time steps
 	size_t step = 1;
 	VecAssign (uOld, uNew);
+	m_CFL = 0; // the Courant number over all the steps
 	while (true)
 	{
-	//	the CFL number to compute
-		m_curCFL = 0;
-	
 	//	set the Courant number for OUTPUT to 0
+		number current_CFL = 0;
 		if (m_spCourant.valid ())
+		{
 			(* m_spCourant) = 0.0;
+			#ifdef UG_PARALLEL
+			m_spCourant->set_storage_type (PST_ADDITIVE);
+			#endif
+		}
+		else
+		{
+			if (m_time_control)
+				UG_THROW ("Time control is only possible if a grid function is specified for CFL (by save_CourantNumber_to)");
+		}
 	
 	//	indicators of wrong signes of the gradient
 		bool wrong_sgn_at_if_A = false, wrong_sgn_at_if_B = false;
@@ -1560,21 +1561,35 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 		AttachmentAllReduce<Vertex> (grid, aSrc, PCL_RO_SUM);
 		if (m_spLSF.valid () && m_spSDF != m_oldSol)
 			AttachmentAllReduce<Vertex> (grid, aSDFUpdate, PCL_RO_SUM);
-		
-		{
-			pcl::ProcessCommunicator procComm;
-			m_curCFL = procComm.allreduce (m_curCFL, PCL_RO_MAX);
-		}
+		if (m_spCourant.valid ())
+			m_spCourant->change_storage_type (PST_CONSISTENT);
 #		endif
 	    
 	//	check the CFL
-	//TODO (parallelization): This should happen only on the master!
-		if (m_time_control && m_curCFL > 1e-10 && (m_curCFL < m_minCFL || m_curCFL > m_maxCFL))
+		if (m_spCourant.valid ())
+		{
+			current_CFL = 0;
+			for (VertexConstIterator iter = m_spCourant->template begin<Vertex> ();
+					iter != m_spCourant->template end<Vertex> (); ++iter)
+			{
+				m_spCourant->inner_dof_indices (*iter, 0, ind);
+				number local_CFL = DoFRef (*m_spCourant, ind[0]);
+				if (local_CFL > current_CFL)
+					current_CFL = local_CFL;
+			}
+#			ifdef UG_PARALLEL
+			{
+				pcl::ProcessCommunicator procComm;
+				current_CFL = procComm.allreduce (current_CFL, PCL_RO_MAX);
+			}
+#			endif
+		}
+		if (m_time_control && current_CFL > 1e-10 && (current_CFL < m_minCFL || current_CFL > m_maxCFL))
 		{
 			number old_dt = m_dt;
-			m_dt = m_dt / m_curCFL * (m_minCFL + m_maxCFL) / 2;
+			m_dt = m_dt / current_CFL * (m_minCFL + m_maxCFL) / 2;
 			if (m_bVerbose)
-				UG_LOG ("CFL " << m_curCFL << " ... resetting time step: " << old_dt << " -> " << m_dt << "\n");
+				UG_LOG ("CFL " << current_CFL << " ... resetting time step: " << old_dt << " -> " << m_dt << "\n");
 			continue; // recompute the step
 		}
 	    
@@ -1592,7 +1607,6 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 				if (!aaCoIE[vrt])
 				{//	just a normal vertex, not at the interface
 					number co_source;
-					uNew.inner_dof_indices (vrt, 0, ind);
 					if (m_spLSF.valid ())
 						co_source = (DoFRef (*m_spLSF, ind[0]) >= 0)? m_source_pos : m_source_neg;
 					else
@@ -1659,14 +1673,19 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 	    assign_dirichlet (uNew);
 	    
 	//	update the total CFL
-		if (m_curCFL > m_CFL) m_CFL = m_curCFL;
+		if (current_CFL > m_CFL) m_CFL = current_CFL;
 	    
 	//	the time step is done
 		if (m_bVerbose)
 		{
 			UG_LOG ("step length: " << m_dt << " (step # " << step << ")\n");
 			UG_LOG ("time: " << m_time << "\n");
-			UG_LOG ("CFL in step: " << m_curCFL << "\n");
+			UG_LOG ("CFL in step: " << current_CFL << "\n");
+			
+			UG_LOG ("advect: TS # " << step << ", time " << m_time << " (dt = " << m_dt << ")");
+			if (m_spCourant.valid ())
+				UG_LOG (", CFL = " << current_CFL);
+			UG_LOG ("\n");
 		}
 	
 		if (this->debug_writer_valid())
@@ -1688,9 +1707,11 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 	
 	if (! m_bVerbose)
 	{
-		UG_LOG ("advect: " << step << " step(s) done, last dt: " << m_dt << ", last CFL = " << m_curCFL << "\n");
+		UG_LOG ("advect: " << step << " step(s) done, last dt: " << m_dt);
+		if (m_spCourant.valid ())
+			UG_LOG (", max. CFL = " << m_CFL);
+		UG_LOG ("\n");
 	}
-	UG_LOG ("advect: max. CFL = " << m_CFL << "\n");
 	
 //	detach from grid
     if (m_spVelPot.valid () && m_spVelPot != m_oldSol)

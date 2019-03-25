@@ -145,8 +145,7 @@ public:
 		m_gamma (1), m_delta (0), m_divFree (false),
 		m_firstOrder (false), m_antiderivSrc (false),
 		m_limiter (false),
-		m_time (0),
-		m_curCFL (0), m_CFL (0)
+		m_time (0), m_CFL (0)
 	{
 		set_source (0);
 	}
@@ -553,7 +552,6 @@ private:
 //	Temporary and computed data
 	
 	number m_time; ///< current time
-	number m_curCFL; ///< max. Courant number achieved in the last time step
 	number m_CFL; ///< max. Courant number achieved in all the computed steps
 };
 
