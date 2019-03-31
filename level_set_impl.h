@@ -605,7 +605,7 @@ bool FV1LevelSetDisc<TGridFunction>::calculate_vertex_grad_vol
 
 //	divide the gradients by the volumes
 	// int count=0;
-	position_accessor_type aaPos = u.domain()->position_accessor();
+	// position_accessor_type aaPos = u.domain()->position_accessor();
 	for (int si=0;si < u.num_subsets();++si)
 	{
 		//UG_LOG("si " << si << "\n");
@@ -1137,7 +1137,7 @@ calculate_vertex_grad_vol_sign(TGridFunction& u, aaGrad& aaGradient,aaVol& aaVol
 	}
 
 	// int count=0;
-	position_accessor_type aaPos = u.domain()->position_accessor();
+	//position_accessor_type aaPos = u.domain()->position_accessor();
 	for (int si=0;si < u.num_subsets();++si)
 	{
 		//UG_LOG("si " << si << "\n");
@@ -1192,7 +1192,7 @@ bool FV1LevelSetDisc<TGridFunction>::compute_normal(TGridFunction& vx,TGridFunct
 	SetAttachmentValues(aaGradient, grid.vertices_begin(), grid.vertices_end(), 0);
 
     MathVector<dim> coord;
-    position_accessor_type aaPos = u.domain()->position_accessor();
+    //position_accessor_type aaPos = u.domain()->position_accessor();
 
     //	get vector holding all indices on the vertex
 	std::vector<DoFIndex> ind;
