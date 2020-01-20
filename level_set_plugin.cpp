@@ -44,6 +44,8 @@
 #include "hrfblsm_discr.h"
 #include "ls_volume.h"
 #include "ls_init.h"
+#include "fv1_conv.h"
+#include "normvel_util.h"
 
 using namespace std;
 using namespace ug::bridge;
@@ -57,6 +59,41 @@ namespace LevelSet{
  */
 struct Functionality
 {
+
+/**
+ * Function called for the registration of Domain dependent parts
+ * of the plugin. All Functions and Classes depending on the Domain
+ * are to be placed here when registering. The method is called for all
+ * available Domain types, based on the current build options.
+ *
+ * @param reg				registry
+ * @param parentGroup		group for sorting of functionality
+ */
+template <typename TDomain>
+static void Domain(Registry& reg, string grp)
+{
+	static const int dim = TDomain::dim;
+	string suffix = GetDomainSuffix<TDomain>();
+	string tag = GetDomainTag<TDomain>();
+	
+//	1st order upwinded discretization of the convection equation
+	{
+		typedef FV1_Convection<TDomain> T;
+		typedef IElemDisc<TDomain> TBase;
+		string name = string("FV1_Convection").append(suffix);
+		reg.add_class_<T, TBase >(name, grp)
+			.template add_constructor<void (*)(SmartPtr<IConvectionShapes<dim> >,const char*,const char*)>("Upwind#Function(s)#Subset(s)")
+			.add_method("set_upwind", static_cast<void (T::*)(SmartPtr<IConvectionShapes<dim> >)>(&T::set_upwind), "Upwind method", "Upwind (no, full, ...)")
+			.add_method("set_velocity", static_cast<void (T::*)(SmartPtr<CplUserData<MathVector<dim>, dim> >)>(&T::set_velocity), "", "Velocity")
+#ifdef UG_FOR_LUA
+			.add_method("set_velocity", static_cast<void (T::*)(const char*)>(&T::set_velocity), "", "Velocity Field")
+			.add_method("set_velocity", static_cast<void (T::*)(LuaFunctionHandle)>(&T::set_velocity), "", "Velocity Field")
+#endif
+			.add_method("set_source", static_cast<void (T::*)(number)>(&T::set_source), "", "value")
+			.set_construct_as_smart_pointer(true);
+		reg.add_class_to_group(name, "FV1_Convection", tag);
+	}
+}
 
 /**
  * Function called for the registration of Domain and Algebra dependent parts
@@ -344,6 +381,31 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.set_construct_as_smart_pointer(true);
 		reg.add_class_to_group(name, "LSFbyRaster", tag);
 	}
+
+//	VelByNormalVel
+	{
+			string name = string("VelByNormalVel").append(suffix);
+			typedef VelByNormalVel<function_type> T;
+			typedef CplUserData<MathVector<dim>, dim> TBase;
+			
+			reg.add_class_<T, TBase> (name, grp)
+				.template add_constructor<void (*)(SmartPtr<function_type>, SmartPtr<function_type>)>("NormalVel#LSF")
+				.set_construct_as_smart_pointer(true);
+			reg.add_class_to_group(name, "VelByNormalVel", tag);
+	}
+	
+//	EikonalVel
+	{
+			string name = string("EikonalVel").append(suffix);
+			typedef EikonalVel<function_type> T;
+			typedef CplUserData<MathVector<dim>, dim> TBase;
+			
+			reg.add_class_<T, TBase> (name, grp)
+				.template add_constructor<void (*)(SmartPtr<function_type>)>("NormalVel#LSF")
+				.set_construct_as_smart_pointer(true);
+			reg.add_class_to_group(name, "EikonalVel", tag);
+	}
+	
 } // end Domain Algebra
 
 }; // end Functionality
@@ -360,6 +422,7 @@ InitUGPlugin_LevelSet(Registry* reg, string grp)
 	typedef LevelSet::Functionality Functionality;
 
 	try{
+		RegisterDomain2d3dDependent<Functionality>(*reg,grp);
 		RegisterDomain2d3dAlgebraDependent<Functionality>(*reg,grp);
 	}
 	UG_REGISTRY_CATCH_THROW(grp);
