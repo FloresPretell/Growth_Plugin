@@ -470,6 +470,7 @@ private:
 		t_aaVol& aaVolume,
 		ADimVector& aGradient,
 		t_aaGrad& aaGradient,
+		TGridFunction * pLSF = NULL,
 		CplUserData<number,dim> * if_val_data = NULL
 	);
 	

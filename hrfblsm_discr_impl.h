@@ -987,6 +987,7 @@ void HiResFluxBasedLSM<TGridFunction>::compute_vertex_grad
 	t_aaVol& aaVolume, ///< the volumes
 	ADimVector& aGradient, ///< where to save
 	t_aaGrad& aaGradient, ///< accessor for the attachment
+	TGridFunction * pLSF, //< the level-set function (if the interface should be specified)
 	CplUserData<number,dim> * if_val_data ///< computes the values at the interface (if not NOLL)
 )
 {
@@ -1048,10 +1049,10 @@ void HiResFluxBasedLSM<TGridFunction>::compute_vertex_grad
 				uValue[i] = locU (0, i);
 			
 		//	get the local LSF (if any)
-			if (m_spLSF.valid ())
+			if (pLSF != NULL)
 			{
 				locLSF.resize (locInd);
-				GetLocalVector (locLSF, *m_spLSF);
+				GetLocalVector (locLSF, *pLSF);
 				for (size_t i = 0; i < noc; i++)
 					lsfValue[i] = locLSF (0, i);
 				lsf = lsfValue;
@@ -1412,7 +1413,7 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 	//	attach, access and compute
 		grid.attach_to_vertices (aVelGrad);
 		aaVelGrad.access (grid, aVelGrad);
-		compute_vertex_grad (*m_spVelPot, geo, aaVolume, aVelGrad, aaVelGrad);
+		compute_vertex_grad (*m_spVelPot, geo, aaVolume, aVelGrad, aaVelGrad, m_spLSF.get());
 		if (m_limiter)
 			limit_grad (*m_spVelPot, aaVelGrad);
 	}
@@ -1446,7 +1447,7 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 		//	attach, access and compute the gradient
 			grid.attach_to_vertices (aSDFGrad);
 			aaSDFGrad.access (grid, aSDFGrad);
-			compute_vertex_grad (*m_spSDF, geo, aaVolume, aSDFGrad, aaSDFGrad);
+			compute_vertex_grad (*m_spSDF, geo, aaVolume, aSDFGrad, aaSDFGrad, m_spLSF.get());
 			if (m_limiter)
 				limit_grad (*m_spSDF, aaSDFGrad);
 		//	attach and access the update
@@ -1494,7 +1495,7 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 		bool wrong_sgn_at_if_A = false, wrong_sgn_at_if_B = false;
 		
 	//	compute scv volume and the gradient
-	    compute_vertex_grad (uOld, geo, aaVolume, aGradient, aaGradient, m_imInterfaceVal.get ());
+	    compute_vertex_grad (uOld, geo, aaVolume, aGradient, aaGradient, m_spLSF.get(), m_imInterfaceVal.get ());
 	    if (m_limiter)
 	    	limit_grad (uOld, aaGradient);
 	    
@@ -1740,11 +1741,11 @@ void HiResFluxBasedLSM<TGridFunction>::compute_normal_vel
 )
 {
 //	we need the solution
-	if (! m_newSol.valid ())
+	if (! m_spLSF.valid ())
 		UG_THROW ("Specify the level-set function!");
 	
 //	get domain
-	domain_type& domain = * (m_newSol->domain().get ());
+	domain_type& domain = * (m_spLSF->domain().get ());
 
 //	get grid of domain
 	grid_type& grid = *domain.grid ();
@@ -1765,15 +1766,15 @@ void HiResFluxBasedLSM<TGridFunction>::compute_normal_vel
 	ANumber aScvVolume;
 	grid.attach_to_vertices (aScvVolume);
 	t_aaVol aaVolume (grid, aScvVolume);
-	compute_volumes (*m_newSol, geo, aScvVolume, aaVolume);
+	compute_volumes (*m_spLSF, geo, aScvVolume, aaVolume);
 	
 //	attach, access and compute the gradient
 	ADimVector aGradient;
 	grid.attach_to_vertices (aGradient);
 	t_aaGrad aaGradient (grid, aGradient);
-	compute_vertex_grad (*m_newSol, geo, aaVolume, aGradient, aaGradient);
+	compute_vertex_grad (*m_spLSF, geo, aaVolume, aGradient, aaGradient); /* do not specify the interface here! */
 	if (m_limiter)
-		limit_grad (*m_newSol, aaGradient);
+		limit_grad (*m_spLSF, aaGradient);
 		
 //	local indices
 	std::vector<DoFIndex> ind;
@@ -1785,23 +1786,27 @@ void HiResFluxBasedLSM<TGridFunction>::compute_normal_vel
 	(*spNormVel) = 0.0;
 
 //	loop over subsets to sum up the normal velocities
-	for (int si = 0; si < m_newSol->num_subsets (); si++)
+	for (int si = 0; si < m_spLSF->num_subsets (); si++)
 	{
-		ElemIterator iterEnd = m_newSol->template end<ElemType> (si);
-		for (ElemIterator iter = m_newSol->template begin<ElemType> (si); iter != iterEnd; ++iter)
+		ElemIterator iterEnd = m_spLSF->template end<ElemType> (si);
+		for (ElemIterator iter = m_spLSF->template begin<ElemType> (si); iter != iterEnd; ++iter)
 		{
 			ElemType* elem = *iter;
 			
-		//	check if this is a "positive" element
+		//	check if this is no "outside" element
 			number uValue[maxNumCo];
 			Vertex* vVrt[maxNumCo];
+			bool elem_outside = true;
 			for (size_t i = 0; i < elem->num_vertices (); ++i)
 			{
 				Vertex* vrt = elem->vertex (i);
-				m_newSol->inner_dof_indices ((vVrt[i] = vrt), 0, ind);
-				uValue[i] = DoFRef (*m_newSol, ind[0]);
+				m_spLSF->inner_dof_indices ((vVrt[i] = vrt), 0, ind);
+				uValue[i] = DoFRef (*m_spLSF, ind[0]);
+				if (uValue[i] < - lsf_threshold ())
+					elem_outside = false;
 			}
-			if (lsf_sign (elem->num_vertices (), uValue) > 0)
+			
+			if (elem_outside)
 				continue; // we do not consider this element
 			
 		//	get vertices and extract corner coordinates
@@ -1824,8 +1829,11 @@ void HiResFluxBasedLSM<TGridFunction>::compute_normal_vel
 				Vertex* vrt = vVrt[i];
 				number vol = geo.scv(i).volume ();
     	    	number gnorm = VecLength (aaGradient [vrt]);
-				spNormVel->inner_dof_indices (vrt, 0, ind);
-				DoFRef (*spNormVel, ind[0]) += (co_vel [i] * aaGradient [vrt]) * vol / gnorm;
+    	    	if (gnorm >= lsf_threshold ())
+    	    	{
+					spNormVel->inner_dof_indices (vrt, 0, ind);
+					DoFRef (*spNormVel, ind[0]) += (co_vel [i] * aaGradient [vrt]) * vol / gnorm;
+				}
 				aaVolume[vrt] += vol;
 			}
 		}
@@ -1838,10 +1846,10 @@ void HiResFluxBasedLSM<TGridFunction>::compute_normal_vel
 #	endif
 	
 //	loop over subsets to divide the normal velocities by the volumes
-	for (int si = 0; si < m_newSol->num_subsets (); si++)
+	for (int si = 0; si < m_spLSF->num_subsets (); si++)
 	{
-		for (VertexConstIterator iter = m_newSol->template begin<Vertex> (si);
-								iter != m_newSol->template end<Vertex> (si); ++iter)
+		for (VertexConstIterator iter = m_spLSF->template begin<Vertex> (si);
+								iter != m_spLSF->template end<Vertex> (si); ++iter)
 		{
 			Vertex* vrt = *iter;
 			number vol = aaVolume[vrt];
@@ -1868,11 +1876,11 @@ void HiResFluxBasedLSM<TGridFunction>::append_vertical_to_normal_vel
 )
 {
 //	we need the solution
-	if (! m_newSol.valid ())
+	if (! m_spLSF.valid ())
 		UG_THROW ("Specify the level-set function!");
 	
 //	get domain
-	domain_type& domain = * (m_newSol->domain().get ());
+	domain_type& domain = * (m_spLSF->domain().get ());
 
 //	get grid of domain
 	grid_type& grid = *domain.grid ();
@@ -1899,15 +1907,15 @@ void HiResFluxBasedLSM<TGridFunction>::append_vertical_to_normal_vel
 	ANumber aScvVolume;
 	grid.attach_to_vertices (aScvVolume);
 	t_aaVol aaVolume (grid, aScvVolume);
-	compute_volumes (*m_newSol, geo, aScvVolume, aaVolume);
+	compute_volumes (*m_spLSF, geo, aScvVolume, aaVolume);
 	
 //	attach, access and compute the gradient
 	ADimVector aGradient;
 	grid.attach_to_vertices (aGradient);
 	t_aaGrad aaGradient (grid, aGradient);
-	compute_vertex_grad (*m_newSol, geo, aaVolume, aGradient, aaGradient);
+	compute_vertex_grad (*m_spLSF, geo, aaVolume, aGradient, aaGradient); /* do not specify the interface here! */
 	if (m_limiter)
-		limit_grad (*m_newSol, aaGradient);
+		limit_grad (*m_spLSF, aaGradient);
 		
 //	local indices
 	std::vector<DoFIndex> ind;
@@ -1916,23 +1924,27 @@ void HiResFluxBasedLSM<TGridFunction>::append_vertical_to_normal_vel
 	SetAttachmentValues (aaVolume, grid.vertices_begin (), grid.vertices_end (), 0);
 	
 //	loop over subsets to sum up the normal velocities
-	for (int si = 0; si < m_newSol->num_subsets (); si++)
+	for (int si = 0; si < m_spLSF->num_subsets (); si++)
 	{
-		ElemIterator iterEnd = m_newSol->template end<ElemType> (si);
-		for (ElemIterator iter = m_newSol->template begin<ElemType> (si); iter != iterEnd; ++iter)
+		ElemIterator iterEnd = m_spLSF->template end<ElemType> (si);
+		for (ElemIterator iter = m_spLSF->template begin<ElemType> (si); iter != iterEnd; ++iter)
 		{
 			ElemType* elem = *iter;
 			
-		//	check if this is a "positive" element
+		//	check if this is an "outside" element
 			number uValue[maxNumCo];
 			Vertex* vVrt[maxNumCo];
+			bool elem_outside = true;
 			for (size_t i = 0; i < elem->num_vertices (); ++i)
 			{
 				Vertex* vrt = elem->vertex (i);
-				m_newSol->inner_dof_indices ((vVrt[i] = vrt), 0, ind);
-				uValue[i] = DoFRef (*m_newSol, ind[0]);
+				m_spLSF->inner_dof_indices ((vVrt[i] = vrt), 0, ind);
+				uValue[i] = DoFRef (*m_spLSF, ind[0]);
+				if (uValue[i] < - lsf_threshold ())
+					elem_outside = false;
 			}
-			if (lsf_sign (elem->num_vertices (), uValue) > 0)
+			
+			if (elem_outside)
 				continue; // we do not consider this element
 			
 		//	get vertices and extract corner coordinates
@@ -1955,7 +1967,10 @@ void HiResFluxBasedLSM<TGridFunction>::append_vertical_to_normal_vel
 				Vertex* vrt = vVrt[i];
 				number vol = geo.scv(i).volume ();
     	    	number gnorm = VecLength (aaGradient [vrt]);
-				aaNVel [vrt] += (co_nVel [i] * aaGradient [vrt] [dim-1]) * vol / gnorm;
+    	    	if (gnorm >= lsf_threshold ())
+    	    	{
+					aaNVel [vrt] += (co_nVel [i] * aaGradient [vrt] [dim-1]) * vol / gnorm;
+				}
 				aaVolume[vrt] += vol;
 			}
 		}
@@ -1967,10 +1982,10 @@ void HiResFluxBasedLSM<TGridFunction>::append_vertical_to_normal_vel
 #	endif
 	
 //	loop over subsets to divide the normal velocities by the volumes
-	for (int si = 0; si < m_newSol->num_subsets (); si++)
+	for (int si = 0; si < m_spLSF->num_subsets (); si++)
 	{
-		for (VertexConstIterator iter = m_newSol->template begin<Vertex> (si);
-								iter != m_newSol->template end<Vertex> (si); ++iter)
+		for (VertexConstIterator iter = m_spLSF->template begin<Vertex> (si);
+								iter != m_spLSF->template end<Vertex> (si); ++iter)
 		{
 			Vertex* vrt = *iter;
 			number vol = aaVolume[vrt];
@@ -1978,6 +1993,9 @@ void HiResFluxBasedLSM<TGridFunction>::append_vertical_to_normal_vel
 				continue; // we are not under the interface!
 			spNormVel->inner_dof_indices (vrt, 0, ind);
 			DoFRef (*spNormVel, ind[0]) += aaNVel [vrt] / vol;
+			
+			if (isnan (DoFRef (*spNormVel, ind[0])))
+				UG_THROW ("HiResFluxBasedLSM::append_vertical_to_normal_vel: nan in the normal velocity - B!");
 		}
 	}
 	
