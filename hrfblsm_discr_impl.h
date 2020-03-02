@@ -1993,9 +1993,6 @@ void HiResFluxBasedLSM<TGridFunction>::append_vertical_to_normal_vel
 				continue; // we are not under the interface!
 			spNormVel->inner_dof_indices (vrt, 0, ind);
 			DoFRef (*spNormVel, ind[0]) += aaNVel [vrt] / vol;
-			
-			if (isnan (DoFRef (*spNormVel, ind[0])))
-				UG_THROW ("HiResFluxBasedLSM::append_vertical_to_normal_vel: nan in the normal velocity - B!");
 		}
 	}
 	
