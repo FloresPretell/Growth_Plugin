@@ -100,6 +100,11 @@ void LSFbyRaster<TGridFunc>::interpolate_to
 		spLSF->inner_dof_indices (vrt, 0, ind);
 		DoFRef (*spLSF, ind[0]) = coord [dim - 1] - raster_val;
 	}
+
+	//	adjust parallel storage state
+#ifdef UG_PARALLEL
+	spLSF->set_storage_type(PST_CONSISTENT);
+#endif
 }
 
 /**
