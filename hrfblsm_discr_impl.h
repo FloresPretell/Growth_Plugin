@@ -1497,7 +1497,7 @@ void HiResFluxBasedLSM<TGridFunction>::advect ()
 	//	compute scv volume and the gradient
 	    compute_vertex_grad (uOld, geo, aaVolume, aGradient, aaGradient, m_spLSF.get(), m_imInterfaceVal.get ());
 	    if (m_limiter)
-	    	limit_grad (uOld, aaGradient);
+			limit_grad (uOld, aaGradient);
 	    
 	//	initialize attachment values
 		SetAttachmentValues (aaUpdate, grid.vertices_begin (), grid.vertices_end (), 0);
