@@ -138,6 +138,19 @@ void LSVolume<TGridFunc>::add_volumes_of_all ()
 		//	add them to the subset
 			ss_vol_plus += vol_plus; ss_vol_minus += vol_minus;
 			
+		//	check the positivity (if requested)
+			if (m_check_positivity && (vol_plus < 0 || vol_minus < 0))
+			{
+				UG_LOG ("Warning in LSVolume: V+ = " << vol_plus << " < 0 or V- = "
+						<< vol_minus << " < 0\n");
+				for (size_t i = 0; i < num_corners; i++)
+				{
+					UG_LOG (" - corner[" << i << "] = " << corners[i]
+						<< ", grid_data_index = " << elem->vertex(i)->grid_data_index ()
+						<< ", lsf = " << lsf_values[i] << '\n');
+				}
+			}
+			
 			/*-- For debugging only: --*
 			number test_vol_plus, test_vol_minus;
 			for (size_t i = 0; i < num_corners; i++)

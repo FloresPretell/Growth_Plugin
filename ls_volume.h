@@ -82,7 +82,8 @@ public:
 		SmartPtr<grid_func_type> spLSF ///< the grid function with the LSF
 	)
 	:	m_spLSF (spLSF),
-		m_volume_plus (-1), m_volume_minus (-1) // dummy values
+		m_volume_plus (-1), m_volume_minus (-1), // dummy values
+		m_check_positivity (false)
 	{};
 	
 ///	sets the subsets to restrict the computation on
@@ -90,6 +91,9 @@ public:
 	(
 		const char * ss_names ///< names of the subsets
 	);
+
+///	set the check-positivity flag
+	void check_positivity (bool v) {m_check_positivity = v;}
 	
 ///	computes the volumes
 	void compute ();
@@ -167,8 +171,10 @@ private:
 	number m_volume_plus; ///< computed volume in the "positive part" of the domain
 	number m_volume_minus; ///< computed volume in the "negative part" of the domain
 	
-	std::vector<number> m_ss_vol_plus; ///< 'positive' volumes in the subsets
-	std::vector<number> m_ss_vol_minus; ///< 'negative' volumes in the subsets
+	std::vector<number> m_ss_vol_plus; ///< volume in the 'positive' subsets
+	std::vector<number> m_ss_vol_minus; ///< volume in the 'negative' subsets
+	
+	bool m_check_positivity; ///< if to check the positivity of the volumes in the elements
 };
 
 /**
