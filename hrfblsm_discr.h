@@ -143,7 +143,7 @@ public:
 	:	m_bVerbose (false), m_dt (0), m_nrOfSteps (1),
 		m_time_control (false), m_maxCFL (0.95), m_minCFL (0.85),
 		m_gamma (1), m_delta (0), m_divFree (false),
-		m_firstOrder (false), m_antiderivSrc (false),
+		m_firstOrder (false), m_antiderivSrc (false), m_elem_vel_vec (false),
 		m_limiter (false),
 		m_time (0), m_CFL (0)
 	{
@@ -214,6 +214,9 @@ public:
 	
 ///	sets the use of the antiderivative in the discretization of the source term
 	void set_antideriv_src (bool b) { m_antiderivSrc = b; }
+	
+///	sets the interpretation of the vector velocity
+	void set_elem_vel_vec (bool b) { m_elem_vel_vec = b; }
 	
 ///	sets whether to use the slope limiter
 	void set_limiter (bool b) { m_limiter = b; }
@@ -536,6 +539,8 @@ private:
 	
 	bool m_firstOrder; ///< if to use the classic (first order) upwind method
 	bool m_antiderivSrc; ///< if to use the antiderivative to discretize the source
+	
+	bool m_elem_vel_vec; ///< for the normal velocity, take the elem.-centered velocity
 	
 	bool m_limiter; ///< whether to use the slope limiter
 	

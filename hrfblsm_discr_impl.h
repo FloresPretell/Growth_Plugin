@@ -1820,9 +1820,16 @@ void HiResFluxBasedLSM<TGridFunction>::compute_normal_vel
 			
 		//	get the nodal velocity
 			MathVector<dim> co_vel[maxNumCo];
-			(*spVelField) (co_vel, geo.scv_global_ips (), m_time, si,
-				elem, geo.corners (), geo.scv_local_ips (), noc, NULL);
-		
+			if (m_elem_vel_vec)
+			{
+				(*spVelField) (co_vel, geo.coe_global (), m_time, si,
+					elem, geo.corners (), geo.coe_local (), 1, NULL);
+				for (size_t i = 1; i < noc; i++) co_vel[i] = co_vel[0];
+			}
+			else
+				(*spVelField) (co_vel, geo.scv_global_ips (), m_time, si,
+					elem, geo.corners (), geo.scv_local_ips (), noc, NULL);
+			
 		//	compute the normal velocity
 			for (size_t i = 0; i < noc; i++)
 			{
