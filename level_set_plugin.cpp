@@ -90,6 +90,7 @@ static void Domain(Registry& reg, string grp)
 			.add_method("set_velocity", static_cast<void (T::*)(LuaFunctionHandle)>(&T::set_velocity), "", "Velocity Field")
 #endif
 			.add_method("set_source", static_cast<void (T::*)(number)>(&T::set_source), "", "value")
+			.add_method("set_diffusion", static_cast<void (T::*)(number)>(&T::set_diffusion), "", "value")
 			.set_construct_as_smart_pointer(true);
 		reg.add_class_to_group(name, "FV1_Convection", tag);
 	}

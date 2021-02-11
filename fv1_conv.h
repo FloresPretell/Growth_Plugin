@@ -54,9 +54,9 @@ namespace LevelSet{
 
 /**
  * The class implements the 1-st order FV discretization of the convection equation
- * (in the non-divergence form):
+ * (in the non-divergence form) with a diffusion term:
  * \f{eqnarray*}{
- *   u_t + \mathbf{V} \cdot \nabla u = r,
+ *   u_t + \mathbf{V} \cdot \nabla u - \nabla \cdot (d \nabla u) = r,
  * \f}
  * where \f$\mathbf{V}\f$ is the convection velocity.
  * 
@@ -141,6 +141,12 @@ public:
 	{
 		m_source = r;
 	}
+	
+///	sets the diffusion coefficient
+	void set_diffusion (number d)
+	{
+		m_diffusion = d;
+	}
 
 //---- Local discretization interface: ----
 private:
@@ -201,6 +207,8 @@ private:
 	DataImport<MathVector<dim>, dim > m_imVelocity; ///< data import for the velocity field (if used)
 	
 	number m_source; ///< the source term \f$r\f$
+	
+	number m_diffusion; ///< the diffusion coefficient
 	
 }; // end class 
 

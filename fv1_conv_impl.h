@@ -53,7 +53,7 @@ FV1_Convection
 	const char * subsets
 )
 :	IElemDisc<TDomain> (functions, subsets),
-	m_spUpwind (upwind), m_source (0)
+	m_spUpwind (upwind), m_source (0), m_diffusion (0)
 {
 //	check number of functions
 	if (this->num_fct () != 1)
@@ -201,6 +201,25 @@ void FV1_Convection<TDomain>::ass_JA_elem
 			J(_U_, scvf.to(),   _U_, scvf.to()  ) += D_conv_flux;
 		}
 	}
+	
+//	assemble the diffusion
+	if(m_diffusion != 0)
+	{
+	//	loop SCVFs
+		for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
+		{
+		// 	get current SCVF
+			const typename TFVGeom::SCVF& scvf = geo.scvf (ip);
+			
+		// 	loop shape functions
+			for(size_t sh = 0; sh < scvf.num_sh(); ++sh)
+			{
+				const number D_diff_flux = m_diffusion * VecDot(scvf.global_grad(sh), scvf.normal());
+				J(_U_, scvf.from(), _U_, sh) -= D_diff_flux;
+				J(_U_, scvf.to()  , _U_, sh) += D_diff_flux;
+			}
+		}
+	}
 }
 
 /// assembles the local defect
@@ -241,6 +260,32 @@ void FV1_Convection<TDomain>::ass_dA_elem
 		{
 			d(_U_, scvf.from()) -= u (_U_, scvf.from()) * (* m_spUpwind) (ip, sh);
 			d(_U_, scvf.to()  ) += u (_U_, scvf.to()  ) * (* m_spUpwind) (ip, sh);
+		}
+	}
+	
+//	assemble the diffusion
+	if(m_diffusion != 0)
+	{
+	//	loop SCVFs
+		for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
+		{
+		// 	get current SCVF
+			const typename TFVGeom::SCVF& scvf = geo.scvf (ip);
+			
+		//	to compute D \nabla c
+			MathVector<dim> grad;
+
+		// 	compute gradient at ip
+			VecSet(grad, 0.0);
+			for(size_t sh = 0; sh < scvf.num_sh(); ++sh)
+				VecScaleAppend(grad, u(_U_, sh), scvf.global_grad(sh));
+
+		// 	compute flux
+			const number diff_flux = m_diffusion * VecDot(grad, scvf.normal());
+
+		// 	add to local defect
+			d(_U_, scvf.from()) -= diff_flux;
+			d(_U_, scvf.to()  ) += diff_flux;
 		}
 	}
 }
