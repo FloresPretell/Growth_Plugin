@@ -63,7 +63,7 @@ namespace LevelSet{
  * For the discretization, the equation is reformulated into the divergence form with
  * a sink term:
  * \f{eqnarray*}{
- *   u_t + \nabla \cdot (u \, \mathbf{V}) = u \, \nabla \mathbf{V} + r,
+ *   u_t + \nabla \cdot (u \, \mathbf{V}) - \nabla \cdot (d \nabla u) = u \, \nabla \mathbf{V} + r,
  * \f}
  *
  * \tparam	TDomain		Domain type

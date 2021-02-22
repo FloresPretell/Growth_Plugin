@@ -114,9 +114,7 @@ void FV1_Convection<TDomain>::prepare_element_loop
 //	get the FV geometry
 	static TFVGeom& geo = GeomProvider<TFVGeom>::get ();
 	
-//	check the velocity and the upwind method
-	if(! m_imVelocity.data_given ())
-		UG_THROW("FV1_Convection: No velocity assigned.");
+//	check the upwind method
 	if(m_spUpwind.invalid ())
 		UG_THROW("FV1_Convection: Upwind has not been set.");
 	
@@ -177,28 +175,32 @@ void FV1_Convection<TDomain>::ass_JA_elem
 	typedef FV1Geometry<TElem, dim> TFVGeom;
 	static TFVGeom& geo = GeomProvider<TFVGeom>::get ();
 
-//	update the upwind method
-	if(! m_spUpwind->update (&geo, m_imVelocity.values (), NULL, false))
-		UG_THROW("ERROR in 'FV1_Convection: Cannot compute convection shapes.\n");
-	const size_t numConvShapes = m_spUpwind->num_sh();
-	
-// 	loop SCVFs
-	for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
+//	assemble the convective term
+	if (m_imVelocity.data_given())
 	{
-	// 	get current SCVF
-		const typename TFVGeom::SCVF& scvf = geo.scvf (ip);
-
-		for(size_t sh = 0; sh < numConvShapes; ++sh)
+	//	update the upwind method
+		if(! m_spUpwind->update (&geo, m_imVelocity.values (), NULL, false))
+			UG_THROW("ERROR in 'FV1_Convection: Cannot compute convection shapes.\n");
+		const size_t numConvShapes = m_spUpwind->num_sh();
+	
+	// 	loop SCVFs
+		for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
 		{
-			const number D_conv_flux = (* m_spUpwind) (ip, sh);
+		// 	get current SCVF
+			const typename TFVGeom::SCVF& scvf = geo.scvf (ip);
+
+			for(size_t sh = 0; sh < numConvShapes; ++sh)
+			{
+				const number D_conv_flux = (* m_spUpwind) (ip, sh);
 			
-		//	fluxes through the SCVF (due the convection term in the divergence form)
-			J(_U_, scvf.from(), _U_, sh) += D_conv_flux;
-			J(_U_, scvf.to(),   _U_, sh) -= D_conv_flux;
+			//	fluxes through the SCVF (due the convection term in the divergence form)
+				J(_U_, scvf.from(), _U_, sh) += D_conv_flux;
+				J(_U_, scvf.to(),   _U_, sh) -= D_conv_flux;
 			
-		//	sink due to the divergence
-			J(_U_, scvf.from(), _U_, scvf.from()) -= D_conv_flux;
-			J(_U_, scvf.to(),   _U_, scvf.to()  ) += D_conv_flux;
+			//	sink due to the divergence
+				J(_U_, scvf.from(), _U_, scvf.from()) -= D_conv_flux;
+				J(_U_, scvf.to(),   _U_, scvf.to()  ) += D_conv_flux;
+			}
 		}
 	}
 	
@@ -237,29 +239,33 @@ void FV1_Convection<TDomain>::ass_dA_elem
 	typedef FV1Geometry<TElem, dim> TFVGeom;
 	static TFVGeom& geo = GeomProvider<TFVGeom>::get();
 
-//	update the upwind method
-	if(! m_spUpwind->update (&geo, m_imVelocity.values (), NULL, false))
-		UG_THROW("ERROR in 'FV1_Convection: Cannot compute convection shapes.\n");
-	const size_t numConvShapes = m_spUpwind->num_sh();
-	
-// 	loop SCVFs
-	for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
+//	assemble the convective term
+	if (m_imVelocity.data_given())
 	{
-	// 	get current SCVF
-		const typename TFVGeom::SCVF& scvf = geo.scvf (ip);
-
-	//	fluxes through the SCVF (due the convection term in the divergence form)
-		number conv_flux = 0;
-		for(size_t sh = 0; sh < numConvShapes; ++sh)
-			conv_flux += u (_U_, sh) * (* m_spUpwind) (ip, sh);
-		d(_U_, scvf.from()) += conv_flux;
-		d(_U_, scvf.to()  ) -= conv_flux;
-			
-	//	sink due to the divergence
-		for(size_t sh = 0; sh < numConvShapes; ++sh)
+	//	update the upwind method
+		if(! m_spUpwind->update (&geo, m_imVelocity.values (), NULL, false))
+			UG_THROW("ERROR in 'FV1_Convection: Cannot compute convection shapes.\n");
+		const size_t numConvShapes = m_spUpwind->num_sh();
+	
+	// 	loop SCVFs
+		for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
 		{
-			d(_U_, scvf.from()) -= u (_U_, scvf.from()) * (* m_spUpwind) (ip, sh);
-			d(_U_, scvf.to()  ) += u (_U_, scvf.to()  ) * (* m_spUpwind) (ip, sh);
+		// 	get current SCVF
+			const typename TFVGeom::SCVF& scvf = geo.scvf (ip);
+
+		//	fluxes through the SCVF (due the convection term in the divergence form)
+			number conv_flux = 0;
+			for(size_t sh = 0; sh < numConvShapes; ++sh)
+				conv_flux += u (_U_, sh) * (* m_spUpwind) (ip, sh);
+			d(_U_, scvf.from()) += conv_flux;
+			d(_U_, scvf.to()  ) -= conv_flux;
+			
+		//	sink due to the divergence
+			for(size_t sh = 0; sh < numConvShapes; ++sh)
+			{
+				d(_U_, scvf.from()) -= u (_U_, scvf.from()) * (* m_spUpwind) (ip, sh);
+				d(_U_, scvf.to()  ) += u (_U_, scvf.to()  ) * (* m_spUpwind) (ip, sh);
+			}
 		}
 	}
 	
