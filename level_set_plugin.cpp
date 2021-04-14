@@ -35,11 +35,13 @@
 #include "bridge/util.h"
 #include "bridge/util_domain_algebra_dependent.h"
 #include "lib_disc/operator/non_linear_operator/newton_solver/newton_update_interface.h"
+#include "lib_disc/spatial_disc/dom_disc_embb.h"
 
 // plugin headers
 #include "level_set.h"
 #include "level_set_user_data.h"
 #include "ls_analytic.h"
+#include "level_set_ave_data.h"
 //#include "ls_curvature2d.h"
 #include "hrfblsm_discr.h"
 #include "ls_volume.h"
@@ -209,6 +211,20 @@ static void DomainAlgebra(Registry& reg, string grp)
 //			.set_construct_as_smart_pointer(true);
 //		reg.add_class_to_group(name, "LevelSetCurvature", tag);
 //	}
+
+	//	Averaging of a grid function over an element
+	{
+		string name = string("LSAveData").append(suffix);
+		typedef GridFunction<TDomain, TAlgebra> TFct;
+		typedef LSAveData<TFct> T;
+		typedef CplUserData<number, dim> TBase;
+		typedef IInterfaceExtrapolation<TDomain, TAlgebra> TExtrapol;
+		reg.add_class_<T, TBase>(name, grp)
+			.template add_constructor<void (*)(SmartPtr<TFct>, const char*)>("GridFunction#Component")
+			.add_method("set_extrapolation", static_cast<void (T::*) (SmartPtr<TExtrapol>)> (&T::set_extrapolation), "", "Extrapolation")
+			.set_construct_as_smart_pointer(true);
+		reg.add_class_to_group(name, "LSAveData", tag);
+	}
 
 	// level set user data
 	{
