@@ -97,18 +97,10 @@ public:
 ///	Constructor
 	LSIntegral
 	(
-		SmartPtr<gf_type>& sp_gf, ///< the grid function
-		const char * fct_name, ///< 'function' to take the data from
-		SmartPtr<ls_gf_type>& sp_lsf ///< the leve-set function (if any)
+		SmartPtr<ls_gf_type> sp_lsf ///< the leve-set function (if any)
 	)
-	:	m_sp_gf (sp_gf), m_spLSF (sp_lsf)
-	{
-		if ((m_fct = sp_gf->fct_id_by_name (fct_name)) >= sp_gf->num_fct ())
-			UG_THROW ("LSAveData: Function space does not contain any function with name '" << fct_name << "'.");
-	
-		if (sp_gf->local_finite_element_id (m_fct) != LFEID(LFEID::LAGRANGE, dim, 1))
-			UG_THROW ("LSAveData: Only vertex-centered grid functions are supported.");
-	}
+	:	m_spLSF (sp_lsf)
+	{}
 
 ///	Destructor
 	virtual ~LSIntegral () {}
@@ -124,7 +116,11 @@ public:
 	}
 
 ///	computes the integrals
-	void compute ();
+	void compute_for
+	(
+		SmartPtr<gf_type> sp_gf, ///< the grid function
+		const char * fct_name ///< 'function' to take the data from
+	);
 	
 ///	returns the integral over the negative part of subsets
 	number integral_over_subsets

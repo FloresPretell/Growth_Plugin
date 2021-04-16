@@ -432,9 +432,9 @@ static void DomainAlgebra(Registry& reg, string grp)
 		typedef typename T::ls_gf_type ls_gf_type;
 		string name = string("LSIntegral").append(suffix);
 		reg.add_class_<T>(name, grp)
-			.template add_constructor<void (*) (SmartPtr<function_type>, const char *, SmartPtr<ls_gf_type>)> ("gf#fct#LSF")
+			.template add_constructor<void (*) (SmartPtr<ls_gf_type>)> ("LSF")
 			.add_method ("on_subsets", static_cast<void (T::*)(const char*)> (&T::on_subsets), "subsets", "Restrict to subsets")
-			.add_method ("compute", static_cast<void (T::*)()> (&T::compute), "", "Compute the integrals")
+			.add_method ("compute_for", static_cast<void (T::*)(SmartPtr<function_type>, const char *)> (&T::compute_for), "gf#fct", "Compute the integrals")
 			.add_method ("integral", static_cast<number (T::*)() const> (&T::integral), "", "Volume of the positive part")
 			.add_method ("integral_over_subsets", static_cast<number (T::*)(const char *) const> (&T::integral_over_subsets), "subsets", "Volume of the positive part in subsets")
 			.set_construct_as_smart_pointer(true);

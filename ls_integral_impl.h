@@ -50,10 +50,21 @@ namespace LevelSet{
  * Sums up the (partial) integrals of all the elements of all the types.
  */
 template <typename TGridFunc>
-void LSIntegral<TGridFunc>::compute ()
+void LSIntegral<TGridFunc>::compute_for
+(
+	SmartPtr<gf_type> sp_gf, ///< the grid function
+	const char * fct_name ///< 'function' to take the data from
+)
 {
 //	The full-dim. grid element types for this dimension:
 	typedef typename domain_traits<dim>::DimElemList ElemList;
+	
+	m_sp_gf = sp_gf;
+	if ((m_fct = sp_gf->fct_id_by_name (fct_name)) >= sp_gf->num_fct ())
+		UG_THROW ("LSAveData: Function space does not contain any function with name '" << fct_name << "'.");
+
+	if (sp_gf->local_finite_element_id (m_fct) != LFEID(LFEID::LAGRANGE, dim, 1))
+		UG_THROW ("LSAveData: Only vertex-centered grid functions are supported.");
 	
 	int n_ss = m_spLSF->num_subsets ();
 
