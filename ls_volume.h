@@ -196,7 +196,11 @@ public:
 public:
 
 ///	computation of the volumes
-	static void compute
+	/**
+	 * Return value: positive or negative if the entire element is in the corresponding
+	 * subdomain; zero otherwise.
+	 */
+	static int compute
 	(
 		const MathVector<WDim> * corner, ///< coordinates of the corners
 		const number * lsf, ///< values of the LSF at the corners
@@ -205,6 +209,7 @@ public:
 	)
 	{
 		UG_THROW ("LSElementSize: Generic version not implemented");
+		return 0; // never reached
 	}
 };
 
@@ -223,7 +228,11 @@ public:
 public:
 
 ///	computation of the volumes (for an edge)
-	static void compute
+	/**
+	 * Return value: positive or negative if the entire element is in the corresponding
+	 * subdomain; zero otherwise.
+	 */
+	static int compute
 	(
 		const MathVector<WDim> * corner, ///< coordinates of the corners
 		const number * lsf, ///< values of the LSF at the corners
@@ -247,7 +256,11 @@ public:
 public:
 
 ///	computation of the volumes (for a triangle)
-	static void compute
+	/**
+	 * Return value: positive or negative if the entire element is in the corresponding
+	 * subdomain; zero otherwise.
+	 */
+	static int compute
 	(
 		const MathVector<WDim> * corner, ///< coordinates of the corners
 		const number * lsf, ///< values of the LSF at the corners
@@ -271,7 +284,11 @@ public:
 public:
 
 ///	computation of the volumes (for a tetrahedrod)
-	static void compute
+	/**
+	 * Return value: positive or negative if the entire element is in the corresponding
+	 * subdomain; zero otherwise.
+	 */
+	static int compute
 	(
 		const MathVector<WDim> * corner, ///< coordinates of the corners
 		const number * lsf, ///< values of the LSF at the corners
@@ -295,7 +312,11 @@ public:
 public:
 
 ///	computation of the volumes (for a prism)
-	static void compute
+	/**
+	 * Return value: positive or negative if the entire element is in the corresponding
+	 * subdomain; zero otherwise.
+	 */
+	static int compute
 	(
 		const MathVector<WDim> * corner, ///< coordinates of the corners
 		const number * lsf, ///< values of the LSF at the corners

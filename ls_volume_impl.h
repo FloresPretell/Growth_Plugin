@@ -223,7 +223,7 @@ void LSVolume<TGridFunc>::print_details () const
  * Specialization of 'LSElementSize<>::compute' for edges
  */
 template <int WDim>
-void LSElementSize<ReferenceEdge, WDim>::compute
+int LSElementSize<ReferenceEdge, WDim>::compute
 (
 	const MathVector<WDim> * corner, ///< coordinates of the corners
 	const number * lsf, ///< values of the LSF at the corners
@@ -232,11 +232,13 @@ void LSElementSize<ReferenceEdge, WDim>::compute
 )
 {
 	number vol_0, vol_1;
+	int r;
 	
 	if (lsf[0] * lsf[1] > 0)
 	{
 		vol_0 = ElementSize<ref_element_type, dim> (corner);
 		vol_1 = 0;
+		r = 1;
 	}
 	else
 	{
@@ -247,6 +249,7 @@ void LSElementSize<ReferenceEdge, WDim>::compute
 		pnt[2] = corner[1];
 		vol_0 = ElementSize<ref_element_type, dim> (pnt);
 		vol_1 = ElementSize<ref_element_type, dim> (pnt + 1);
+		r = 0;
 	}
 	
 	if (lsf[0] >= 0)
@@ -255,15 +258,16 @@ void LSElementSize<ReferenceEdge, WDim>::compute
 	}
 	else
 	{
-		vol_minus = vol_0; vol_plus = vol_1;
+		vol_minus = vol_0; vol_plus = vol_1; r = - r;
 	}
+	return r;
 }
 
 /**
  * Specialization of 'LSElementSize<>::compute' for triangles
  */
 template <int WDim>
-void LSElementSize<ReferenceTriangle, WDim>::compute
+int LSElementSize<ReferenceTriangle, WDim>::compute
 (
 	const MathVector<WDim> * corner, ///< coordinates of the corners
 	const number * lsf, ///< values of the LSF at the corners
@@ -289,12 +293,12 @@ void LSElementSize<ReferenceTriangle, WDim>::compute
 	if (num_neg == 0)
 	{
 		vol_plus = vol; vol_minus = 0;
-		return;
+		return 1;
 	}
 	if (num_neg == 3)
 	{
 		vol_plus = 0; vol_minus = vol;
-		return;
+		return -1;
 	}
 	
 //	look for the cut corner
@@ -322,13 +326,14 @@ void LSElementSize<ReferenceTriangle, WDim>::compute
 	{
 		vol_plus = cut_vol; vol_minus = vol - cut_vol;
 	}
+	return 0;
 }
 
 /**
  * Specialization of 'LSElementSize<>::compute' for tetrahedra
  */
 template <int WDim>
-void LSElementSize<ReferenceTetrahedron, WDim>::compute
+int LSElementSize<ReferenceTetrahedron, WDim>::compute
 (
 	const MathVector<WDim> * corner, ///< coordinates of the corners
 	const number * lsf, ///< values of the LSF at the corners
@@ -358,12 +363,12 @@ void LSElementSize<ReferenceTetrahedron, WDim>::compute
 	if (num_neg == 0)
 	{
 		vol_plus = vol; vol_minus = 0;
-		return;
+		return 1;
 	}
 	if (num_neg == 4)
 	{
 		vol_plus = 0; vol_minus = vol;
-		return;
+		return -1;
 	}
 	
 //	if only one corner is cut out
@@ -390,7 +395,7 @@ void LSElementSize<ReferenceTetrahedron, WDim>::compute
 			vol_plus = cut_vol; vol_minus = vol - cut_vol;
 		}
 		
-		return;
+		return 0;
 	}
 	
 //	if two corners at every side: two prisms
@@ -421,13 +426,14 @@ void LSElementSize<ReferenceTetrahedron, WDim>::compute
 	}
 	vol_minus = ElementSize<ReferencePrism, dim> (neg_prism);
 	vol_plus = vol - vol_minus;
+	return 0;
 }
 
 /**
  * Specialization of 'LSElementSize<>::compute' for prisms
  */
 template <int WDim>
-void LSElementSize<ReferencePrism, WDim>::compute
+int LSElementSize<ReferencePrism, WDim>::compute
 (
 	const MathVector<WDim> * corner, ///< coordinates of the corners
 	const number * lsf, ///< values of the LSF at the corners
@@ -464,12 +470,12 @@ void LSElementSize<ReferencePrism, WDim>::compute
 	if (num_neg == 0)
 	{
 		vol_plus = vol; vol_minus = 0;
-		return;
+		return 1;
 	}
 	if (num_neg == 6)
 	{
 		vol_plus = 0; vol_minus = vol;
-		return;
+		return -1;
 	}
 	
 //	if only one corner is cut out, i.e. a tetrahedron is cut out
@@ -511,7 +517,7 @@ void LSElementSize<ReferencePrism, WDim>::compute
 			vol_plus = cut_vol; vol_minus = vol - cut_vol;
 		}
 		
-		return;
+		return 0;
 	}
 	
 //	if two corners at every side: 2 tetrahedra or a prism cut out
@@ -585,7 +591,7 @@ void LSElementSize<ReferencePrism, WDim>::compute
 				vol_minus = vol - cut_vol;
 			}
 			
-			return;
+			return 0;
 		}
 		
 	// Case 2: one corner of each base are cut out, and they are connected; a prism is cut out
@@ -626,7 +632,7 @@ void LSElementSize<ReferencePrism, WDim>::compute
 				vol_minus = vol - cut_vol;
 			}
 			
-			return;
+			return 0;
 		}
 		
 	//	Case 3: The corners belong to different bases but are not connected.
@@ -649,7 +655,7 @@ void LSElementSize<ReferencePrism, WDim>::compute
 			vol_minus += neg_vol;
 			
 			vol_plus = vol - vol_minus;
-			return;
+			return 0;
 		}
 		if (num_neg == 4)
 		{
@@ -666,7 +672,7 @@ void LSElementSize<ReferencePrism, WDim>::compute
 			vol_plus += pos_vol;
 			
 			vol_minus = vol - vol_plus;
-			return;
+			return 0;
 		}
 	}
 	
@@ -696,7 +702,7 @@ void LSElementSize<ReferencePrism, WDim>::compute
 			vol_minus = vol - cut_vol;
 		}
 		
-		return;
+		return 0;
 	}
 	
 	// Case 2: The "very complicated case": Two corners of one base and one
@@ -759,6 +765,8 @@ void LSElementSize<ReferencePrism, WDim>::compute
 	
 	vol_plus = part_prism_vol_plus + part_tet_vol_plus;
 	vol_minus = part_prism_vol_minus + part_tet_vol_minus;
+	
+	return 0;
 }
 
 } // end namespace LevelSet
