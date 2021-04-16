@@ -61,6 +61,8 @@ namespace LevelSet {
  * Class for averaging of a grid function in the elements
  *
  * This class computes the average of a given grid function over the element.
+ *
+ * \tparam TGridFunc	type of the grid function with the values to averate
  */
 template <typename TGridFunction>
 class LSAveData
