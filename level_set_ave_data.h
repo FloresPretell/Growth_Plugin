@@ -95,7 +95,7 @@ public:
 ///	Constructor
 	LSAveData
 	(
-		SmartPtr<gf_type>& sp_gf, ///< the grid function
+		SmartPtr<gf_type> sp_gf, ///< the grid function
 		const char * fct_name ///< 'function' to take the data from
 	)
 	:	m_sp_gf (sp_gf)
