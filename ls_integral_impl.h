@@ -77,10 +77,10 @@ void LSIntegral<TGridFunc>::compute_for
 #ifdef UG_PARALLEL
 //	sum up the volumes from different processes
 	pcl::ProcessCommunicator procComm;
-	m_volume_minus = procComm.allreduce (m_integral, PCL_RO_SUM);
+	m_integral = procComm.allreduce (m_integral, PCL_RO_SUM);
 	
 	for (int si = 0; si < n_ss; si++)
-		m_ss_vol_minus[si] = procComm.allreduce (m_ss_integral[si], PCL_RO_SUM);
+		m_ss_integral[si] = procComm.allreduce (m_ss_integral[si], PCL_RO_SUM);
 #endif
 }
 
