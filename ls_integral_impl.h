@@ -151,7 +151,7 @@ void LSIntegral<TGridFunc>::add_integrals_of_all ()
 			number ave_integrand = 0;
 			size_t n_co_minus = 0;
 			for (size_t i = 0; i < num_corners; i++)
-			if (lsf_values [i] <= 0)
+			if (lsf_values [i] < 0)
 			{
 				Vertex * vrt = elem->vertex (i);
 				if (integrand.inner_dof_indices (vrt, m_fct, ind) != 1)
