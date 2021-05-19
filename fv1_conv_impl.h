@@ -53,7 +53,8 @@ FV1_Convection
 	const char * subsets
 )
 :	IElemDisc<TDomain> (functions, subsets),
-	m_spUpwind (upwind), m_source (0), m_diffusion (0)
+	m_spUpwind (upwind), m_source (0), m_diffusion (0),
+	m_alpha(1.0),  m_exGrad(new DataExport<MathVector<dim>, dim>(functions))
 {
 //	check number of functions
 	if (this->num_fct () != 1)
@@ -216,7 +217,10 @@ void FV1_Convection<TDomain>::ass_JA_elem
 		// 	loop shape functions
 			for(size_t sh = 0; sh < scvf.num_sh(); ++sh)
 			{
-				const number D_diff_flux = m_diffusion * VecDot(scvf.global_grad(sh), scvf.normal());
+				MathVector<dim> normal= scvf.normal();
+				normal[dim] /= m_alpha;
+
+				const number D_diff_flux = m_diffusion * VecDot(scvf.global_grad(sh), normal);
 				J(_U_, scvf.from(), _U_, sh) -= D_diff_flux;
 				J(_U_, scvf.to()  , _U_, sh) += D_diff_flux;
 			}
@@ -287,7 +291,10 @@ void FV1_Convection<TDomain>::ass_dA_elem
 				VecScaleAppend(grad, u(_U_, sh), scvf.global_grad(sh));
 
 		// 	compute flux
-			const number diff_flux = m_diffusion * VecDot(grad, scvf.normal());
+			MathVector<dim> normal= scvf.normal();
+			normal[dim] /= m_alpha;
+
+			const number diff_flux = m_diffusion * VecDot(grad, normal);
 
 		// 	add to local defect
 			d(_U_, scvf.from()) -= diff_flux;
@@ -414,7 +421,91 @@ void FV1_Convection<TDomain>::register_loc_discr_func ()
 	this->set_add_def_A_elem_fct(id, & this_type::template ass_dA_elem<TElem>);
 	this->set_add_def_M_elem_fct(id, & this_type::template ass_dM_elem<TElem>);
 	this->set_add_rhs_elem_fct	(id, & this_type::template ass_rhs_elem<TElem>);
+
+	static const int refDim = reference_element_traits<TElem>::dim;
+	m_exGrad->template set_fct<this_type,refDim>(id, this, &this_type::template ex_grad<TElem>);
 }
+
+
+
+//	computes the linearized defect w.r.t to the velocity
+template<typename TDomain>
+template <typename TElem>
+void FV1_Convection<TDomain>::
+ex_grad(MathVector<dim> vValue[],
+        const MathVector<dim> vGlobIP[],
+        number time, int si,
+        const LocalVector& u,
+        GridObject* elem,
+        const MathVector<dim> vCornerCoords[],
+        const MathVector<dim> vLocIP[],
+        const size_t nip,
+        bool bDeriv,
+        std::vector<std::vector<MathVector<dim> > > vvvDeriv[])
+{
+
+	//	get the FV geometry
+		typedef FV1Geometry<TElem, dim> TFVGeom;
+		static TFVGeom& geo = GeomProvider<TFVGeom>::get();
+
+		//	assemble the convective term
+	/*	if (m_imVelocity.data_given())
+		{
+			//	update the upwind method
+				if(! m_spUpwind->update (&geo, m_imVelocity.values (), NULL, false))
+					UG_THROW("ERROR in 'FV1_Convection: Cannot compute convection shapes.\n");
+				const size_t numConvShapes = m_spUpwind->num_sh();
+
+			// 	loop SCVFs
+				for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
+				{
+				// 	get current SCVF
+					const typename TFVGeom::SCVF& scvf = geo.scvf (ip);
+
+				//	fluxes through the SCVF (due the convection term in the divergence form)
+					number conv_flux = 0;
+					for(size_t sh = 0; sh < numConvShapes; ++sh)
+						conv_flux += u (_U_, sh) * (* m_spUpwind) (ip, sh);
+					d(_U_, scvf.from()) += conv_flux;
+					d(_U_, scvf.to()  ) -= conv_flux;
+
+				//	sink due to the divergence
+					for(size_t sh = 0; sh < numConvShapes; ++sh)
+					{
+						d(_U_, scvf.from()) -= u (_U_, scvf.from()) * (* m_spUpwind) (ip, sh);
+						d(_U_, scvf.to()  ) += u (_U_, scvf.to()  ) * (* m_spUpwind) (ip, sh);
+					}
+				}
+			}*/
+	//	assemble the diffusion
+	if(m_diffusion != 0)
+	{
+
+		UG_ASSERT(vLocIP == geo.scvf_local_ips(), "Huhh: Think twice!");
+
+		if(vLocIP == geo.scvf_local_ips())
+		{
+			//	Loop Sub Control Volume Faces (SCVF)
+				for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
+				{
+				// 	Get current SCVF
+					const typename TFVGeom::SCVF& scvf = geo.scvf(ip);
+
+					// 	compute gradient at ip
+					MathVector<dim> &grad = vValue[ip];
+					VecSet(grad, 0.0);
+					for(size_t sh = 0; sh < scvf.num_sh(); ++sh)
+						VecScaleAppend(grad, m_diffusion*u(_U_, sh), scvf.global_grad(sh));
+
+					grad[dim] /= m_alpha;
+
+
+				}
+		}
+
+
+}
+};
 
 } // end namespace LevelSet
 } // end namespace ug

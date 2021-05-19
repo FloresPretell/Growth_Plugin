@@ -94,6 +94,8 @@ static void Domain(Registry& reg, string grp)
 #endif
 			.add_method("set_source", static_cast<void (T::*)(number)>(&T::set_source), "", "value")
 			.add_method("set_diffusion", static_cast<void (T::*)(number)>(&T::set_diffusion), "", "value")
+			.add_method("set_alpha", static_cast<void (T::*)(number)>(&T::set_alpha), "", "value")
+			.add_method("gradient", &T::gradient, "", "value")
 			.set_construct_as_smart_pointer(true);
 		reg.add_class_to_group(name, "FV1_Convection", tag);
 	}

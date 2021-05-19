@@ -148,6 +148,32 @@ public:
 		m_diffusion = d;
 	}
 
+	void set_alpha (number d)
+	{
+		m_alpha = d;
+	}
+
+	///	returns the export of the gradient of associated unknown function
+	typedef CplUserData<MathVector<dim>, dim> TGradientExport;
+	SmartPtr<TGradientExport> gradient()
+	{return m_exGrad;}
+
+	///	Export for the gradient of concentration
+	SmartPtr<DataExport<MathVector<dim>, dim> > m_exGrad;
+
+	///	computes the gradient of the concentration
+	template <typename TElem>
+	void ex_grad(MathVector<dim> vValue[],
+			const MathVector<dim> vGlobIP[],
+			number time, int si,
+			const LocalVector& u,
+			GridObject* elem,
+			const MathVector<dim> vCornerCoords[],
+			const MathVector<dim> vLocIP[],
+			const size_t nip,
+			bool bDeriv,
+			std::vector<std::vector<MathVector<dim> > > vvvDeriv[]);
+
 //---- Local discretization interface: ----
 private:
 	
@@ -210,6 +236,7 @@ private:
 	
 	number m_diffusion; ///< the diffusion coefficient
 	
+	number m_alpha; ///< the diffusion coefficient
 }; // end class 
 
 } // end namespace LevelSet
