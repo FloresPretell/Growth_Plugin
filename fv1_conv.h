@@ -155,11 +155,7 @@ public:
 
 	///	returns the export of the gradient of associated unknown function
 	typedef CplUserData<MathVector<dim>, dim> TGradientExport;
-	SmartPtr<TGradientExport> gradient()
-	{return m_exGrad;}
-
-	///	Export for the gradient of concentration
-	SmartPtr<DataExport<MathVector<dim>, dim> > m_exGrad;
+	SmartPtr<TGradientExport> gradient() {return m_exGrad;}
 
 	///	computes the gradient of the concentration
 	template <typename TElem>
@@ -237,6 +233,9 @@ private:
 	number m_diffusion; ///< the diffusion coefficient
 	
 	number m_alpha; ///< the diffusion coefficient
+
+	///	Export for the gradient of concentration
+	SmartPtr<DataExport<MathVector<dim>, dim> > m_exGrad;
 }; // end class 
 
 } // end namespace LevelSet
