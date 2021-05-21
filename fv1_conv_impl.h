@@ -218,7 +218,7 @@ void FV1_Convection<TDomain>::ass_JA_elem
 			for(size_t sh = 0; sh < scvf.num_sh(); ++sh)
 			{
 				MathVector<dim> normal= scvf.normal();
-				normal[dim] /= m_alpha;
+				normal[dim-1] /= m_alpha;
 
 				const number D_diff_flux = m_diffusion * VecDot(scvf.global_grad(sh), normal);
 				J(_U_, scvf.from(), _U_, sh) -= D_diff_flux;
@@ -292,7 +292,7 @@ void FV1_Convection<TDomain>::ass_dA_elem
 
 		// 	compute flux
 			MathVector<dim> normal= scvf.normal();
-			normal[dim] /= m_alpha;
+			normal[dim-1] /= m_alpha;
 
 			const number diff_flux = m_diffusion * VecDot(grad, normal);
 
@@ -497,7 +497,7 @@ ex_grad(MathVector<dim> vValue[],
 					for(size_t sh = 0; sh < scvf.num_sh(); ++sh)
 						VecScaleAppend(grad, m_diffusion*u(_U_, sh), scvf.global_grad(sh));
 
-					grad[dim] /= m_alpha;
+					grad[dim-1] /= m_alpha;
 
 
 				}
