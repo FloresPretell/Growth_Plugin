@@ -31,7 +31,7 @@
  */
 
 /*
- * Tools for averaging of variable values in the elements (mainly for plotting)
+ * Quadrature of grid functions under the level-set
  */
 #ifndef __H__UG__PLUGINS__LEVEL_SET_LS_INTEGRAL_H__
 #define __H__UG__PLUGINS__LEVEL_SET_LS_INTEGRAL_H__
@@ -58,7 +58,7 @@ namespace ug {
 namespace LevelSet {
 
 /**
- * Class for averaging of a grid function in the elements
+ * Class for integration of a grid function in the elements
  *
  * This class computes the integral of a given grid function over the given full-dim. subsets.
  *
@@ -169,6 +169,136 @@ private:
 	
 	std::vector<number> m_ss_integral; ///< integrals over the subsets
 	number m_integral; ///< the entire integral
+};
+
+/**
+ * Class for integration of the 'Heaviside function' times a grid function in the elements
+ *
+ * This class computes the volume of the part of the domain under the level set where
+ * a given grid function is less or eq. and greater or eq. then a given number.
+ *
+ * \tparam TGridFunc	type of the grid function with the values to check
+ */
+template <typename TGridFunction>
+class LSHeavisideIntegral
+{
+public:
+///	type of the grid function
+	typedef TGridFunction gf_type;
+	
+///	world dimension
+	static const int dim = gf_type::dim;
+	
+///	this type
+	typedef LSHeavisideIntegral<gf_type> this_type;
+
+///	domain type
+	typedef typename gf_type::domain_type domain_type;
+	
+/// type of the position accessor
+	typedef typename domain_type::position_accessor_type position_accessor_type;
+	
+///	algebra type
+	typedef typename gf_type::algebra_type algebra_type;
+	
+///	algebra type for the LSF
+	typedef CPUAlgebra lsf_algebra_type;
+	
+///	grid function type for the LSF
+	typedef GridFunction<domain_type, lsf_algebra_type> ls_gf_type;
+	
+public:
+
+///	Constructor
+	LSHeavisideIntegral
+	(
+		SmartPtr<ls_gf_type> sp_lsf ///< the leve-set function (if any)
+	)
+	:	m_spLSF (sp_lsf)
+	{}
+
+///	Destructor
+	virtual ~LSHeavisideIntegral () {}
+	
+///	sets the subsets to restrict the computation on
+	void on_subsets
+	(
+		const char * ss_names ///< names of the subsets
+	)
+	{
+		m_ssGrp.set_subset_handler (m_sp_gf->domain()->subset_handler ());
+		m_ssGrp.add (TokenizeString (ss_names));
+	}
+
+///	computes the integrals
+	void compute_for
+	(
+		SmartPtr<gf_type> sp_gf, ///< the grid function
+		const char * fct_name, ///< 'function' to take the data from
+		number limval ///< the value for the Heaviside function
+	);
+	
+///	returns the volume for gf <= limval over the given subsets
+	number le_vol_over_subsets
+	(
+		const char * ss_names ///< name of the subset
+	) const;
+	
+///	returns the volume for gf >= limval over the given subsets
+	number ge_vol_over_subsets
+	(
+		const char * ss_names ///< name of the subset
+	) const;
+	
+///	return the integral over the entire negative subdomain where gf <= limval
+	number le_vol () const
+	{
+		return m_levol;
+	}
+	
+///	return the integral over the entire negative subdomain where gf <= limval
+	number ge_vol () const
+	{
+		return m_gevol;
+	}
+	
+private:
+
+///	adds contributions of all elements of a given type
+	template <typename TElem>
+	void add_integrals_of_all ();
+	
+///	helper class for the computation of the volumes
+	struct AddIntegrals
+	{
+		this_type * m_pThis;
+		
+	///	constructor
+		AddIntegrals
+		(
+			this_type * pThis ///< pointer to the master class
+		)
+		: m_pThis (pThis) {}
+		
+	///	computation of the volume for all elements of the given type
+		template <typename TElem> void operator() (TElem)
+		{
+			m_pThis->template add_integrals_of_all<TElem> ();
+		}
+	};
+	
+private:
+
+	SmartPtr<gf_type> m_sp_gf; ///< the grid function
+	size_t m_fct; ///< the function inside of the grid function
+	number m_limval; ///< the switch value for the Heaviside function
+	
+	SmartPtr<ls_gf_type> m_spLSF; ///< the specified LSF
+	SubsetGroup m_ssGrp; ///< the subset group (if subsets specified)
+	
+	std::vector<number> m_ss_gevol; ///< integrals over the subsets for gf >= limval
+	std::vector<number> m_ss_levol; ///< integrals over the subsets for gf <= limval
+	number m_gevol, m_levol; ///< the entire integral for gf >= limval and gf <= limval
 };
 
 } // namespace LevelSet
