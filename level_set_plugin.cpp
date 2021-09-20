@@ -49,6 +49,7 @@
 #include "fv1_conv.h"
 #include "normvel_util.h"
 #include "ls_integral.h"
+#include "ls_filinker.h"
 
 using namespace std;
 using namespace ug::bridge;
@@ -254,56 +255,80 @@ static void DomainAlgebra(Registry& reg, string grp)
 
 	// level set user vector data
 	{
-			string name = string("LevelSetUserVectorData").append(suffix);
-			typedef LevelSetUserVectorData<function_type> T;
-			typedef CplUserData<MathVector<dim>, dim> TBase;
-			typedef INewtonUpdate TBase2;
-			reg.add_class_<T, TBase,TBase2>(name, grp)
-				.template add_constructor<void (*)(SmartPtr<ApproximationSpace<TDomain> >,SmartPtr<function_type>)>("Approximation space, grid function")
-				.add_method("set_inside", static_cast<void (T::*)(SmartPtr<CplUserData<MathVector<dim>, dim> >)>(&T::set_inside_data), "", "Source")
-				.add_method("set_inside", static_cast<void (T::*)(number)>(&T::set_inside_data), "", "F_x")
-				.add_method("set_inside", static_cast<void (T::*)(number,number)>(&T::set_inside_data), "", "F_x, F_y")
-				.add_method("set_inside", static_cast<void (T::*)(number,number,number)>(&T::set_inside_data), "", "F_x, F_y, F_z")
-			#ifdef UG_FOR_LUA
-				.add_method("set_inside", static_cast<void (T::*)(const char*)>(&T::set_inside_data), "", "Source Vector")
-			#endif
-				.add_method("set_outside", static_cast<void (T::*)(SmartPtr<CplUserData<MathVector<dim>, dim> >)>(&T::set_outside_data), "", "Source")
-				.add_method("set_outside", static_cast<void (T::*)(number)>(&T::set_outside_data), "", "F_x")
-				.add_method("set_outside", static_cast<void (T::*)(number,number)>(&T::set_outside_data), "", "F_x, F_y")
-				.add_method("set_outside", static_cast<void (T::*)(number,number,number)>(&T::set_outside_data), "", "F_x, F_y, F_z")
-			#ifdef UG_FOR_LUA
-				.add_method("set_outside", static_cast<void (T::*)(const char*)>(&T::set_outside_data), "", "Source Vector")
-			#endif
-				.add_method("set_eval_type", static_cast<void (T::*)(int)>(&T::set_eval_type), "", "Evaluation type")
+		string name = string("LevelSetUserVectorData").append(suffix);
+		typedef LevelSetUserVectorData<function_type> T;
+		typedef CplUserData<MathVector<dim>, dim> TBase;
+		typedef INewtonUpdate TBase2;
+		reg.add_class_<T, TBase,TBase2>(name, grp)
+			.template add_constructor<void (*)(SmartPtr<ApproximationSpace<TDomain> >,SmartPtr<function_type>)>("Approximation space, grid function")
+			.add_method("set_inside", static_cast<void (T::*)(SmartPtr<CplUserData<MathVector<dim>, dim> >)>(&T::set_inside_data), "", "Source")
+			.add_method("set_inside", static_cast<void (T::*)(number)>(&T::set_inside_data), "", "F_x")
+			.add_method("set_inside", static_cast<void (T::*)(number,number)>(&T::set_inside_data), "", "F_x, F_y")
+			.add_method("set_inside", static_cast<void (T::*)(number,number,number)>(&T::set_inside_data), "", "F_x, F_y, F_z")
+		#ifdef UG_FOR_LUA
+			.add_method("set_inside", static_cast<void (T::*)(const char*)>(&T::set_inside_data), "", "Source Vector")
+		#endif
+			.add_method("set_outside", static_cast<void (T::*)(SmartPtr<CplUserData<MathVector<dim>, dim> >)>(&T::set_outside_data), "", "Source")
+			.add_method("set_outside", static_cast<void (T::*)(number)>(&T::set_outside_data), "", "F_x")
+			.add_method("set_outside", static_cast<void (T::*)(number,number)>(&T::set_outside_data), "", "F_x, F_y")
+			.add_method("set_outside", static_cast<void (T::*)(number,number,number)>(&T::set_outside_data), "", "F_x, F_y, F_z")
+		#ifdef UG_FOR_LUA
+			.add_method("set_outside", static_cast<void (T::*)(const char*)>(&T::set_outside_data), "", "Source Vector")
+		#endif
+			.add_method("set_eval_type", static_cast<void (T::*)(int)>(&T::set_eval_type), "", "Evaluation type")
+		.set_construct_as_smart_pointer(true);
+		reg.add_class_to_group(name, "LevelSetUserVectorData", tag);
+	}
+	
+	// level set filter linker for numbers
+	{
+		string name = string("LSNumberFilterLinker").append(suffix);
+		typedef LSFilterLinker<TDomain, TAlgebra, number> T;
+		typedef DependentUserData<number, dim> TBase;
+		typedef IInterfaceExtrapolation<TDomain, TAlgebra> TExtrapol;
+		reg.add_class_<T, TBase>(name, grp)
+			.template add_constructor<void (*)(SmartPtr<CplUserData<number, dim> >, SmartPtr<TExtrapol>)>("Data#DomainDisc")
 			.set_construct_as_smart_pointer(true);
-			reg.add_class_to_group(name, "LevelSetUserVectorData", tag);
-		}
+		reg.add_class_to_group(name, "LSNumberFilterLinker", tag);
+	}
+
+	// level set filter linker for vectors
+	{
+		string name = string("LSVectorFilterLinker").append(suffix);
+		typedef LSFilterLinker<TDomain, TAlgebra, MathVector<dim> > T;
+		typedef DependentUserData<MathVector<dim>, dim> TBase;
+		typedef IInterfaceExtrapolation<TDomain, TAlgebra> TExtrapol;
+		reg.add_class_<T, TBase>(name, grp)
+			.template add_constructor<void (*)(SmartPtr<CplUserData<MathVector<dim>, dim> >, SmartPtr<TExtrapol>)>("Data#DomainDisc")
+			.set_construct_as_smart_pointer(true);
+		reg.add_class_to_group(name, "LSVectorFilterLinker", tag);
+	}
 
 	// two phase flow source data
-		{
-			string name = string("CRTwoPhaseSource").append(suffix);
-			typedef CRTwoPhaseSource<function_type> T;
-			typedef CplUserData<MathVector<dim>, dim> TBase;
-			typedef INewtonUpdate TBase2;
-			reg.add_class_<T, TBase,TBase2>(name, grp)
-				.template add_constructor<void (*)(SmartPtr<ApproximationSpace<TDomain> >,SmartPtr<function_type>)>("Approximation space, grid function")
-				.add_method("set_density", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim> >)>(&T::set_density), "", "Set density")
-				.add_method("set_density", static_cast<void (T::*)(number)>(&T::set_density), "", "Set density")
-			#ifdef UG_FOR_LUA
-				.add_method("set_density", static_cast<void (T::*)(const char*)>(&T::set_density), "", "Set density")
-			#endif
-				.add_method("set_source", static_cast<void (T::*)(SmartPtr<CplUserData<MathVector<dim>, dim> >)>(&T::set_source), "", "Source")
-				.add_method("set_source", static_cast<void (T::*)(number)>(&T::set_source), "", "F_x")
-				.add_method("set_source", static_cast<void (T::*)(number,number)>(&T::set_source), "", "F_x, F_y")
-				.add_method("set_source", static_cast<void (T::*)(number,number,number)>(&T::set_source), "", "F_x, F_y, F_z")
-			#ifdef UG_FOR_LUA
-				.add_method("set_source", static_cast<void (T::*)(const char*)>(&T::set_source), "", "Source Vector")
-			#endif
-				.add_method("set_sigma", static_cast<void (T::*)(number)>(&T::set_sigma), "", "Set sigma")
-				.add_method("set_gravitation", static_cast<void (T::*)(number)>(&T::set_gravitation), "", "Set gravitation constant")
-				.set_construct_as_smart_pointer(true);
-			reg.add_class_to_group(name, "CRTwoPhaseSource", tag);
-		}
+	{
+		string name = string("CRTwoPhaseSource").append(suffix);
+		typedef CRTwoPhaseSource<function_type> T;
+		typedef CplUserData<MathVector<dim>, dim> TBase;
+		typedef INewtonUpdate TBase2;
+		reg.add_class_<T, TBase,TBase2>(name, grp)
+			.template add_constructor<void (*)(SmartPtr<ApproximationSpace<TDomain> >,SmartPtr<function_type>)>("Approximation space, grid function")
+			.add_method("set_density", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim> >)>(&T::set_density), "", "Set density")
+			.add_method("set_density", static_cast<void (T::*)(number)>(&T::set_density), "", "Set density")
+		#ifdef UG_FOR_LUA
+			.add_method("set_density", static_cast<void (T::*)(const char*)>(&T::set_density), "", "Set density")
+		#endif
+			.add_method("set_source", static_cast<void (T::*)(SmartPtr<CplUserData<MathVector<dim>, dim> >)>(&T::set_source), "", "Source")
+			.add_method("set_source", static_cast<void (T::*)(number)>(&T::set_source), "", "F_x")
+			.add_method("set_source", static_cast<void (T::*)(number,number)>(&T::set_source), "", "F_x, F_y")
+			.add_method("set_source", static_cast<void (T::*)(number,number,number)>(&T::set_source), "", "F_x, F_y, F_z")
+		#ifdef UG_FOR_LUA
+			.add_method("set_source", static_cast<void (T::*)(const char*)>(&T::set_source), "", "Source Vector")
+		#endif
+			.add_method("set_sigma", static_cast<void (T::*)(number)>(&T::set_sigma), "", "Set sigma")
+			.add_method("set_gravitation", static_cast<void (T::*)(number)>(&T::set_gravitation), "", "Set gravitation constant")
+			.set_construct_as_smart_pointer(true);
+		reg.add_class_to_group(name, "CRTwoPhaseSource", tag);
+	}
 
 // 	HiResFluxBasedLSM
 	{
