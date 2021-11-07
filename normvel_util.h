@@ -296,7 +296,6 @@ public:
 			rTrialSpace.grads(vLocGrad, vLocIP[ip]);
 
 		//	b) get multiindices of element
-			std::vector<DoFIndex > ind;
 			m_spVelPot->dof_indices(elem, 0, ind);
 
 		//	compute grad at ip
