@@ -35,6 +35,7 @@
  */
 
 #include "lib_disc/reference_element/reference_element_traits.h"
+#include "lib_disc/spatial_disc/disc_util/fv1_geom.h"
 #ifdef UG_PARALLEL
 #include "pcl/pcl_process_communicator.h"
 #endif
@@ -319,6 +320,134 @@ void LSHeavisideIntegral<TGridFunc>::add_integrals_of_all ()
 		}
 		m_ss_levol[si] += ss_levol; m_ss_gevol[si] += ss_gevol;
 		m_levol += ss_levol; m_gevol += ss_gevol;
+	}
+}
+
+/*---- Class 'FVLSIntegral': ----*/
+
+/**
+ * Sums up the (partial) integrals of all the elements of all the types.
+ */
+template <typename TGridFunc>
+void FVLSIntegral<TGridFunc>::compute_for
+(
+	SmartPtr<gf_type> sp_gf, ///< the grid function
+	const char * fct_name ///< 'function' to take the data from
+)
+{
+//	The full-dim. grid element types for this dimension:
+	typedef typename domain_traits<dim>::DimElemList ElemList;
+	
+	m_sp_gf = sp_gf;
+	if ((m_fct = sp_gf->fct_id_by_name (fct_name)) >= sp_gf->num_fct ())
+		UG_THROW ("FVLSIntegral: Function space does not contain any function with name '" << fct_name << "'.");
+
+	if (sp_gf->local_finite_element_id (m_fct) != LFEID(LFEID::LAGRANGE, dim, 1))
+		UG_THROW ("FVLSIntegral: Only vertex-centered grid functions are supported.");
+	
+	int n_ss = m_spLSF->num_subsets ();
+	
+//	sum up all the integrals
+	m_integral = 0;
+	m_ss_integral.resize (n_ss);
+	for (int si = 0; si < n_ss; si++) m_ss_integral[si] = 0;
+	boost::mpl::for_each<ElemList> (AddIntegrals (this));
+	
+#ifdef UG_PARALLEL
+//	sum up the volumes from different processes
+	pcl::ProcessCommunicator procComm;
+	m_integral = procComm.allreduce (m_integral, PCL_RO_SUM);
+	
+	for (int si = 0; si < n_ss; si++)
+		m_ss_integral[si] = procComm.allreduce (m_ss_integral[si], PCL_RO_SUM);
+#endif
+}
+
+/**
+ * Extracts the integral over the given subsets
+ */
+template <typename TGridFunc>
+number FVLSIntegral<TGridFunc>::integral_over_subsets
+(
+	const char * ss_names ///< name of the subset
+) const
+{
+	SubsetGroup ss_grp (m_spLSF->domain()->subset_handler ());
+	ss_grp.add (TokenizeString (ss_names));
+	
+	number ss_integral = 0;
+	for (size_t i = 0; i < ss_grp.size (); i++)
+		ss_integral += m_ss_integral[ss_grp[i]];
+	return ss_integral;
+}
+
+/**
+ * Sums up the (partial) integrals of all the elements of one type.
+ */
+template <typename TGridFunc>
+template <typename TElem>
+void FVLSIntegral<TGridFunc>::add_integrals_of_all ()
+{
+	typedef typename gf_type::template traits<TElem>::const_iterator ElemIter;
+	typedef typename reference_element_traits<TElem>::reference_element_type ref_elem_t;
+	typedef FV1Geometry<TElem, dim> TFVGeom;
+
+	static const size_t num_corners = ref_elem_t::numCorners;
+	
+	const ls_gf_type & lsf = * m_spLSF;
+	const gf_type & integrand = * m_sp_gf;
+	const position_accessor_type & aaPos = lsf.domain()->position_accessor ();
+	std::vector<DoFIndex> ind (1);
+	MathVector<dim> corners [num_corners];
+	number lsf_values [num_corners];
+	
+	for (int si = 0; si < lsf.num_subsets (); si++)
+	{
+		if (m_ssGrp.subset_handler().valid () && ! m_ssGrp.contains (si))
+			continue; // skip this subset: it is not mentioned in the specified list
+		
+		number ss_integral = 0;
+		ElemIter iterEnd = lsf.template end<TElem> (si);
+		for (ElemIter iter = lsf.template begin<TElem> (si); iter != iterEnd; ++iter)
+		{
+			TElem * elem = *iter;
+			
+		//	get the corner coordinates ans the values of the LSF
+			bool elem_to_compute = false;
+			for (size_t i = 0; i < num_corners; i++)
+			{
+				Vertex * vrt = elem->vertex (i);
+				corners [i] = aaPos [vrt];
+				if (lsf.inner_dof_indices (vrt, 0, ind) != 1)
+					UG_THROW ("FVLSIntegral: Not a scalar grid function for the LSF!");
+				lsf_values [i] = DoFRef (lsf, ind [0]);
+				if (lsf_values [i] <= 0) elem_to_compute = true;
+			}
+			if (! elem_to_compute)
+				continue;
+			
+		//	compute the FV geometry
+			static TFVGeom& geo = GeomProvider<TFVGeom>::get ();
+			try
+			{
+				geo.update (elem, corners);
+			}
+			UG_CATCH_THROW ("FVLSIntegral: Cannot update Finite Volume Geometry.");
+		
+		//	get the average of the integrand
+			for (size_t i = 0; i < num_corners; i++)
+			if (lsf_values [i] <= 0)
+			{
+				Vertex * vrt = elem->vertex (i);
+				if (integrand.inner_dof_indices (vrt, m_fct, ind) != 1)
+					UG_THROW ("FVLSIntegral: Not a scalar grid function for the integrand!");
+				const number dof_val = DoFRef (integrand, ind[0]);
+				const number scv_vol = geo.scv(i).volume ();
+				ss_integral += scv_vol * dof_val;
+			}
+		}
+		m_ss_integral[si] += ss_integral;
+		m_integral += ss_integral;
 	}
 }
 
