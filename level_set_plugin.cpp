@@ -291,6 +291,16 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.set_construct_as_smart_pointer(true);
 		reg.add_class_to_group(name, "LSNumberFilterLinker", tag);
 	}
+	{
+		string name = string("LSNumberFilterLinker2").append(suffix);
+		typedef LSFilterLinker2<TDomain, TAlgebra, number> T;
+		typedef DependentUserData<number, dim> TBase;
+		typedef IInterfaceExtrapolation<TDomain, TAlgebra> TExtrapol;
+		reg.add_class_<T, TBase>(name, grp)
+			.template add_constructor<void (*)(SmartPtr<CplUserData<number, dim> >, SmartPtr<CplUserData<number, dim> >, SmartPtr<TExtrapol>)>("Data1#Data2#DomainDisc")
+			.set_construct_as_smart_pointer(true);
+		reg.add_class_to_group(name, "LSNumberFilterLinker2", tag);
+	}
 
 	// level set filter linker for vectors
 	{

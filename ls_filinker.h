@@ -120,7 +120,6 @@ public:
 			if (((extrapol_type *) m_spExtrapolation.get())->check_elem_lsf
 				(rRefElem.num(0), elem, si, false, vCornerCoords, time) == 0)
 			{ // element is cut
-				//	compute the dispersion by the usual formula
 				(* m_spData) (vValue, vGlobIP, time, si, elem, vCornerCoords, vLocIP, nip, u, vJT);
 				return;
 			}
@@ -158,7 +157,6 @@ public:
 			if (((extrapol_type *) m_spExtrapolation.get())->check_elem_lsf
 				(rRefElem.num(0), elem, si, false, vCornerCoords, time) == 0)
 			{ // element is cut
-				//	compute the dispersion and its derivatives by the usual formulas
 				const data_type* vV = m_spData->values (s);
 				for (size_t i = 0; i < nip; i++)
 				{
@@ -189,9 +187,176 @@ private:
 	//	extrapolation by the level-set function
 	SmartPtr<extrapol_type> m_spExtrapolation;
 
-	//	the original dispersion
+	//	the data for the cut elements
 	SmartPtr<CplUserData<data_type, dim> > m_spData;
 	SmartPtr<DependentUserData<data_type, dim> > m_spDData;
+};
+
+/**
+ * Class for the linker that switches between data on the cut and uncut elements.
+ *
+ * This linker evaluates the associated object only on the elements cut by the level set
+ * and the other object for the other elements.
+ */
+template <typename TDomain, typename TAlgebra, typename TData>
+class LSFilterLinker2
+:	public StdDataLinker< LSFilterLinker2<TDomain, TAlgebra, TData>, TData, TDomain::dim>
+{
+	typedef StdDataLinker< LSFilterLinker<TDomain, TAlgebra, TData>, TData, TDomain::dim> base_type;
+	
+public:
+
+	//	world dimension of grid function
+	static const int dim = TDomain::dim;
+
+	//	domain type
+	typedef TDomain domain_type;
+	
+	//	algebra type
+	typedef TAlgebra algebra_type;
+	
+	//	extrapolation type
+	typedef IInterfaceExtrapolation<domain_type, algebra_type> extrapol_type;
+	
+	//	type of the data
+	typedef TData data_type;
+	
+	//	constructor
+	LSFilterLinker2
+	(
+		SmartPtr<CplUserData<data_type, dim> > spData_ce, ///< the original data to extract from for cut elements
+		SmartPtr<CplUserData<data_type, dim> > spData_we, ///< the original data to extract from for whole elements
+		SmartPtr<extrapol_type> spExtrapol ///< extrapolation by the LSF
+	)
+	:	m_spExtrapolation (spExtrapol)
+	{
+		if (spData_ce.invalid () || spData_we.invalid ())
+			UG_THROW ("LSFilterLinker2: No valid data specified.");
+		this->set_num_input(2);
+		
+		m_spData_ce = spData_ce;
+		m_spDData_ce = spData_ce.template cast_dynamic<DependentUserData<data_type, dim> > ();
+		this->set_input (0, spData_ce, spData_ce);
+		
+		m_spData_we = spData_we;
+		m_spDData_we = spData_we.template cast_dynamic<DependentUserData<data_type, dim> > ();
+		this->set_input (1, spData_we, spData_we);
+	}
+
+	inline void evaluate (data_type& value,
+						  const MathVector<dim>& globIP,
+						  number time, int si) const
+	{
+		UG_THROW ("LSFilterLinker2 needs the grid element.");
+	}
+
+	template <int refDim>
+	inline void evaluate
+	(
+		data_type vValue[],
+		const MathVector<dim> vGlobIP[],
+		number time,
+		int si,
+		GridObject* elem,
+		const MathVector<dim> vCornerCoords[],
+		const MathVector<refDim> vLocIP[],
+		const size_t nip,
+		LocalVector* u,
+		const MathMatrix<refDim, dim>* vJT = NULL
+	) const
+	{
+		//	check if the element is inside/cut/outside
+		if (m_spExtrapolation.valid ())
+		{
+			const ReferenceObjectID roid = elem->reference_object_id ();
+			const DimReferenceElement<dim>& rRefElem = ReferenceElementProvider::get<dim> (roid);
+			
+			if (((extrapol_type *) m_spExtrapolation.get())->check_elem_lsf
+				(rRefElem.num(0), elem, si, false, vCornerCoords, time) == 0)
+			{ // element is cut
+				(* m_spData_ce) (vValue, vGlobIP, time, si, elem, vCornerCoords, vLocIP, nip, u, vJT);
+				return;
+			}
+		}
+		
+		// element is not cut, set the value to 0
+		(* m_spData_we) (vValue, vGlobIP, time, si, elem, vCornerCoords, vLocIP, nip, u, vJT);
+	}
+	
+	template <int refDim>
+	void eval_and_deriv
+	(
+		data_type vValue[],
+		const MathVector<dim> vGlobIP[],
+		number time,
+		int si,
+		GridObject* elem,
+		const MathVector<dim> vCornerCoords[],
+		const MathVector<refDim> vLocIP[],
+		const size_t nip,
+		LocalVector* u,
+		bool bDeriv,
+		int s,
+		std::vector<std::vector<data_type> > vvvDeriv[],
+		const MathMatrix<refDim, dim>* vJT = NULL
+	) const
+	{
+		//	check if the element is inside/cut/outside
+		if (m_spExtrapolation.valid ())
+		{
+			const ReferenceObjectID roid = elem->reference_object_id ();
+			const DimReferenceElement<dim>& rRefElem = ReferenceElementProvider::get<dim> (roid);
+			
+			if (((extrapol_type *) m_spExtrapolation.get())->check_elem_lsf
+				(rRefElem.num(0), elem, si, false, vCornerCoords, time) == 0)
+			{ // element is cut
+				const data_type* vV = m_spData_ce->values (s);
+				for (size_t i = 0; i < nip; i++)
+				{
+					vValue[i] = vV[i];
+			
+					if (! bDeriv) continue;
+					for (size_t fct = 0; fct < m_spDData_ce->num_fct(); fct++)
+					{
+						const data_type* vDData = m_spDData_ce->deriv (s, i, fct);
+						const size_t c_fct = this->input_common_fct (0, fct);
+						for (size_t sh = 0; sh < this->num_sh (c_fct); sh++)
+							vvvDeriv[i][c_fct][sh] = vDData [sh];
+					}
+				}
+				return;
+			}
+		}
+		
+		//	element not cut, use the second data set
+		const data_type* vV = m_spData_we->values (s);
+		for (size_t i = 0; i < nip; i++)
+		{
+			vValue[i] = vV[i];
+	
+			if (! bDeriv) continue;
+			for (size_t fct = 0; fct < m_spDData_we->num_fct(); fct++)
+			{
+				const data_type* vDData = m_spDData_we->deriv (s, i, fct);
+				const size_t c_fct = this->input_common_fct (0, fct);
+				for (size_t sh = 0; sh < this->num_sh (c_fct); sh++)
+					vvvDeriv[i][c_fct][sh] = vDData [sh];
+			}
+		}
+	}
+	
+private:
+
+	//	extrapolation by the level-set function
+	SmartPtr<extrapol_type> m_spExtrapolation;
+
+	//	the data for the cut elements
+	SmartPtr<CplUserData<data_type, dim> > m_spData_ce;
+	SmartPtr<DependentUserData<data_type, dim> > m_spDData_ce;
+
+	//	the data for the whole elements
+	SmartPtr<CplUserData<data_type, dim> > m_spData_we;
+	SmartPtr<DependentUserData<data_type, dim> > m_spDData_we;
 };
 
 } // namespace LevelSet
