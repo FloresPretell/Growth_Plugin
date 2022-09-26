@@ -67,7 +67,7 @@ void LSVolume<TGridFunc>::compute ()
 //	The full-dim. grid element types for this dimension:
 	typedef typename domain_traits<dim>::DimElemList ElemList;
 	
-	int n_ss = m_spLSF->num_subsets ();
+	const int n_ss = m_spLSF->num_subsets ();
 
 //	sum up all the volumes
 	m_volume_plus = m_volume_minus = 0;
@@ -76,16 +76,33 @@ void LSVolume<TGridFunc>::compute ()
 	boost::mpl::for_each<ElemList> (AddVolumes (this));
 	
 #ifdef UG_PARALLEL
-//	sum up the volumes from different processes
-	pcl::ProcessCommunicator procComm;
-	m_volume_minus = procComm.allreduce (m_volume_minus, PCL_RO_SUM);
-	m_volume_plus = procComm.allreduce (m_volume_plus, PCL_RO_SUM);
+	allreduce_volumes ();
+#endif
+}
+
+/**
+ * Sums up the (partial) weights (weighted volumes) of all the elements of all the types.
+ */
+template <typename TGridFunc>
+void LSVolume<TGridFunc>::compute
+(
+	SmartPtr<UserData<number, dim> > spDensity, ///< the weight (density) function
+	number time ///< the time argument for the density
+)
+{
+//	The full-dim. grid element types for this dimension:
+	typedef typename domain_traits<dim>::DimElemList ElemList;
 	
-	for (int si = 0; si < n_ss; si++)
-	{
-		m_ss_vol_minus[si] = procComm.allreduce (m_ss_vol_minus[si], PCL_RO_SUM);
-		m_ss_vol_plus[si] = procComm.allreduce (m_ss_vol_plus[si], PCL_RO_SUM);
-	}
+	const int n_ss = m_spLSF->num_subsets ();
+
+//	sum up all the volumes
+	m_volume_plus = m_volume_minus = 0;
+	m_ss_vol_plus.resize (n_ss); m_ss_vol_minus.resize (n_ss);
+	for (int si = 0; si < n_ss; si++) m_ss_vol_plus[si] = m_ss_vol_minus[si] = 0;
+	boost::mpl::for_each<ElemList> (AddWeightedVolumes (this, spDensity.get (), time));
+	
+#ifdef UG_PARALLEL
+	allreduce_volumes ();
 #endif
 }
 
@@ -174,6 +191,103 @@ void LSVolume<TGridFunc>::add_volumes_of_all ()
 		m_ss_vol_plus[si] += ss_vol_plus; m_ss_vol_minus[si] += ss_vol_minus;
 	}
 }
+
+/**
+ * Sums up the (partial) volumes of all the elements of one type with weights.
+ */
+template <typename TGridFunc>
+template <typename TElem>
+void LSVolume<TGridFunc>::add_volumes_of_all
+(
+	UserData<number, dim> * pDensity, ///< the weight (density) function
+	number time ///< the time argument for the density
+)
+{
+	typedef typename grid_func_type::template traits<TElem>::const_iterator ElemIter;
+	typedef typename reference_element_traits<TElem>::reference_element_type ref_elem_t;
+
+	static const size_t num_corners = ref_elem_t::numCorners;
+	
+	const grid_func_type & lsf = * m_spLSF;
+	const position_accessor_type & aaPos = lsf.domain()->position_accessor ();
+	std::vector<DoFIndex> ind (1);
+	MathVector<dim> corners [num_corners], midpoint;
+	number lsf_values [num_corners];
+	
+	for (int si = 0; si < lsf.num_subsets (); si++)
+	{
+		if (m_ssGrp.subset_handler().valid () && ! m_ssGrp.contains (si))
+			continue; // skip this subset: it is not mentioned in the specified list
+		
+		number ss_vol_plus = 0, ss_vol_minus = 0;
+		ElemIter iterEnd = lsf.template end<TElem> (si);
+		for (ElemIter iter = lsf.template begin<TElem> (si); iter != iterEnd; ++iter)
+		{
+			TElem * elem = *iter;
+			
+		//	get the corner coordinates ans the values of the LSF
+			midpoint = 0;
+			for (size_t i = 0; i < num_corners; i++)
+			{
+				Vertex * vrt = elem->vertex (i);
+				midpoint += (corners [i] = aaPos [vrt]);
+				if (lsf.inner_dof_indices (vrt, 0, ind) != 1)
+					UG_THROW ("LSVolume: Not a scalar grid function for the LSF!");
+				lsf_values [i] = DoFRef (lsf, ind [0]);
+			}
+			midpoint /= num_corners;
+			
+		//	compute the volumes
+			number vol_plus, vol_minus;
+			LSElementSize<ref_elem_t, dim>::compute (corners, lsf_values, vol_plus, vol_minus);
+		
+		//	compute the weight
+			number density;
+			(* pDensity) (density, midpoint, time, si);
+			vol_plus *= density; vol_minus *= density;
+			
+		//	add them to the total volumes
+			m_volume_plus += vol_plus; m_volume_minus += vol_minus;
+			
+		//	add them to the subset
+			ss_vol_plus += vol_plus; ss_vol_minus += vol_minus;
+			
+		//	check the positivity (if requested)
+			if (m_check_positivity && (vol_plus < 0 || vol_minus < 0))
+			{
+				UG_LOG ("Warning in LSVolume: V+ = " << vol_plus << " < 0 or V- = "
+						<< vol_minus << " < 0\n");
+				for (size_t i = 0; i < num_corners; i++)
+				{
+					UG_LOG (" - corner[" << i << "] = " << corners[i]
+						<< ", grid_data_index = " << elem->vertex(i)->grid_data_index ()
+						<< ", lsf = " << lsf_values[i] << '\n');
+				}
+			}
+		}
+		m_ss_vol_plus[si] += ss_vol_plus; m_ss_vol_minus[si] += ss_vol_minus;
+	}
+}
+
+#ifdef UG_PARALLEL
+/**
+ * Sum up the volumes from different processes
+ */
+template <typename TGridFunc>
+void LSVolume<TGridFunc>::allreduce_volumes ()
+{
+	pcl::ProcessCommunicator procComm;
+	m_volume_minus = procComm.allreduce (m_volume_minus, PCL_RO_SUM);
+	m_volume_plus = procComm.allreduce (m_volume_plus, PCL_RO_SUM);
+	
+	const int n_ss = m_spLSF->num_subsets ();
+	for (int si = 0; si < n_ss; si++)
+	{
+		m_ss_vol_minus[si] = procComm.allreduce (m_ss_vol_minus[si], PCL_RO_SUM);
+		m_ss_vol_plus[si] = procComm.allreduce (m_ss_vol_plus[si], PCL_RO_SUM);
+	}
+}
+#endif
 
 /**
  * Extracts the volumes enclosed in given subsets

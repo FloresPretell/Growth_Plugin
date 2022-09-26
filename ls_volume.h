@@ -98,6 +98,26 @@ public:
 ///	computes the volumes
 	void compute ();
 	
+///	computes the weights (weighted volumes)
+	void compute
+	(
+		SmartPtr<UserData<number, dim> > spDensity, ///< the weight (density) function
+		number time ///< the time argument for the density
+	);
+	
+///	computes the weights (weighted volumes) without the time argument
+	void compute
+	(
+		SmartPtr<UserData<number, dim> > spDensity ///< the weight (density) function
+	)
+	{compute (spDensity, 0);}
+	
+#ifdef UG_FOR_LUA
+///	compute the weights (weighted volumes) when density is specified by a LUA function
+	void compute (LuaFunctionHandle density_fct) {compute (make_sp(new LuaUserData<number, dim> (density_fct)));}
+	void compute (const char * density_fct_name) {compute (LuaUserDataFactory<number, dim>::create(density_fct_name));}
+#endif
+	
 ///	extracts the volumes enclosed in given subsets
 	void volume_in_subsets
 	(
@@ -162,6 +182,42 @@ private:
 		}
 	};
 	
+///	adds weighted contributions of all elements of a given type
+	template <typename TElem>
+	void add_volumes_of_all
+	(
+		UserData<number, dim> * pDensity, ///< the weight (density) function
+		number time ///< the time argument for the density
+	);
+	
+///	helper class for the computation of the weighted volumes
+	struct AddWeightedVolumes
+	{
+		this_type * m_pThis;
+		UserData<number, dim> * m_pDensity;
+		number m_time;
+		
+	///	constructor
+		AddWeightedVolumes
+		(
+			this_type * pThis, ///< pointer to the master class
+			UserData<number, dim> * pDensity, ///< pointer to the density function
+			number time ///< the time argument for the density
+		)
+		: m_pThis (pThis), m_pDensity (pDensity), m_time (time) {}
+		
+	///	computation of the volume for all elements of the given type
+		template <typename TElem> void operator() (TElem)
+		{
+			m_pThis->template add_volumes_of_all<TElem> (m_pDensity, m_time);
+		}
+	};
+	
+#ifdef UG_PARALLEL
+//	Sum up the volumes from different processes
+	void allreduce_volumes ();
+#endif
+
 private:
 
 	SmartPtr<TGridFunc> m_spLSF; ///< the specified LSF
