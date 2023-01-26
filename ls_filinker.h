@@ -48,7 +48,7 @@ namespace LevelSet {
  * Class for the linker that extracts data on the cut elements.
  *
  * This linker evaluates the associated object only on the elements cut by the level set.
- * for the other elements, it returns 0.
+ * For the other elements, it returns 0.
  */
 template <typename TDomain, typename TAlgebra, typename TData>
 class LSFilterLinker
