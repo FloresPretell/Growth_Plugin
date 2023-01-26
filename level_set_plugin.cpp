@@ -53,6 +53,7 @@
 #include "levset_simple_extrapol.h"
 #include "levset_lin_extrapol.h"
 #include "grid_func_ls_user_data.h"
+#include "ls_darcy_velocity_linker.h"
 
 using namespace std;
 using namespace ug::bridge;
@@ -600,6 +601,27 @@ static void DomainAlgebra(Registry& reg, string grp)
 			.template add_constructor<void (*)(SmartPtr<function_type>, const char*, SmartPtr<TExtrapol>)>("GridFunction#Component#Extrapolation")
 			.set_construct_as_smart_pointer(true);
 		reg.add_class_to_group(name, "GridFuncLSGradientData", tag);
+	}
+	
+//	Special linker for the Darcy velocity
+	{
+		string name = string("LSDarcyVelocityLinker").append(suffix);
+		typedef LSDarcyVelocityLinker<TDomain, TAlgebra> T;
+		typedef DependentUserData<MathVector<dim>, dim> TBase;
+		typedef IInterfaceExtrapolation<TDomain, TAlgebra> TExtrapol;
+		reg.add_class_<T, TBase>(name, grp)
+			.add_method("set_gravity", &T::set_gravity)
+			.add_method("set_permeability", static_cast<void (T::*)(number)>(&T::set_permeability))
+			.add_method("set_permeability", static_cast<void (T::*)(SmartPtr<CplUserData<MathMatrix<dim,dim>,dim> >)>(&T::set_permeability))
+			.add_method("set_pressure_gradient", &T::set_pressure_gradient)
+			.add_method("set_viscosity", static_cast<void (T::*)(number)>(&T::set_viscosity))
+			.add_method("set_viscosity", static_cast<void (T::*)(SmartPtr<CplUserData<number,dim> >)>(&T::set_viscosity))
+			.add_method("set_density", static_cast<void (T::*)(number)>(&T::set_density))
+			.add_method("set_density", static_cast<void (T::*)(SmartPtr<CplUserData<number,dim> >)>(&T::set_density))
+			.template add_constructor<void (*)(SmartPtr<TExtrapol>)>("DomainDisc")
+			.set_construct_as_smart_pointer(true)
+		;
+		reg.add_class_to_group(name, "LSDarcyVelocityLinker", tag);
 	}
 		
 //	Special linker for the Bear-Scheidegger Dispersion
