@@ -375,6 +375,7 @@ static void Domain(Registry& reg, string grp)
 			
 			reg.add_class_<T, TBase> (name, grp)
 				.template add_constructor<void (*)(SmartPtr<TLSFct>)>("LSF")
+				.add_method ("set_scaling", static_cast<void (T::*)(number)> (&T::set_scaling), "value", "Sets the scaling for the velocity")
 				.set_construct_as_smart_pointer(true);
 			reg.add_class_to_group(name, "EikonalVel", tag);
 	}

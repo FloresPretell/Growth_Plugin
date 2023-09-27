@@ -65,6 +65,9 @@ public:
 private:
 /// 'potential' of the velocity: direction is its normalized gradient; typically the LSF
 	SmartPtr<TGridFunc> m_spVelPot;
+	
+///	scaling factor for the velocity
+	number m_scaling;
 
 ///	local finite element id (assumed to be the same for both the functions)
 	LFEID m_lfeID;
@@ -75,11 +78,14 @@ public:
 	(
 		SmartPtr<TGridFunc> spPot ///< grid function with the 'potential' of the velocity
 	)
-	: m_spVelPot (spPot)
+	: m_spVelPot (spPot), m_scaling (1)
 	{
 	//	local finite element ids
 		m_lfeID = m_spVelPot->local_finite_element_id(0);
 	};
+	
+///	Set the scaling
+	void set_scaling (number v) {m_scaling = v;}
 	
 ///	The vector field of the gradients is not continuous over the sides of the elements
 	virtual bool continuous () const {return false;}
@@ -162,7 +168,7 @@ public:
 		//	compute the velocity vector
 			number len = VecLength (grad);
 			if (len > 1e-15)
-				VecScale (vValue[ip], grad, 1 / len);
+				VecScale (vValue[ip], grad, m_scaling / len);
 			else
 				VecSet (vValue[ip], 0.0);
 		}
