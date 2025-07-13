@@ -212,6 +212,7 @@ end
 
 
 
+
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 --  Function to obtain the direction of the tubuline inside the neuron
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
@@ -932,6 +933,71 @@ function SmoothCutrvatureAnisotropic(ApproxSpace_lsf, gridfunction_curvature, do
     return curvature
 end
 
+
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+--  Function to Smmooth of the velocity of the interface:
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+function Smooth_Normal_Interface_Velocity(ApproxSpace_lsf, gridfunction_normal_velocity, domain, Difusion_smooth)
+
+    -- 2. My inputs-----------------------------------------------------------------
+    local dom = domain
+    local approxSpace = ApproxSpace_lsf
+    local InterfaceVelocity = gridfunction_normal_velocity
+    local difusion = Difusion_smooth -- the value of the difussion coeficiente 
+
+    ----------------------------------------------------------------------------
+    --- Domain Discretization
+    ----------------------------------------------------------------------------
+    LSTransportUpwind = FullUpwind()
+    SmoothVelNorm_Imp = FV1_Convection(LSTransportUpwind, "ca_cyt", "Outer")
+    SmoothVelNorm_Imp:set_diffusion(difusion)
+    SmoothVelNorm_Imp:set_non_sink(false)
+
+    --- 2. Domain Discretization del transporte del LS implicit method
+    InterfaceVelocityDomainDisc = DomainDiscretization(approxSpace)
+    InterfaceVelocityDomainDisc:add(SmoothVelNorm_Imp)
+
+    -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+    --- Solver for the implicit solution of the Transport disc: 
+    -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+    solverDesc2 = {
+        type = "bicgstab", -- "linear", "bicgstab"
+        precond = {
+            type = "gmg", -- preconditioner ["gmg", "ilu", "ilut", "jac", "gs", "sgs"]
+            approxSpace = approxSpace,
+            smoother = "ilu", -- gmg-smoother ["ilu", "ilut", "jac", "gs", "sgs"]
+            cycle = "V", -- gmg-cycle ["V", "F", "W"]
+            preSmooth = 2, -- number presmoothing steps
+            postSmooth = 2, -- number postsmoothing steps,
+            rap = true, -- use the Galerkin formular in the hierarchy
+            baseSolver = "lu", -- direct coarse grid solver
+            baselevel = numPreRefs -- the base level of the hierarchy
+        },
+        convCheck = {
+            type = "standard",
+            iterations = 100,
+            absolute = 1e-8,
+            reduction = 1e-12,
+            verbose = false
+        }
+    }
+    local solver2 = util.solver.CreateSolver(solverDesc2)
+
+    -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+    -- 4. Move the LSF : Fenomeno fisico para que se mueva 
+    -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+    local geo_dt = 0.01
+    local geo_NumTimeSteps = 5
+
+    util.SolveLinearTimeProblem(InterfaceVelocity, {
+        domainDisc = InterfaceVelocityDomainDisc,
+        reassemble = true
+    }, solver2, nil, nil, "ImplEuler", 1, 0, nil, geo_dt, 0.001, nil, false, nil, 0, geo_NumTimeSteps)
+    print("\nsolving the smooth ..\n\n")
+    return InterfaceVelocity
+end
 
 
 

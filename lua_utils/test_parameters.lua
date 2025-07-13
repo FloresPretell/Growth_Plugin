@@ -23,6 +23,9 @@ function GetParams()
     ---@field velocity     number "Transport coefficient (direction × intensity):  5 × (10 μm)/(500 s) = 0.1 μm/s"
     ---@field somaFlux     number "Tubulin flux at soma boundary: 0.25 × 40 μM = 10 μM"
     ---@field assemblyRate number "Tubulin assembly rate: 50 x 1 /(500 s · 6.25 μM) = 0.016 μM⁻¹·s⁻¹ " 
+    ---@field assemblyRateCurvatureminimun   table<number, table<number, number>>   "Minimum curvature threshold for assembly rate, keyed by [dim][ref_def],  where ref_def is 5 (numRefs ≤ 5) or 6 (numRefs ≥ 6)"
+    ---@field assemblyRateCurvaturemaximun   table<number, table<number, number>>   "Maximum curvature threshold for assembly rate, keyed by [dim][ref_def],  where ref_def is 5 (numRefs ≤ 5) or 6 (numRefs ≥ 6)"
+
 
     ---@class MapParams
     ---@field diffusion number "Diffusion coefficient of MAP proteins: 1 × (10 μm)^2/(500 s) = 0.2 μm²/s"
@@ -34,6 +37,7 @@ function GetParams()
 
     ---@class CalciumParams
     ---@field initial number "Initial calcium concentration: 0.25 x 0.5uM = 0.125 uM"
+    ---@field difussion number "Calcium diffusion coefficient: 1 × (10 μm)^2/(500 s) = 0.2 μm²/s"
 
     ---@class IntracellularParams
     ---@field tubulin  TubulinParams
@@ -72,6 +76,24 @@ function GetParams()
         velocity     = util.GetParamNumber("-tubulinVelocity",       5,   "Transport coefficient (direction × intensity)"), -- 5 × (10 μm)/(500 s) = 0.1 μm/s
         somaFlux     = util.GetParamNumber("-somaTubulinBoundaryFlux", 0.25, "Tubulin flux at soma boundary"), -- 0.25 × 40 μM = 10 μM
         assemblyRate = util.GetParamNumber("-tubulinAssemblyRate",   50,  "Tubulin assembly rate"), -- 50 x 1 /(500 s · 6.25 μM) = 0.016 μM⁻¹·s⁻¹
+        assemblyRateCurvatureminimun = {
+            [2] = {  -- dim = 2
+                [5] = util.GetParamNumber("-assamblyCurvaturemin",  5.5, "Minimun Curvature for assambly rate in 2D with refinemnte 5 or less"),
+                [6] = util.GetParamNumber("-assamblyCurvaturemin",  10, "Minimun Curvature for assambly rate in 2D with refinemnte 6 or more"),
+            },
+            [3] = {  -- dim = 3
+                [5] = util.GetParamNumber("-assamblyCurvaturemin",  20, "Minimun Curvature for assambly rate in 3D without defining refinment"),
+            },
+        },
+        assemblyRateCurvaturemaximun = {
+            [2] = {  -- dim = 2
+                [5] = util.GetParamNumber("-assamblyCurvaturemin",  18.5, "Minimun Curvature for assambly rate in 2D with refinemnte 5 or less"),
+                [6] = util.GetParamNumber("-assamblyCurvaturemin",  20, "Minimun Curvature for assambly rate in 2D with refinemnte 6 or more"),
+            },
+            [3] = {  -- dim = 3
+                [5] = util.GetParamNumber("-assamblyCurvaturemin",  27, "Minimun Curvature for assambly rate in 3D without defining refinment"),
+            },
+        },  
     },
     map = {
         diffusion = util.GetParamNumber("-mapDiffusion", 1,    "Diffusion coefficient of MAP proteins"), -- 1 × (10 μm)^2/(500 s) = 0.2 μm²/s
@@ -83,6 +105,7 @@ function GetParams()
     },
     calcium = {
         initial = util.GetParamNumber("-initialCalcium", 0.25, "Initial calcium concentration"), -- 0.25 x 0.5uM = 0.125 uM
+        difussion = util.GetParamNumber("-calciumDiffusion", 1, "Calcium diffusion coefficient"), -- 1 × (10 μm)^2/(500 s) = 0.2 μm²/s
     },
     },
 
