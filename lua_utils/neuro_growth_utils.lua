@@ -857,11 +857,12 @@ end
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 --  Function to Smmooth of Curvature
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-function SmoothCutrvatureAnisotropic(ApproxSpace_lsf, gridfunction_curvature, domain , Difusion_smooth)
+function SmoothCutrvatureAnisotropic(ApproxSpace_lsf, gridfunction_ls, gridfunction_curvature, domain , Difusion_smooth)
 
     -- 2. My inputs-----------------------------------------------------------------
     local dom = domain
     local approxSpace = ApproxSpace_lsf
+    local lsf = gridfunction_ls
     local curvature = gridfunction_curvature
     local difusion = Difusion_smooth -- the value of the difussion coeficiente
 
