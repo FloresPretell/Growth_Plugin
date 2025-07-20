@@ -183,7 +183,6 @@ function GetParams()
                 },
 
 
-
                 synthesisUCurvatureMinimun = {
                     [2] = {  -- dim=2
                         [5] = util.GetParamNumber("-synthUCurvaturemin",  4,"Min interval for U Synthesis (2D, numRefs ≤ 5)"),
