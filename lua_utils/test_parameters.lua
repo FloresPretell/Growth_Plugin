@@ -417,3 +417,110 @@ function GenerateGridfunctions()
     return gf
 end
 
+
+
+---@class VTKOutputGroup
+---@field Output VTKOutput -- Single VTKOutput configured to export all relevant GridFunctions (inside/outside, level set, SDF, curvature, eikonal, and auxiliary velocity/flux fields). It uses:
+---|                               * approxSpace fields (5 comps): exports ca_cyt, t, u, b, p with prefixed names (u_ca_cyt, u_t, ...)
+---|                               * approxSpace2 / approxSpace_Vel scalar fields (1 comp): exports only "ca_cyt" but labeled by the field name (lsf, sdf_new, velocity, ...)
+
+--- Function that creates ONE VTKOutput (`Output`) with all selections already defined.
+-- This is a convenience wrapper so the main simulation loop can simply call:
+--   local out = GenerateVTKOutput(gf).Output
+--   out:print("vtk_dir/out", gf.u, step, time)   -- (or your preferred VTKOutput print call)
+--
+-- Export policy (hard-coded, no iteration):
+--   1) gf.u  (approxSpace, 5 components): ca_cyt, t, u, b, p
+--   2) Everything else (approxSpace2): only ca_cyt
+--
+-- Naming convention in the VTK:
+--   - gf.u components are exported as: u_ca_cyt, u_t, u_u, u_b, u_p
+--   - scalar fields are exported using their key name: lsf, sdf_new, curvature, velocity, ...
+--
+-- Requirements:
+--   - approxSpace contains: "ca_cyt", "t", "u", "b", "p"
+--   - approxSpace2 contains: "ca_cyt"
+--   - approxSpace_Vel is assumed scalar-like with "ca_cyt" (if it is vector-valued, switch to GridFunctionVectorData)
+--
+-- @param gf GridFunctionGroup  Table returned by GenerateGridfunctions()
+-- @return VTKOutputGroup outs  A table with field `Output`
+---@return VTKOutputGroup
+function GenerateVTKOutput(gf)
+
+    local Output = VTKOutput()
+    Output:clear_selection()
+    Output:select_all(false)
+
+    ------------------------------------------------------------------
+    -- approxSpace (5 components)
+    ------------------------------------------------------------------
+    Output:select_nodal(GridFunctionNumberData(gf.u, "ca_cyt"), "u_ca_cyt")
+    Output:select_nodal(GridFunctionNumberData(gf.u, "t"),      "u_t")
+    Output:select_nodal(GridFunctionNumberData(gf.u, "u"),      "u_u")
+    Output:select_nodal(GridFunctionNumberData(gf.u, "b"),      "u_b")
+    Output:select_nodal(GridFunctionNumberData(gf.u, "p"),      "u_p")
+
+    ------------------------------------------------------------------
+    -- approxSpace2 (1 component)
+    ------------------------------------------------------------------
+    Output:select_nodal(GridFunctionNumberData(gf.u2, "ca_cyt"), "inhibitor")
+
+    Output:select_nodal(GridFunctionNumberData(gf.lsf, "ca_cyt"), "lsf")
+    Output:select_nodal(GridFunctionNumberData(gf.lsf_oposite, "ca_cyt"), "lsf_oposite")
+
+    Output:select_nodal(GridFunctionNumberData(gf.sdf_new, "ca_cyt"), "sdf_new")
+    Output:select_nodal(GridFunctionNumberData(gf.sdf_old, "ca_cyt"), "sdf_old")
+    Output:select_nodal(GridFunctionNumberData(gf.sdf_cfl_num_gf, "ca_cyt"), "sdf_cfl_num_gf")
+
+    Output:select_nodal(GridFunctionNumberData(gf.u_new, "ca_cyt"), "u_new")
+    Output:select_nodal(GridFunctionNumberData(gf.u_old, "ca_cyt"), "u_old")
+
+    Output:select_nodal(GridFunctionNumberData(gf.norm_vel_int, "ca_cyt"), "norm_vel_int")
+    Output:select_nodal(GridFunctionNumberData(gf.curvature, "ca_cyt"), "curvature")
+
+    Output:select_nodal(GridFunctionNumberData(gf.Eikonal_Inside, "ca_cyt"), "Eikonal_Inside")
+    Output:select_nodal(GridFunctionNumberData(gf.Eikonal_Inside_direc_inter, "ca_cyt"), "Eikonal_Inside_direc_inter")
+
+    --Output:select_nodal(GridFunctionNumberData(gf.u,"a_free"), "a_free") -- concentracion
+    --Output:select_nodal(GridFunctionNumberData(gf.u,"a_bound"), "a_bound") -- concentracion
+
+--[[     ------------------------------------------------------------------
+    -- approxSpace_Vel (assumed scalar component ca_cyt)
+    ------------------------------------------------------------------
+    ---
+    local component_names
+    if dim == 2 then
+        component_names = "v_x,v_y"
+    elseif dim == 3 then
+        component_names = "v_x,v_y,v_z"
+    end
+
+    Output:select(GridFunctionVectorData(gf.velocity, component_names), "velocity_based_concentration")
+    Output:select(GridFunctionVectorData(gf.flujo_exp, component_names), "flujo_exp")
+    Output:select(GridFunctionVectorData(gf.flujo_outside_exp, component_names), "flujo_outside_exp")
+    Output:select(GridFunctionVectorData(gf.direc_Tubulin, component_names), "direc_Tubulin")
+
+    ---Scalar value (optional)
+    -- velocity components
+    Output:select(GridFunctionNumberData(gf.velocity, "v_x"), "velocity_x")
+    Output:select(GridFunctionNumberData(gf.velocity, "v_y"), "velocity_y")
+    -- flujo_exp components
+    Output:select(GridFunctionNumberData(gf.flujo_exp, "v_x"), "flujo_exp_x")
+    Output:select(GridFunctionNumberData(gf.flujo_exp, "v_y"), "flujo_exp_y")
+    -- flujo_outside_exp components
+    Output:select(GridFunctionNumberData(gf.flujo_outside_exp, "v_x"), "flujo_outside_exp_x")
+    Output:select(GridFunctionNumberData(gf.flujo_outside_exp, "v_y"), "flujo_outside_exp_y")
+    -- direc_Tubulin components
+    Output:select(GridFunctionNumberData(gf.direc_Tubulin, "v_x"), "direc_Tubulin_x")
+    Output:select(GridFunctionNumberData(gf.direc_Tubulin, "v_y"), "direc_Tubulin_y")
+    if dim == 3 then
+        Output:select(GridFunctionNumberData(gf.velocity, "v_z"), "velocity_z")
+        Output:select(GridFunctionNumberData(gf.flujo_exp, "v_z"), "flujo_exp_z")
+        Output:select(GridFunctionNumberData(gf.flujo_outside_exp, "v_z"), "flujo_outside_exp_z")
+        Output:select(GridFunctionNumberData(gf.direc_Tubulin, "v_z"), "direc_Tubulin_z")
+    end ]]
+
+    return Output
+
+end
+

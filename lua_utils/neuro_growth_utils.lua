@@ -1282,3 +1282,40 @@ function Divergence_Free_intensity_Calculation(ApproxSpace_lsf, gridfunction_int
     print("finish: Intensity of the velocity to make it divergence free")
     return u
 end
+
+
+
+
+
+--- Submit a SLURM post-processing job to pack (merge + optionally delete)
+--  a range of UG4 VTK outputs.
+--
+--  This is meant to be called from the simulation (preferably only on rank 0)
+--  every N timesteps, to avoid accumulating millions of partitioned files.
+--
+--  The SLURM script receives:
+--    ROOT : case root directory (outside "merged/")
+--    T0   : first timestep index to process (inclusive)
+--    T1   : last timestep index to process  (inclusive)
+--    SNAPSHOT_INTERVAL : output stride used by UG4 VTK printing
+--
+--  Example:
+--    Submit_pack_job(0, 49)   -- process Output_t000000 ... Output_t000049
+--
+-- @param t0 integer First timestep index to process (inclusive)
+-- @param t1 integer Last timestep index to process (inclusive)
+-- @param post_slurm_script string Path to the SLURM script that will do the packing
+-- @param root string Root directory of the case
+-- @return integer exit_code Return code from os.execute (0 typically means success)
+function Submit_pack_job(t0, t1, snapshot_interval, post_slurm_script, root)
+    if ProcRank and ProcRank() ~= 0 then -- Only submit from rank 0
+        return 0
+    end
+
+    local cmd = string.format(
+        'sbatch --export=ALL,ROOT="%s",T0=%d,T1=%d,SNAPSHOT_INTERVAL=%d "%s"',
+        root, t0, t1, snapshot_interval, post_slurm_script
+    )
+    print("[sbatch] "..cmd)
+    return os.execute(cmd)
+end
