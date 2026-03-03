@@ -1,0 +1,6 @@
+/scratch/flore0a/Preproposal/Scalability/Test1/procesors192/Simulation2D
+/scratch/flore0a/Preproposal/Scalability/Test1/procesors384/Simulation2D
+/scratch/flore0a/Preproposal/Scalability/Test1/procesors450/Simulation2D
+/scratch/flore0a/Preproposal/Scalability/Test1/procesors48/Simulation2D
+/scratch/flore0a/Preproposal/Scalability/Test1/procesors576/Simulation2D
+/scratch/flore0a/Preproposal/Scalability/Test1/procesors96/Simulation2D

@@ -1,0 +1,24 @@
+ModuleCmd_Switch.c(179):ERROR:152: Module 'PrgEnv-cray' is currently not loaded
+Unloading module for Paraview
+Paraview is now unloaded
+ffmpeg(4):ERROR:105: Unable to locate a modulefile for 'ffmpeg'
+cpu-bind=MASK - nid01775, task  0  0 [2396414]: mask 0xffffff000000000000000000000000000000000000000000ffffff set
+cpu-bind=MASK - nid01775, task  1  1 [2396415]: mask 0xffffff000000000000000000000000000000000000000000ffffff000000000000000000000000 set
+cpu-bind=MASK - nid01775, task  2  2 [2396416]: mask 0xffffff000000000000000000000000000000000000000000ffffff000000 set
+cpu-bind=MASK - nid01775, task  3  3 [2396417]: mask 0xffffff000000000000000000000000000000000000000000ffffff000000000000000000000000000000 set
+mem-bind=NONE - nid01775, task  0  0 [2396414]: mask 0xff
+mem-bind=NONE - nid01775, task  1  1 [2396415]: mask 0xff
+mem-bind=NONE - nid01775, task  3  3 [2396417]: mask 0xff
+mem-bind=NONE - nid01775, task  2  2 [2396416]: mask 0xff
+cpu-bind=MASK - nid01776, task  4  0 [1336660]: mask 0xffffff000000000000000000000000000000000000000000ffffff set
+cpu-bind=MASK - nid01776, task  5  1 [1336661]: mask 0xffffff000000000000000000000000000000000000000000ffffff000000000000000000000000 set
+cpu-bind=MASK - nid01776, task  6  2 [1336662]: mask 0xffffff000000000000000000000000000000000000000000ffffff000000 set
+cpu-bind=MASK - nid01776, task  7  3 [1336663]: mask 0xffffff000000000000000000000000000000000000000000ffffff000000000000000000000000000000 set
+mem-bind=NONE - nid01776, task  7  3 [1336663]: mask 0xff
+mem-bind=NONE - nid01776, task  4  0 [1336660]: mask 0xff
+mem-bind=NONE - nid01776, task  6  2 [1336662]: mask 0xff
+mem-bind=NONE - nid01776, task  5  1 [1336661]: mask 0xff
+
+real	0m18.500s
+user	0m0.019s
+sys	0m0.061s
