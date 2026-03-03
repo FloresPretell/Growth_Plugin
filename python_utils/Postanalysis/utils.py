@@ -12,3 +12,5 @@ def Export_folders_from_results(PATH):
     for s in simulation_dirs:
         print(s)
     return simulation_dirs  # opcional, útil si quieres usarlas después
+
+cp -r /scratch/flore0a/Dataset_test1/small_test       /project/k10070/Nicole/UG4/ug4/plugins/Growth_Plugin/python_utils/
