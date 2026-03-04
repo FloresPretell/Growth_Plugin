@@ -47,6 +47,10 @@
 
 #include "ls_tubulin_velocity_linker.h"
 #include "ls_interface_influx_linker.h"
+#include "ls_cone_selection_linker.h"
+
+
+
 #include "ls_interface_influx_outside_linker.h"
 #include "ls_interface_influx_top_based_curvature_linker.h"
 #include "ls_interface_reaction_linker.h" // top based curvature also
@@ -337,6 +341,27 @@ namespace ug
 						 .set_construct_as_smart_pointer(true);
 					reg.add_class_to_group(name, "LSInterfaceInflux", tag);
 				}
+
+								//	Linker for give the value to influx for the boundary (cut elements)
+				{
+					string name = string("LSConesSelection").append(suffix);
+					typedef LSConesSelection<TDomain, TAlgebra> T;
+					typedef DependentUserData<MathVector<dim>, dim> TBase;
+					typedef IInterfaceExtrapolation<TDomain, TAlgebra> TExtrapol;
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_method("set_LevelSet_gradient", &T::set_LevelSet_gradient)
+						 .add_method("set_Eikanol_gradient", &T::set_Eikanol_gradient)
+						 .add_method("set_Tubuline", static_cast<void (T::*)(number)>(&T::set_Tubuline))
+						 .add_method("set_Tubuline", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_Tubuline))
+						 .add_method("set_domain_discretizacion", &T::set_domain_discretizacion)
+						 .add_method("set_magnitud_influx", static_cast<void (T::*)(number)>(&T::set_magnitud_influx))
+						 //.add_method("set_domain_disc_1d"       , &T::set_domain_disc_1d, "", "domainDisc","Set the 1d cable domain discretization.")
+						 .template add_constructor<void (*)()>()
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "LSConesSelection", tag);
+				}
+
+
 
 				//	Linker for give the value to influx for the boundary (cut elements) to outside the domain
 				{
