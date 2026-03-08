@@ -110,14 +110,14 @@ function GetParams()
     -- Intracellular parameters
         Intracellular = {
             tubulin = {
-                initial = util.GetParamNumber("-initialTubulin", 0.3, "Initial tubulin concentration"),
+                initial = util.GetParamNumber("-initialTubulin", 0.3, "Initial tubulin concentration"), 
                 diffusion    = util.GetParamNumber("-tubulinDiffusion",      5,   "Diffusion coefficient of tubulin"),   -- 5 × (10 μm)^2/(500 s) = 1 μm²/s
                 velocity     = util.GetParamNumber("-tubulinVelocity",       5,   "Transport coefficient (direction × intensity)"), -- 5 × (10 μm)/(500 s) = 0.1 μm/s
                 somaFlux     = util.GetParamNumber("-somaTubulinBoundaryFlux", 0.25, "Tubulin flux at soma boundary"), -- 0.25 × 40 μM = 10 μM
                 assemblyRate = util.GetParamNumber("-tubulinAssemblyRate",   50,  "Tubulin assembly rate"), -- 50 x 1 /(500 s · 6.25 μM) = 0.016 μM⁻¹·s⁻¹
                 assemblyRateCurvatureminimun = {
                     [2] = {  -- dim = 2
-                        [5] = util.GetParamNumber("-assamblyCurvaturemin",  5.5, "Minimun Curvature for assambly rate in 2D with refinemnte 5 or less"),
+                        [5] = util.GetParamNumber("-assamblyCurvaturemin",  5.5, " Curvature for assambly rate in 2D with refinemnte 5 or less"),
                         [6] = util.GetParamNumber("-assamblyCurvaturemin",  10, "Minimun Curvature for assambly rate in 2D with refinemnte 6 or more"),
                     },
                     [3] = {  -- dim = 3
@@ -126,11 +126,11 @@ function GetParams()
                 },
                 assemblyRateCurvaturemaximun = {
                     [2] = {  -- dim = 2
-                        [5] = util.GetParamNumber("-assamblyCurvaturemin",  18.5, "Minimun Curvature for assambly rate in 2D with refinemnte 5 or less"),
-                        [6] = util.GetParamNumber("-assamblyCurvaturemin",  20, "Minimun Curvature for assambly rate in 2D with refinemnte 6 or more"),
+                        [5] = util.GetParamNumber("-assamblyCurvaturemax",  18.5, "Maximum Curvature for assambly rate in 2D with refinemnte 5 or less"),
+                        [6] = util.GetParamNumber("-assamblyCurvaturemax",  20, "Maximum Curvature for assambly rate in 2D with refinemnte 6 or more"),
                     },
                     [3] = {  -- dim = 3
-                        [5] = util.GetParamNumber("-assamblyCurvaturemin",  27, "Minimun Curvature for assambly rate in 3D without defining refinment"),
+                        [5] = util.GetParamNumber("-assamblyCurvaturemax",  27, "Maximum Curvature for assambly rate in 3D without defining refinment"),
                     },
                 },  
             },
@@ -226,12 +226,17 @@ function GetParams()
             calcium = {
                 initial = util.GetParamNumber("-initialCalcium", 0.25, "Initial calcium concentration"), -- 0.25 x 0.5uM = 0.125 uM
                 difussion = util.GetParamNumber("-calciumDiffusion", 1, "Calcium diffusion coefficient"), -- 1 × (10 μm)^2/(500 s) = 0.2 μm²/s
+                rateflux = util.GetParamNumber("-calciumFlux", 0.0005, "Calcium flux at membrane"), -- 0.0005 x 1/500 s = 1e-6 s⁻¹
+                kg = util.GetParamNumber("-calciumKG", 1, "Calcium .."), -- 1 x  0.5uM x  0.5uM = 0.25 uM⁻²
+                kf = util.GetParamNumber("-calciumKF", 1, "Calcium .."), -- 1 x  0.5uM x  0.5uM = 0.25 uM⁻²
+
             },
         },
 
     -- Extracellular parameters
         Extracellular = {
             inhibition = {
+                initial = util.GetParamNumber("-initialInhibition", 0.0001, "Initial inhibitor concentration"), -- 0.0001 × 1.35 μM = 0.000135 μM
                 rateSource  = util.GetParamNumber("-inhibitionRateSource",  5,   "Inhibitor production rate coefficient"), -- 5 x 1/500 s = 0.01 s⁻¹
                 capacity    = util.GetParamNumber("-inhibitionCapacity",    0.01,"Inhibitor capacity"), -- 0.01 × 1.35 μM = 0.0135 μM
                 diffusion   = util.GetParamNumber("-inhibitionDiffusion",   1,   "Inhibitor diffusion coefficient"),  -- 1 × (10 μm)^2/(500 s) = 0.2 μm²/s
@@ -292,15 +297,17 @@ function GetParams()
                 Transporteq = {
                     diffusion = {
                         [2] = {
-                            [5] = util.GetParamNumber("-synthICurvaturemax", 0.015,"Diffusion term of the Implicit discretization of the transport equation (2D, numRefs ≤ 5)"),
-                            [6] = util.GetParamNumber("-synthICurvaturemax", 0.00001,"Diffusion term of the Implicit discretization of the transport equation (2D, numRefs ≥ 6)"),
+                            [5] = util.GetParamNumber("-transportIsotropicCurvature2D", 0.015,"Diffusion term of the Implicit discretization of the transport equation (2D, numRefs ≤ 5)"),
+                            [6] = util.GetParamNumber("-transportIsotropicCurvature2D", 0.00001,"Diffusion term of the Implicit discretization of the transport equation (2D, numRefs ≥ 6)"),
                         },
                         [3] = {
-                            [5] = util.GetParamNumber("-synthICurvaturemax", 0.01, "Diffusion term of the Implicit discretization of the transport equation (3D, use numRefs ≤ 5)"),
+                            [5] = util.GetParamNumber("-transportIsotropicCurvature3D", 0.01, "Diffusion term of the Implicit discretization of the transport equation (3D, use numRefs ≤ 5)"),
                         },
                     },
                 },
                 Curvature2D = {
+                    initialisotropic = util.GetParamNumber("-initialisotropicCurvature2D", 0.0067, "Isotropic curvature for 2D level set method"),
+                    initialanisotropic = util.GetParamNumber("-initialanisotropicCurvature2D", 0.07, "Anisotropic curvature for 2D level set method"),
                     isotropic = util.GetParamNumber("-isotropicCurvature2D", 0.007, "Isotropic curvature for 2D level set method"),
                     anisotropic = util.GetParamNumber("-anisotropicCurvature2D", 0.0825, "Anisotropic curvature for 2D level set method"),
                     
