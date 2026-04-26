@@ -27,4 +27,4 @@ source /scratch/flore0a/Modules.sh
 HINT_FLAG="--hint=nomultithread  --mem-bind=v,none --cpu-bind=v,cores"
 SIMDIR="/scratch/flore0a/Dataset_test1/small_test/Simulation2D/"
 
-time srun -n $_ntasks --ntasks-per-node=$_ntasks_per_node $HINT_FLAG -c $_nthreads --cpu-bind=verbose,cores   `(which pvbatch)` --force-offscreen-rendering /project/k10070/Nicole/UG4/ug4/plugins/Growth_Plugin/python_utils/Merge_vtu/merge_one_file.py  --root "${SIMDIR}"
+time srun -n $_ntasks --ntasks-per-node=$_ntasks_per_node $HINT_FLAG -c $_nthreads --cpu-bind=verbose,cores   `(which pvbatch)` --force-offscreen-rendering merge_one_file.py  --root "${SIMDIR}"
