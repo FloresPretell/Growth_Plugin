@@ -12,7 +12,6 @@
 #SBATCH -e /dev/null
 
 set -euo pipefail
-mkdir -p logs
 
 # set script vars
 _ntasks=1

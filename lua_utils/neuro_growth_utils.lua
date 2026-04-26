@@ -353,7 +353,7 @@ function GenerateImaginaryMolecule2(ApproxSpace_lsf, gridfunction_gradiente, gri
             iterations = 50, -- maximum number of iterations
             absolute = 5e-5, -- absolut value of defect to be reached; usually 1e-7 - 1e-9
             reduction = 1e-8, -- reduction factor of defect to be reached; usually 1e-6 - 1e-8
-            verbose = false -- print convergence rates if true
+            verbose = true -- print convergence rates if true
         },
     
         linSolver = {
@@ -380,7 +380,7 @@ function GenerateImaginaryMolecule2(ApproxSpace_lsf, gridfunction_gradiente, gri
                 iterations = 150, -- number of iterations
                 absolute = 1e-8, -- absolut value of defact to be reached; usually 1e-8 - 1e-10 (may not be larger than in newton section)
                 reduction = 1e-12, -- reduction factor of defect to be reached
-                verbose = false -- print convergence rates if true
+                verbose = true -- print convergence rates if true
             }
         }
     } -- definir el error para que ecuaciones quieres ... 
@@ -402,7 +402,7 @@ function GenerateImaginaryMolecule2(ApproxSpace_lsf, gridfunction_gradiente, gri
         iterations = 50, -- maximum number of iterations
         absolute = 5e-7, -- absolut value of defect to be reached; usually 1e-7 - 1e-9
         reduction = 1e-10, -- reduction factor of defect to be reached; usually 1e-6 - 1e-8
-        verbose = false -- print convergence rates if true
+        verbose = true -- print convergence rates if true
     },
 
     linSolver = {
@@ -424,7 +424,7 @@ function GenerateImaginaryMolecule2(ApproxSpace_lsf, gridfunction_gradiente, gri
             iterations = 150, -- number of iterations
             absolute = 1e-8, -- absolut value of defact to be reached; usually 1e-8 - 1e-10 (may not be larger than in newton section)
             reduction = 1e-12, -- reduction factor of defect to be reached
-            verbose = false -- print convergence rates if true
+            verbose = true -- print convergence rates if true
         }
     }
     } -- definir el error para que ecuaciones quieres ... 
@@ -664,7 +664,7 @@ function GenerateImaginaryMolecule(ApproxSpace_lsf, gridfunction_ls, domain)
             iterations = 150,
             absolute = 1e-5,
             reduction = 1e-12,
-            verbose = false
+            verbose = true
         }
     }
 
@@ -833,7 +833,7 @@ function SmoothCutrvature(ApproxSpace_lsf, gridfunction_curvature, domain, Difus
             iterations = 100,
             absolute = 1e-8,
             reduction = 1e-12,
-            verbose = false
+            verbose = true
         }
     }
     solver2 = util.solver.CreateSolver(solverDesc2)
@@ -902,7 +902,7 @@ function SmoothCutrvatureAnisotropic(ApproxSpace_lsf, gridfunction_ls, gridfunct
             iterations = 100,
             absolute = 1e-8,
             reduction = 1e-12,
-            verbose = false
+            verbose = true
         }
     }
     solver2 = util.solver.CreateSolver(solverDesc2)
@@ -977,7 +977,7 @@ function Smooth_Normal_Interface_Velocity(ApproxSpace_lsf, gridfunction_normal_v
             iterations = 100,
             absolute = 1e-8,
             reduction = 1e-12,
-            verbose = false
+            verbose = true
         }
     }
     local solver2 = util.solver.CreateSolver(solverDesc2)
@@ -1184,7 +1184,7 @@ function Divergence_Free_intensity_Calculation(ApproxSpace_lsf, gridfunction_int
             iterations = 50, -- maximum number of iterations
             absolute = 5e-7, -- absolut value of defect to be reached; usually 1e-7 - 1e-9
             reduction = 1e-10, -- reduction factor of defect to be reached; usually 1e-6 - 1e-8
-            verbose = false -- print convergence rates if true
+            verbose = true -- print convergence rates if true
         },
     
         linSolver = {
@@ -1206,7 +1206,7 @@ function Divergence_Free_intensity_Calculation(ApproxSpace_lsf, gridfunction_int
                 iterations = 150, -- number of iterations
                 absolute = 1e-8, -- absolut value of defact to be reached; usually 1e-8 - 1e-10 (may not be larger than in newton section)
                 reduction = 1e-12, -- reduction factor of defect to be reached
-                verbose = false -- print convergence rates if true
+                verbose = true -- print convergence rates if true
             }
         }
     } -- definir el error para que ecuaciones quieres ... 
@@ -1282,7 +1282,6 @@ function Divergence_Free_intensity_Calculation(ApproxSpace_lsf, gridfunction_int
     print("finish: Intensity of the velocity to make it divergence free")
     return u
 end
-
 
 
 
