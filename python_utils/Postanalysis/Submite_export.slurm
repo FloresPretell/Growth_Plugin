@@ -33,4 +33,4 @@ SIMDIR=$(sed -n "$((SLURM_ARRAY_TASK_ID+1))p" dirs.txt)
 
 echo "Task ${SLURM_ARRAY_TASK_ID} exporting ${SIMDIR}"
 
-time srun -n $_ntasks --ntasks-per-node=$_ntasks_per_node $HINT_FLAG -c $_nthreads --cpu-bind=verbose,cores   `(which pvbatch)` --force-offscreen-rendering ./main_export.py  --simdir "${SIMDIR}" --variable_input "t"
+time srun -n $_ntasks --ntasks-per-node=$_ntasks_per_node $HINT_FLAG -c $_nthreads --cpu-bind=verbose,cores   `(which pvbatch)` --force-offscreen-rendering /project/k10070/Nicole/UG4/ug4/plugins/Growth_Plugin/python_utils/Postanalysis/main_export.py  --simdir "${SIMDIR}" --variable_input "t"
