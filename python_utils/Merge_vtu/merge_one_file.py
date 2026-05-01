@@ -1,4 +1,3 @@
-#!/usr/bin/env pvpython
 import os, glob, sys, argparse
 import paraview.simple as pv
 
