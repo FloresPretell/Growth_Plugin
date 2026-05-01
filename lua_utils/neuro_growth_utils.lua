@@ -248,7 +248,7 @@ function GenerateImaginaryMolecule2(ApproxSpace_lsf, gridfunction_gradiente, gri
         dt_min = 0.00001 -- solo prueba para funcion
     end
 
-    if numRefs == 4 or numRefs == 3 then
+    if numRefs == 4 or numRefs <= 3 then
         geo_dt = 0.1 -- time step length
         geo_NumTimeSteps = 100 -- Dependiendo de la geometria debes de modificar este valor para asegurarte que la advencion sea suficiente para que vaya por toda la geometria
         geo_endTime = 10 -- 0.1 * 100

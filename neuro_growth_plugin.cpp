@@ -54,10 +54,11 @@
 #include "ls_interface_influx_outside_linker.h"
 #include "ls_interface_influx_top_based_curvature_linker.h"
 #include "ls_interface_reaction_linker.h" // top based curvature also
-#include "ls_interface_reaction_linker_inside_curv.h"							 
+#include "ls_interface_reaction_linker_inside_curv.h"
 #include "ls_initial_value.h"
 #include "ls_initial_value_interface.h"
 #include "ls_tensor_linker.h"
+#include "ls_vector_source_mass_rate.h"
 
 using namespace std;
 using namespace ug::bridge;
@@ -463,6 +464,29 @@ namespace ug
 						 .template add_constructor<void (*)()>()
 						 .set_construct_as_smart_pointer(true);
 					reg.add_class_to_group(name, "LSReactionInsideCurv", tag);
+				}
+
+				// Diagnostic helper: net FV1 mass rate from vector source into lsf<=0 region.
+				// Equivalent to summing SCVF flux contributions to intracellular nodes.
+				// Lua: local h = FVLSVectorSourceIntegral(lsf_gf)
+				//      h:set_vector_source(src); h:compute(t); h:result()
+				{
+					typedef FVLSVectorSourceIntegral<function_type> T;
+					typedef typename T::ls_gf_type ls_gf_type;
+					string name = string("FVLSVectorSourceIntegral").append(suffix);
+					reg.add_class_<T>(name, grp)
+						 .template add_constructor<void (*)(SmartPtr<ls_gf_type>)>("LSF")
+						 .add_method("set_vector_source",
+							static_cast<void (T::*)(SmartPtr<typename T::vec_src_type>)>(&T::set_vector_source),
+							"", "vecSource", "Set the vector-valued CplUserData to integrate")
+						 .add_method("compute",
+							static_cast<void (T::*)(number)>(&T::compute),
+							"", "time", "Compute net mass rate into lsf<=0 at given time")
+						 .add_method("result",
+							static_cast<number (T::*)() const>(&T::result),
+							"", "", "Net mass rate into Omega_i after compute()")
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "FVLSVectorSourceIntegral", tag);
 				}
 			}
 
