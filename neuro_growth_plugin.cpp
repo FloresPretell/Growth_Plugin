@@ -59,6 +59,7 @@
 #include "ls_initial_value_interface.h"
 #include "ls_tensor_linker.h"
 #include "ls_vector_source_mass_rate.h"
+#include "curvature_eval_discr.h"  // Experimental evaluator-only stable curvature (does not modify Kappla_LS).
 
 using namespace std;
 using namespace ug::bridge;
@@ -117,6 +118,79 @@ namespace ug
 
 						 .set_construct_as_smart_pointer(true);
 					reg.add_class_to_group(name, "Kappla_LS", tag);
+				}
+
+				// Experimental evaluator-only stable curvature.
+				// Independent of Kappla_LS. Not used by the official model.
+				// Lua: local k = CurvatureEval_LS()
+				//      k:set_epsilon(1e-6)               -- optional
+				//      k:compute_stable_kappa(lsf, kappa_out)
+				{
+					typedef CurvatureEval_LS<TLSFct> T;
+					string name = string("CurvatureEval_LS").append(suffix);
+					reg.add_class_<T>(name, grp)
+						 .add_constructor()
+						 .add_method("set_epsilon",
+							static_cast<void (T::*)(number)>(&T::set_epsilon),
+							"", "epsilon",
+							"Smooth regularization for sqrt(|grad phi|^2 + epsilon^2)")
+						 .add_method("epsilon",
+							static_cast<number (T::*)() const>(&T::epsilon),
+							"", "",
+							"Current smoothing parameter epsilon")
+						 .add_method("compute_stable_kappa",
+							static_cast<void (T::*)(SmartPtr<TLSFct>, SmartPtr<TLSFct>)>(&T::compute_stable_kappa),
+							"", "spLSF#spKappaStable",
+							"Compute kappa = div(grad phi / sqrt(|grad phi|^2 + eps^2)) into spKappaStable")
+						 // Step A: fixed-radius physical averaging
+						 .add_method("set_averaging_radius",
+							static_cast<void (T::*)(number)>(&T::set_averaging_radius),
+							"", "R_avg", "Physical Gaussian-averaging radius")
+						 .add_method("averaging_radius",
+							static_cast<number (T::*)() const>(&T::averaging_radius),
+							"", "", "Current averaging radius")
+						 .add_method("compute_kappa_fixed_radius",
+							static_cast<void (T::*)(SmartPtr<TLSFct>, SmartPtr<TLSFct>)>(&T::compute_kappa_fixed_radius),
+							"", "spLSF#spKappaOut",
+							"Mesh-independent fixed-physical-radius averaged curvature")
+						 .add_method("avg_singleton_count",
+							static_cast<size_t (T::*)() const>(&T::avg_singleton_count),
+							"", "", "Vertices that fell back to raw FV1 (R_avg too small)")
+						 .add_method("avg_total_count",
+							static_cast<size_t (T::*)() const>(&T::avg_total_count),
+							"", "", "Total vertices visited by last fixed-radius pass")
+						 // Step B: weighted least-squares quadratic reconstruction
+						 .add_method("set_lsq_ring_depth",
+							static_cast<void (T::*)(int)>(&T::set_lsq_ring_depth),
+							"", "depth", "Neighborhood ring depth (1 or 2; default 2)")
+						 .add_method("lsq_ring_depth",
+							static_cast<int (T::*)() const>(&T::lsq_ring_depth),
+							"", "", "Current LSQ ring depth")
+						 .add_method("set_lsq_weight_exponent",
+							static_cast<void (T::*)(number)>(&T::set_lsq_weight_exponent),
+							"", "p", "LSQ inverse-distance weight exponent (default 2.0)")
+						 .add_method("lsq_weight_exponent",
+							static_cast<number (T::*)() const>(&T::lsq_weight_exponent),
+							"", "", "Current LSQ weight exponent")
+						 .add_method("set_lsq_band_phi",
+							static_cast<void (T::*)(number)>(&T::set_lsq_band_phi),
+							"", "phi_threshold",
+							"LSQ band: |phi(v)| > phi_threshold gets 0.0; default infinity")
+						 .add_method("lsq_band_phi",
+							static_cast<number (T::*)() const>(&T::lsq_band_phi),
+							"", "", "Current LSQ band threshold")
+						 .add_method("compute_kappa_lsq",
+							static_cast<void (T::*)(SmartPtr<TLSFct>, SmartPtr<TLSFct>)>(&T::compute_kappa_lsq),
+							"", "spLSF#spKappaOut",
+							"Weighted-LSQ quadratic reconstruction of curvature in the band")
+						 .add_method("lsq_fallback_count",
+							static_cast<size_t (T::*)() const>(&T::lsq_fallback_count),
+							"", "", "Band vertices that fell back during last LSQ pass")
+						 .add_method("lsq_total_count",
+							static_cast<size_t (T::*)() const>(&T::lsq_total_count),
+							"", "", "Total band vertices visited by last LSQ pass")
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "CurvatureEval_LS", tag);
 				}
 
 				/*
