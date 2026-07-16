@@ -40,6 +40,22 @@ def extract_pvtu_files(root: str, t0=None, t1=None, snapshot_interval=None):
     return pvtu_files
  
  
+def register_deletable(name_list, root, pvtu):
+    """Register the .pvtu AND all its partition pieces (Output_p*_t<N>.vtu) for deletion.
+    FIX 2026-07-02: previously only the .pvtu was listed, so the ~96 partition .vtu files
+    per timestep were NEVER deleted after merge -> scratch inode blow-up. The real partition
+    naming is Output_p<NN>_t<NNNN>.vtu (NOT Output_t<N>_*.vtu)."""
+    if not name_list:
+        return
+    name_list.write(pvtu + "\n")
+    m = re.search(r"Output_t(\d+)\.pvtu$", os.path.basename(pvtu))
+    if not m:
+        return
+    tnum = m.group(1)
+    for part in sorted(glob.glob(os.path.join(root, f"Output_p*_t{tnum}.vtu"))):
+        name_list.write(part + "\n")
+
+
 def merge_pvtu_to_vtu(root=None, list_to_delete=None,t0=None, t1=None, snapshot_interval=None):
     merged_dir = os.path.join(root, "merged")
     os.makedirs(merged_dir, exist_ok=True) #create merge directory
@@ -53,8 +69,8 @@ def merge_pvtu_to_vtu(root=None, list_to_delete=None,t0=None, t1=None, snapshot_
         base = stem + ".vtu" 
         out_vtu = os.path.join(merged_dir, base)
         if os.path.exists(out_vtu) and os.path.getsize(out_vtu) > 0:
-            if name_list: # merged already exists -> still register pvtu for deletion
-                name_list.write(pvtu + "\n")
+            # merged already exists -> still register pvtu + partitions for deletion
+            register_deletable(name_list, root, pvtu)
             continue
         print("[merge]", pvtu, "->", out_vtu)
 
@@ -65,10 +81,9 @@ def merge_pvtu_to_vtu(root=None, list_to_delete=None,t0=None, t1=None, snapshot_
         pv.UpdatePipeline()
         pv.SaveData(out_vtu, proxy=m)
         
-        # si se creó el output, registramos qué borrar
+        # si se creó el output, registramos qué borrar (pvtu + particiones)
         if os.path.exists(out_vtu) and os.path.getsize(out_vtu) > 0:
-            if name_list:
-                name_list.write(pvtu + "\n")
+            register_deletable(name_list, root, pvtu)
                  
     if name_list:
         name_list.close()

@@ -241,26 +241,28 @@ namespace ug
 
 
 								
-								/// ELEGIT EL SIGNO (+ or -), esto depende de los 2 umbrales (minimoInhibition, minimoInhSign)
-								if (vInhibition[ip] >= minimoInhibition && vInhibition[ip] >= minimoInhSign)
+								/// ===== CALIBRATED velocity modification (20260702, UG4_test1 copy) =====
+								/// Two-stage response, ordered by inhibitor level (intended: inh_threshold < inh_sign):
+								///   AVOIDANCE (inh>=inh_threshold): steer the growth vector AWAY from the
+								///     inhibitor gradient while PRESERVING forward growth speed:
+								///        v = |V| * normalize(V - velInhibicion)
+								///     (Old code set v = velInhibicion, which points ALONG grad(inh) — i.e.
+								///      toward the neighbour / inward — so tips receded and branches collapsed.)
+								///   RETRACTION (inh>=inh_sign): recede along -growth direction at a fraction
+								///     retractRate of the growth speed (old -(V-velInh) was ~-2|V| and sideways).
+								const number retractRate = 0.5; // TODO expose as CLI -retract_rate; tune with Nicole
+								if (vInhibition[ip] >= minimoInhSign && minimoInhibition < minimoInhSign)
 								{
-									if (minimoInhibition >= minimoInhSign) {
-										VecAdd(velFinal, vValue[ip], velInhibicion);
-										VecScale(vValue[ip], velInhibicion, 1.0); // make  growth with correction 
-									} else {
-										VecSubtract(velFinal, vValue[ip], velInhibicion);
-										VecScale(vValue[ip], velFinal, -1.0); // make  retraction
-									}
+									// RETRACTION: controlled recede along the (inward) growth axis
+									VecScale(vValue[ip], vValue[ip], -retractRate);
 								}
-								else if (vInhibition[ip] >= minimoInhibition)
+								else
 								{
-									VecAdd(velFinal, vValue[ip], velInhibicion);
-									VecScale(vValue[ip], velInhibicion, 1.0); // make  growth with correction 
-								}
-								else if (vInhibition[ip] >= minimoInhSign)
-								{
-									VecSubtract(velFinal, vValue[ip], velInhibicion);
-									VecScale(vValue[ip], velFinal, -1.0); // make retraction
+									// AVOIDANCE (redirection): tangential steer away, speed preserved
+									MathVector<dim> steer;
+									VecSubtract(steer, vValue[ip], velInhibicion); // V - velInh (points away from neighbour)
+									number steerNorm = VecLength(steer) + 0.0000001;
+									VecScale(vValue[ip], steer, magnitud / steerNorm);
 								}
 
 							}
@@ -418,26 +420,21 @@ namespace ug
 								//VecScale(velFinal, velFinal, inhibicionNorm);
 
 
-								/// ELEGIT EL SIGNO (+ or -), esto depende de los 2 umbrales (minimoInhibition, minimoInhSign)
-								if (vInhibition[ip] >= minimoInhibition && vInhibition[ip] >= minimoInhSign)
+								/// ===== CALIBRATED velocity modification (20260702, UG4_test1 copy) =====
+								/// Mirrors evaluate(): AVOIDANCE steers away preserving speed; RETRACTION recedes.
+								const number retractRate = 0.5; // TODO expose as CLI -retract_rate; tune with Nicole
+								if (vInhibition[ip] >= minimoInhSign && minimoInhibition < minimoInhSign)
 								{
-									if (minimoInhibition >= minimoInhSign) {
-										VecAdd(velFinal, vDarcyVel[ip], velInhibicion);
-										VecScale(vDarcyVel[ip], velInhibicion, 1.0); // make  growth with correction 
-									} else {
-										VecSubtract(velFinal, vDarcyVel[ip], velInhibicion);
-										VecScale(vDarcyVel[ip], velFinal, -1.0); // make  retraction
-									}
+									// RETRACTION: controlled recede along the (inward) growth axis
+									VecScale(vDarcyVel[ip], vDarcyVel[ip], -retractRate);
 								}
-								else if (vInhibition[ip] >= minimoInhibition)
+								else
 								{
-									VecAdd(velFinal, vDarcyVel[ip], velInhibicion);
-									VecScale(vDarcyVel[ip], velInhibicion, 1.0); // make  growth with correction 
-								}
-								else if (vInhibition[ip] >= minimoInhSign)
-								{
-									VecSubtract(velFinal, vDarcyVel[ip], velInhibicion);
-									VecScale(vDarcyVel[ip], velFinal, -1.0); // make retraction
+									// AVOIDANCE (redirection): tangential steer away, speed preserved
+									MathVector<dim> steer;
+									VecSubtract(steer, vDarcyVel[ip], velInhibicion); // V - velInh (away from neighbour)
+									number steerNorm = VecLength(steer) + 0.0000001;
+									VecScale(vDarcyVel[ip], steer, magnitud / steerNorm);
 								}
 
 							}

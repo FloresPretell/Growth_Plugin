@@ -1820,10 +1820,17 @@ namespace ug
                spKappla->inner_dof_indices(vrt, 0, ind);
                DoFRef(*spKappla, ind[0]) /= vol;
 
-               if (isnan(DoFRef(*spKappla, ind[0])))
+               // Stability guard (Phase D.1, 2026-06-30): a non-finite curvature (NaN/Inf,
+               // arising from a degenerate |grad(phi)| or an upstream NaN in phi) must NOT
+               // propagate into the curvature smoothing or the reaction kappa-windows that
+               // consume it. Curvature is physically undefined where the interface normal is
+               // undefined, so correct it to 0 here instead of only logging the detection.
+               // See PhaseA_mathematical_analysis.md section 5. Original behaviour was a
+               // log-only detector (no correction).
+               if (isnan(DoFRef(*spKappla, ind[0])) || isinf(DoFRef(*spKappla, ind[0])))
                   {
-                     UG_LOG("NAN detected in 2 loop \n");
-
+                     UG_LOG("NAN/Inf curvature corrected to 0 (loop 2)\n");
+                     DoFRef(*spKappla, ind[0]) = 0.0;
                   }
             }
          }

@@ -259,6 +259,35 @@ namespace ug
             //	clear all derivative values
             this->set_zero(vvvDeriv, nip);
 
+            // Analytic self-Jacobian of the logistic inhibitor source (Phase D.3b, 2026-06-30).
+            // IMPORTANT: despite the name, set_Tubuline()/m_spTubuline is bound to the INHIBITOR's
+            // OWN field (gf.u2 "ca_cyt", see model line 369), so this vector source is nonlinear in
+            // its OWN unknown:   V = dir * r * c * (1 - c/K),   dir = grad(phi)/|grad(phi)| (frozen).
+            // Previously the Jacobian was zeroed, degrading the inhibitor Newton solve to a PICARD
+            // iteration (measured contraction ~0.67 -> up to 9 iters and near-divergence at large dt;
+            // this was the primary large-dt bottleneck, NOT the intracellular block).
+            //   dV/dc = dir * r * (1 - 2c/K).   The curvature window (Heaviside) stays lagged.
+            // Idiom verified against ugcore .../linker/darcy_velocity_linker.h. See REPORT section 3.0.
+            if (m_spDTubuline.valid() && !m_spDTubuline->zero_derivative())
+            for (size_t ip = 0; ip < nip; ++ip)
+            {
+               if (!(vCurvature[ip] > minimo && vCurvature[ip] < maximo))
+                  continue;                                   // outside window: V=0, dV=0
+
+               MathVector<dim> direccion;
+               const number gradientnorm = VecLength(vLevelSetGrad[ip]);
+               VecScale(direccion, vLevelSetGrad[ip], 1.0 / (gradientnorm + 0.00001));
+
+               const number dflux3_dc = GrowthRate * (1.0 - 2.0 * vTubuline[ip] / MagnitudCapacity);
+
+               for (size_t fct = 0; fct < m_spDTubuline->num_fct(); ++fct)
+               {
+                  const number *dIn = m_spDTubuline->deriv(s, ip, fct);
+                  const size_t cf   = this->input_common_fct(_RHO_, fct);
+                  for (size_t sh = 0; sh < this->num_sh(cf); ++sh)
+                     VecScaleAppend(vvvDeriv[ip][cf][sh], dflux3_dc * dIn[sh], direccion);
+               }
+            }
 
          }
 

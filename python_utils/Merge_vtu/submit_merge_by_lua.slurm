@@ -12,7 +12,6 @@
 #SBATCH -e /dev/null
 
 set -euo pipefail
-mkdir -p logs
 
 # set script vars
 _ntasks=1
@@ -53,21 +52,15 @@ time srun -n $_ntasks --ntasks-per-node=$_ntasks_per_node $HINT_FLAG -c $_nthrea
 ### STEP 2
 #  delete fragments listed by python ----
 if [[ -f "$LIST" ]]; then
-  while IFS= read -r pvtu; do
-    [[ -z "$pvtu" ]] && continue
-
-    case "$pvtu" in
-      "$SIMDIR"/Output_t*.pvtu) ;;
-      *) echo "[delete] SKIP: $pvtu"; continue ;;
+  # The python manifest now lists the .pvtu AND all its Output_p*_t<N>.vtu partition
+  # pieces (fixed 2026-07-02), so just delete every path in it. Guarded to
+  # "$SIMDIR"/Output_* so a malformed line can never rm outside the sim dir.
+  while IFS= read -r frag; do
+    [[ -z "$frag" ]] && continue
+    case "$frag" in
+      "$SIMDIR"/Output_*) rm -f -- "$frag" ;;
+      *) echo "[delete] SKIP unsafe path: $frag" ;;
     esac
-
-    t_str="$(basename "$pvtu")"
-    t_str="${t_str#Output_t}"
-    t_str="${t_str%.pvtu}"
-
-    rm -f -- "$pvtu"
-    find "$SIMDIR" -maxdepth 1 -type f -name "Output_p*_t${t_str}.vtu" -delete
-
   done < "$LIST"
   rm -f -- "$LIST"
 else

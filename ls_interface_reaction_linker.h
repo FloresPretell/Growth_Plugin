@@ -270,6 +270,57 @@ namespace ug
             //	clear all derivative values
             this->set_zero(vvvDeriv, nip);
 
+            // Analytic smooth-part Jacobian (Phase D.3, 2026-06-30). Previously this linker
+            // returned a ZERO Jacobian (frozen/Picard tangent), which makes the intracellular
+            // Newton block degrade as dt / refinement grow. Here we fill the differentiable
+            // part of dR/d(input); the curvature window (Heaviside) and the velocity-sign
+            // branch are non-smooth and remain lagged (their derivative is a discontinuity).
+            // R = s * [ SecondTerm*Mag*g(F1) + Cadd ], g(F1)=F1^2/(Cdiv+F1^2), s=sign(VelDef).
+            //   dR/dSecondTerm = s*Mag*g(F1)                  -> slot _B_   (tubulin<->u term)
+            //   dR/dFirstTerm  = s*SecondTerm*Mag*g'(F1)      -> slot _RHO_ (calcium Hill term)
+            // Index/idiom verified against ugcore .../linker/darcy_velocity_linker.h.
+            // See PhaseA_mathematical_analysis.md section 3.2.
+            for (size_t ip = 0; ip < nip; ++ip)
+            {
+               if (!(vCurvature[ip] > minimo && vCurvature[ip] < maximo))
+                  continue;                                  // outside window: value 0, deriv 0
+
+               number sgn;
+               if (vVelDeformation[ip] < 0.0)       sgn = -1.0;
+               else if (vVelDeformation[ip] == 0.0) sgn =  0.0;
+               else                                 sgn =  1.0;
+               if (sgn == 0.0) continue;                     // value pinned to 0
+
+               const number F1    = vFirstTerm[ip];
+               const number F1sq  = F1 * F1;
+               const number denom = Constantdiv + F1sq;
+               if (denom <= 0.0) continue;                   // guard 0/0 (Cdiv=0 & F1=0)
+               const number g  = F1sq / denom;               // F1^2/(Cdiv+F1^2)
+               const number gp = 2.0 * F1 * Constantdiv / (denom * denom); // g'(F1)
+
+               const number dR_dSecond = sgn * MagnitudFlux * g;
+               const number dR_dFirst  = sgn * vSecondTerm[ip] * MagnitudFlux * gp;
+
+               // d R / d SecondTerm  (input slot _B_)
+               if (m_spDSecondTerm.valid() && !m_spDSecondTerm->zero_derivative())
+                  for (size_t fct = 0; fct < m_spDSecondTerm->num_fct(); ++fct)
+                  {
+                     const number *dIn = m_spDSecondTerm->deriv(s, ip, fct);
+                     const size_t cf   = this->input_common_fct(_B_, fct);
+                     for (size_t sh = 0; sh < this->num_sh(cf); ++sh)
+                        vvvDeriv[ip][cf][sh] += dR_dSecond * dIn[sh];
+                  }
+
+               // d R / d FirstTerm  (input slot _RHO_)
+               if (m_spDFirstTerm.valid() && !m_spDFirstTerm->zero_derivative())
+                  for (size_t fct = 0; fct < m_spDFirstTerm->num_fct(); ++fct)
+                  {
+                     const number *dIn = m_spDFirstTerm->deriv(s, ip, fct);
+                     const size_t cf   = this->input_common_fct(_RHO_, fct);
+                     for (size_t sh = 0; sh < this->num_sh(cf); ++sh)
+                        vvvDeriv[ip][cf][sh] += dR_dFirst * dIn[sh];
+                  }
+            }
 
          }
 

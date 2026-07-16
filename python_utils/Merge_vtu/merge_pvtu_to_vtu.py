@@ -38,7 +38,11 @@ def merge_pvtu_to_vtu(root=None, list_to_delete=None):
             merged_count += 1
             if name_list:
                 name_list.write(pvtu + "\n")
-                parts = sorted(glob.glob(os.path.join(root, stem + "_*.vtu")))
+                # FIX 2026-07-02: partition pieces are named Output_p<NN>_t<NNNN>.vtu,
+                # NOT Output_t<NNNN>_*.vtu. The old glob matched nothing, so the ~96
+                # partition files per timestep were never listed/deleted.
+                tnum = stem.replace("Output_t", "")
+                parts = sorted(glob.glob(os.path.join(root, f"Output_p*_t{tnum}.vtu")))
                 for p in parts:
                     name_list.write(p + "\n")
                     
