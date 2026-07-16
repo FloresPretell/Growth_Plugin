@@ -59,6 +59,11 @@
 #include "ls_initial_value_interface.h"
 #include "ls_tensor_linker.h"
 
+//	Refinement_LS: our level-set refinement / interface-fitted projectors (relocated 2026-07-16
+//	from Dmitry's LevelSet plugin; we use LevelSet but do not modify it). Self-contained headers.
+#include "Refinement_LS/refinement_ls.h"
+#include "Refinement_LS/ls_signed_normal_linker.h"   // w = sign(phi)*grad(phi)/|grad(phi)|
+
 using namespace std;
 using namespace ug::bridge;
 
@@ -204,6 +209,21 @@ namespace ug
 					reg.add_class_to_group(name, "LSTensorLinker", tag);
 				}
 
+				//	Refinement_LS: signed unit normal velocity  w = sign(phi)*grad(phi)/|grad(phi)|
+				//	(drives reinit + velocity-extension on the hanging mesh via FV1_Convectionhang)
+				{
+					string name = string("LSSignedNormal").append(suffix);
+					typedef LSSignedNormal<dim> T;
+					typedef DependentUserData<MathVector<dim>, dim> TBase;
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_method("set_levelset_gradient", &T::set_levelset_gradient)
+						 .add_method("set_levelset_value", &T::set_levelset_value)
+						 .add_method("set_eps", &T::set_eps)
+						 .add_constructor()
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "LSSignedNormal", tag);
+				}
+
 
 			} // end Domain Algebra
 
@@ -228,6 +248,9 @@ namespace ug
 				// typedef ApproximationSpace<TDomain> approximation_space_type;
 				typedef GridFunction<TDomain, TAlgebra> function_type;
 				static const int dim = TDomain::dim;
+
+				//	Refinement_LS: register the level-set refinement markers + SWC phi + tube prepare
+				RefinementLS::RegisterDomainAlgebra<TDomain, TAlgebra>(reg, grp);
 
 				//	Special linker for the Darcy velocity
 				{
@@ -485,6 +508,9 @@ namespace ug
 			RegisterDimensionDependent<Functionality>(*reg,grp);
 			RegisterDomain2d3dDependent<Functionality>(*reg, grp);
 			RegisterDomain2d3dAlgebraDependent<Functionality>(*reg, grp);
+
+		//	Refinement_LS: dimension-independent projector classes + file-based conforming refiners
+			RefinementLS::RegisterCommon(*reg, grp);
 		}
 		UG_REGISTRY_CATCH_THROW(grp);
 	}
