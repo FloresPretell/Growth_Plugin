@@ -9,10 +9,9 @@
 #SBATCH --array=0-0
 #SBATCH --mem=200G
 #SBATCH -o /dev/null
-#SBATCH -e logs/%x_%A_%a.err
+#SBATCH -e /dev/null
 
 set -euo pipefail
-mkdir -p logs
 
 # set script vars
 _ntasks=1

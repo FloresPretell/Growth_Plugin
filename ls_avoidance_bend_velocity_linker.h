@@ -31,8 +31,8 @@
  * GNU Lesser General Public License for more details.
  */
 
-#ifndef __H__UG__PLUGINS__LEVEL_SET_CONCENTRATION_VELOCITY_LINKER__
-#define __H__UG__PLUGINS__LEVEL_SET_CONCENTRATION_VELOCITY_LINKER__
+#ifndef __H__UG__PLUGINS__LS_AVOIDANCE_BEND_VELOCITY_LINKER__
+#define __H__UG__PLUGINS__LS_AVOIDANCE_BEND_VELOCITY_LINKER__
 
 // ug4 headers
 #include "lib_disc/spatial_disc/user_data/linker/linker.h"
@@ -52,8 +52,8 @@ namespace ug
 
 
 		template <typename TDomain, typename TAlgebra>
-		class LSConcentrationDepentVelocity
-			 : public StdDataLinker<LSConcentrationDepentVelocity<TDomain, TAlgebra>, MathVector<TDomain::dim>, TDomain::dim>
+		class LSAvoidanceBendVelocity
+			 : public StdDataLinker<LSAvoidanceBendVelocity<TDomain, TAlgebra>, MathVector<TDomain::dim>, TDomain::dim>
 		{
 			//	domain type
 			typedef TDomain domain_type;
@@ -65,13 +65,13 @@ namespace ug
 			static const int dim = domain_type::dim;
 
 			//	Base class type
-			typedef StdDataLinker<LSConcentrationDepentVelocity<domain_type, algebra_type>, MathVector<dim>, dim> base_type;
+			typedef StdDataLinker<LSAvoidanceBendVelocity<domain_type, algebra_type>, MathVector<dim>, dim> base_type;
 
 			//	extrapolation type
 			typedef IInterfaceExtrapolation<domain_type, algebra_type> extrapol_type;
 
 		public:
-			LSConcentrationDepentVelocity(SmartPtr<extrapol_type> spExtrapol) : 
+			LSAvoidanceBendVelocity(SmartPtr<extrapol_type> spExtrapol) : 
 				m_spExtrapolation(spExtrapol),
 				m_spCalcium(NULL), m_spDCalcium(NULL),
 				m_spTubuline(NULL), m_spDTubuline(NULL),
@@ -116,7 +116,7 @@ namespace ug
 										const MathVector<dim> &globIP,
 										number time, int si) const
 			{
-				UG_THROW("LSConcentrationDepentVelocity: Element is necessary for the evaluation.");
+				UG_THROW("LSAvoidanceBendVelocity: Element is necessary for the evaluation.");
 			}
 
 			template <int refDim>
@@ -215,11 +215,23 @@ namespace ug
 								// 1. Calcular la norma del gradiente de inhibición
 								number inhibicionNorm = VecLength(vInhibitionGrad[ip]); // Magnitud de grad(inh)
 
-								// CROWD-STALL REMOVED (2026-07-08, Nicole): the isotropic gradient-cancel stall
-								// was an artificial numerical patch with no biological basis. "Surrounded ->
-								// stop advancing" is now handled biologically by RETRACTION (fires on the scalar
-								// inhibitor = whole-cone collapse under uniform repellent); branch spacing is the
-								// inhibitor field's own lateral inhibition. Directional response runs unconditionally.
+								// #1 CROWD-STALL FIX (20260706): when grad(inh) cancels (cone surrounded on
+								// several sides), the directional steer is noise (velInhibicion -> 0 -> no-op),
+								// so the cone grows straight into the crowd and forms holes. Instead slow growth
+								// ISOTROPICALLY, keyed on the SCALAR inhibitor (which does NOT cancel), stalling
+								// growth in the crowded interior while free tips (clear gradient) keep steering.
+								const number gradFloor = 0.15;
+								// RETRACTION regime (inh>=sign) must NOT be diverted to the isotropic crowd-stall
+								// when grad(inh) cancels (symmetric head-on saturation): recede is intrinsic and
+								// needs no gradient direction. Only stall the AVOIDANCE regime when grad cancels.
+								const bool retractRegime = (vInhibition[ip] >= minimoInhSign && minimoInhibition < minimoInhSign);
+								if (inhibicionNorm < gradFloor && !retractRegime)
+								{
+									number slow = 1.0 - vInhibition[ip];
+									if (slow < 0.0) slow = 0.0;
+									VecScale(vValue[ip], vValue[ip], slow); // isotropic stall
+								}
+								else
 								{
 
 								// 2. Calcular el cuadrado de la norma del gradiente de inhibición
@@ -257,23 +269,31 @@ namespace ug
 								///      toward the neighbour / inward — so tips receded and branches collapsed.)
 								///   RETRACTION (inh>=inh_sign): recede along -growth direction at a fraction
 								///     retractRate of the growth speed (old -(V-velInh) was ~-2|V| and sideways).
-								const number retractRate = 4.0; // STRONG (was 0.5): exceeds growth so tips genuinely RECEDE, not stall
+								const number retractRate = 1.8;  // RAISED from 0.5: recede FASTER than growth so head-on nets apart (test) // TODO expose as CLI -retract_rate; tune with Nicole
 								if (vInhibition[ip] >= minimoInhSign && minimoInhibition < minimoInhSign)
 								{
-									// RETRACTION: recede along the growth axis at a magnitude that EXCEEDS growth
-									// (floored), so the tip genuinely RECEDES (net area loss), not just stalls (Nicole 2026-07-08).
+									// RETRACTION: recede along the (inward) growth axis at a FLOORED magnitude, so a
+									// jammed / tubulin-starved tip (magnitud -> 0, exactly the head-on collision case)
+									// still recedes at a real speed instead of freezing and welding to its neighbour.
 									number rmag = retractRate * magnitud;
-									const number rfloor = 0.6 * MagnitudVelocity;
+									const number rfloor = 0.4 * MagnitudVelocity;
 									if (rmag < rfloor) rmag = rfloor;
 									VecScale(vValue[ip], DirectionGrowth, -rmag);
 								}
 								else
 								{
-									// AVOIDANCE (redirection): tangential steer away, speed preserved
-									MathVector<dim> steer;
-									VecSubtract(steer, vValue[ip], velInhibicion); // V - velInh (points away from neighbour)
-									number steerNorm = VecLength(steer) + 0.0000001;
-									VecScale(vValue[ip], steer, magnitud / steerNorm);
+									// AVOIDANCE by DIFFERENTIAL NORMAL GROWTH (bend): the interface only
+									// advects by V.n, so rotating V tangentially is projected out (lost).
+									// Instead reduce the growth MAGNITUDE on the side whose growth points
+									// TOWARD the inhibitor (facing the neighbour) -> that side grows less,
+									// the far side grows normally -> the tip BENDS AWAY. This is real steering
+									// the interface obeys. alphaBend = steering strength.
+									number gNbend = VecLength(vInhibitionGrad[ip]) + 0.0000001;
+									number facing = VecDot(DirectionGrowth, vInhibitionGrad[ip]) / gNbend; // >0 = toward inhibitor
+									const number alphaBend = 1.5;
+									number bend = 1.0 - alphaBend * (facing > 0.0 ? facing : 0.0);
+									if (bend < 0.0) bend = 0.0;
+									VecScale(vValue[ip], vValue[ip], bend); // keep outward direction, slow the facing side
 								}
 								} // end else: clear-gradient directional response (crowd-stall handled above)
 
@@ -407,11 +427,20 @@ namespace ug
 								// 1. Calcular la norma del gradiente de inhibición
 								number inhibicionNorm = VecLength(vInhibitionGrad[ip]) ; // Magnitud de grad(inh)
 
-								// CROWD-STALL REMOVED (2026-07-08, Nicole): the isotropic gradient-cancel stall
-								// was an artificial numerical patch with no biological basis. "Surrounded ->
-								// stop advancing" is now handled biologically by RETRACTION (fires on the scalar
-								// inhibitor = whole-cone collapse under uniform repellent); branch spacing is the
-								// inhibitor field's own lateral inhibition. Directional response runs unconditionally.
+								// #1 CROWD-STALL FIX (20260706): mirror of evaluate(). Surrounded cone (grad
+								// cancels) -> isotropic slow-down keyed on the scalar inhibitor, not a noise steer.
+								const number gradFloor = 0.15;
+								// RETRACTION regime (inh>=sign) must NOT be diverted to the isotropic crowd-stall
+								// when grad(inh) cancels (symmetric head-on saturation): recede is intrinsic and
+								// needs no gradient direction. Only stall the AVOIDANCE regime when grad cancels.
+								const bool retractRegime = (vInhibition[ip] >= minimoInhSign && minimoInhibition < minimoInhSign);
+								if (inhibicionNorm < gradFloor && !retractRegime)
+								{
+									number slow = 1.0 - vInhibition[ip];
+									if (slow < 0.0) slow = 0.0;
+									VecScale(vDarcyVel[ip], vDarcyVel[ip], slow); // isotropic stall
+								}
+								else
 								{
 
 								// 2. Calcular el cuadrado de la norma del gradiente de inhibición
@@ -441,23 +470,26 @@ namespace ug
 
 								/// ===== CALIBRATED velocity modification (20260702, UG4_test1 copy) =====
 								/// Mirrors evaluate(): AVOIDANCE steers away preserving speed; RETRACTION recedes.
-								const number retractRate = 4.0; // STRONG (was 0.5): exceeds growth so tips genuinely RECEDE, not stall
+								const number retractRate = 1.8;  // RAISED from 0.5: recede FASTER than growth so head-on nets apart (test) // TODO expose as CLI -retract_rate; tune with Nicole
 								if (vInhibition[ip] >= minimoInhSign && minimoInhibition < minimoInhSign)
 								{
-									// RETRACTION: recede along the growth axis at a magnitude that EXCEEDS growth
-									// (floored), so the tip genuinely RECEDES (net area loss), not just stalls (Nicole 2026-07-08).
+									// RETRACTION: recede along the (inward) growth axis at a FLOORED magnitude, so a
+									// jammed / tubulin-starved tip (magnitud -> 0, exactly the head-on collision case)
+									// still recedes at a real speed instead of freezing and welding to its neighbour.
 									number rmag = retractRate * magnitud;
-									const number rfloor = 0.6 * MagnitudVelocity;
+									const number rfloor = 0.4 * MagnitudVelocity;
 									if (rmag < rfloor) rmag = rfloor;
 									VecScale(vDarcyVel[ip], DirectionGrowth, -rmag);
 								}
 								else
 								{
-									// AVOIDANCE (redirection): tangential steer away, speed preserved
-									MathVector<dim> steer;
-									VecSubtract(steer, vDarcyVel[ip], velInhibicion); // V - velInh (away from neighbour)
-									number steerNorm = VecLength(steer) + 0.0000001;
-									VecScale(vDarcyVel[ip], steer, magnitud / steerNorm);
+									// AVOIDANCE by DIFFERENTIAL NORMAL GROWTH (bend) — mirrors evaluate().
+									number gNbend = VecLength(vInhibitionGrad[ip]) + 0.0000001;
+									number facing = VecDot(DirectionGrowth, vInhibitionGrad[ip]) / gNbend; // >0 = toward inhibitor
+									const number alphaBend = 1.5;
+									number bend = 1.0 - alphaBend * (facing > 0.0 ? facing : 0.0);
+									if (bend < 0.0) bend = 0.0;
+									VecScale(vDarcyVel[ip], vDarcyVel[ip], bend); // keep outward direction, slow the facing side
 								}
 								} // end else: clear-gradient directional response (crowd-stall handled above)
 

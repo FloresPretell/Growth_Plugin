@@ -31,8 +31,8 @@
  * GNU Lesser General Public License for more details.
  */
 
-#ifndef __H__UG__PLUGINS__LEVEL_SET_CONCENTRATION_VELOCITY_LINKER__
-#define __H__UG__PLUGINS__LEVEL_SET_CONCENTRATION_VELOCITY_LINKER__
+#ifndef __H__UG__PLUGINS__LEVEL_SET_CONCENTRATION_VELOCITY_ROBUST_LINKER__
+#define __H__UG__PLUGINS__LEVEL_SET_CONCENTRATION_VELOCITY_ROBUST_LINKER__
 
 // ug4 headers
 #include "lib_disc/spatial_disc/user_data/linker/linker.h"
@@ -52,8 +52,8 @@ namespace ug
 
 
 		template <typename TDomain, typename TAlgebra>
-		class LSConcentrationDepentVelocity
-			 : public StdDataLinker<LSConcentrationDepentVelocity<TDomain, TAlgebra>, MathVector<TDomain::dim>, TDomain::dim>
+		class LSConcentrationDepentVelocityRobust
+			 : public StdDataLinker<LSConcentrationDepentVelocityRobust<TDomain, TAlgebra>, MathVector<TDomain::dim>, TDomain::dim>
 		{
 			//	domain type
 			typedef TDomain domain_type;
@@ -65,13 +65,13 @@ namespace ug
 			static const int dim = domain_type::dim;
 
 			//	Base class type
-			typedef StdDataLinker<LSConcentrationDepentVelocity<domain_type, algebra_type>, MathVector<dim>, dim> base_type;
+			typedef StdDataLinker<LSConcentrationDepentVelocityRobust<domain_type, algebra_type>, MathVector<dim>, dim> base_type;
 
 			//	extrapolation type
 			typedef IInterfaceExtrapolation<domain_type, algebra_type> extrapol_type;
 
 		public:
-			LSConcentrationDepentVelocity(SmartPtr<extrapol_type> spExtrapol) : 
+			LSConcentrationDepentVelocityRobust(SmartPtr<extrapol_type> spExtrapol) : 
 				m_spExtrapolation(spExtrapol),
 				m_spCalcium(NULL), m_spDCalcium(NULL),
 				m_spTubuline(NULL), m_spDTubuline(NULL),
@@ -116,7 +116,7 @@ namespace ug
 										const MathVector<dim> &globIP,
 										number time, int si) const
 			{
-				UG_THROW("LSConcentrationDepentVelocity: Element is necessary for the evaluation.");
+				UG_THROW("LSConcentrationDepentVelocityRobust: Element is necessary for the evaluation.");
 			}
 
 			template <int refDim>
@@ -191,12 +191,27 @@ namespace ug
 						{
 							//	Calculate Direccion = normal
 							MathVector<dim> DirectionGrowth;                                              // vector to save direction of the velocity
-							number gradientnorm = VecLength(vDirection[ip]);                     // obtain the norm of the gradient of the LevelSet
-							VecScale(DirectionGrowth, vDirection[ip], 1.0 / (gradientnorm + 0.0000001)); // normalize the gradient of the LevelSet
+							number gradientnorm = VecLength(m_useNormalDir ? vLevelSetGrad[ip] : vDirection[ip]);                     // obtain the norm of the gradient of the LevelSet
+							VecScale(DirectionGrowth, m_useNormalDir ? vLevelSetGrad[ip] : vDirection[ip], 1.0 / (gradientnorm + 0.0000001)); // normalize the gradient of the LevelSet
 
 							// Magnitud of the growth
-							number growth = MagnitudVelocity * vTubuline[ip]; // cantidad de concentración que entrará por las paredes
-							number magnitud = growth * vMAPb[ip]; // cantidad de concentración que entr
+							// ROBUST 20260706: saturate the tubulin response so one high-tubulin branch cannot
+							// dominate (winner-take-all: tubulin 0.3..36 -> 120x velocity spread -> one branch grows/
+							// thickens/pinches while others starve+thin). Michaelis-Menten tub/(Ksat+tub) compresses
+							// the range -> EVEN growth across branches. m_tubSat=0 keeps the original linear response.
+							number tubEff = (m_tubSat > 0.0) ? (vTubuline[ip] / (m_tubSat + vTubuline[ip])) : vTubuline[ip];
+							number growth = MagnitudVelocity * tubEff; // cantidad de concentración que entrará por las paredes
+							number magnitud = growth * (vMAPb[ip] > m_bFloor ? vMAPb[ip] : m_bFloor); // ROBUST: floor MAP2-bound // cantidad de concentración que entr
+							// ROBUST 20260706: TIP-SHARPENING. Concentrate the velocity where the growth
+							// direction aligns with the outward normal (the very tip: d.n ~ 1) and suppress it
+							// on the shaft (d axial, n radial: d.n ~ 0). magnitud *= (d.n)^(tipSharp-1) makes
+							// branches grow THIN and LONG instead of thickening over the tip patch. 1 = off.
+							if (m_tipSharp > 1.0) {
+								number _nn = VecLength(vLevelSetGrad[ip]) + 1e-9;
+								number _al = VecDot(DirectionGrowth, vLevelSetGrad[ip]) / _nn; // d.n (DirectionGrowth is unit)
+								if (_al < 0.0) _al = 0.0;
+								magnitud *= pow(_al, m_tipSharp - 1.0);
+							}
 
 							// obtener la velocidad : magnitud . direction
 							VecScale(vValue[ip], DirectionGrowth, magnitud);
@@ -214,13 +229,6 @@ namespace ug
 						
 								// 1. Calcular la norma del gradiente de inhibición
 								number inhibicionNorm = VecLength(vInhibitionGrad[ip]); // Magnitud de grad(inh)
-
-								// CROWD-STALL REMOVED (2026-07-08, Nicole): the isotropic gradient-cancel stall
-								// was an artificial numerical patch with no biological basis. "Surrounded ->
-								// stop advancing" is now handled biologically by RETRACTION (fires on the scalar
-								// inhibitor = whole-cone collapse under uniform repellent); branch spacing is the
-								// inhibitor field's own lateral inhibition. Directional response runs unconditionally.
-								{
 
 								// 2. Calcular el cuadrado de la norma del gradiente de inhibición
 								number inhibicionNorm2 = inhibicionNorm * inhibicionNorm + 0.0000001; // /grad(inh)/^2, evitando divisiones por cero
@@ -257,15 +265,11 @@ namespace ug
 								///      toward the neighbour / inward — so tips receded and branches collapsed.)
 								///   RETRACTION (inh>=inh_sign): recede along -growth direction at a fraction
 								///     retractRate of the growth speed (old -(V-velInh) was ~-2|V| and sideways).
-								const number retractRate = 4.0; // STRONG (was 0.5): exceeds growth so tips genuinely RECEDE, not stall
+								const number retractRate = 0.5; // TODO expose as CLI -retract_rate; tune with Nicole
 								if (vInhibition[ip] >= minimoInhSign && minimoInhibition < minimoInhSign)
 								{
-									// RETRACTION: recede along the growth axis at a magnitude that EXCEEDS growth
-									// (floored), so the tip genuinely RECEDES (net area loss), not just stalls (Nicole 2026-07-08).
-									number rmag = retractRate * magnitud;
-									const number rfloor = 0.6 * MagnitudVelocity;
-									if (rmag < rfloor) rmag = rfloor;
-									VecScale(vValue[ip], DirectionGrowth, -rmag);
+									// RETRACTION: controlled recede along the (inward) growth axis
+									VecScale(vValue[ip], vValue[ip], -retractRate);
 								}
 								else
 								{
@@ -275,7 +279,6 @@ namespace ug
 									number steerNorm = VecLength(steer) + 0.0000001;
 									VecScale(vValue[ip], steer, magnitud / steerNorm);
 								}
-								} // end else: clear-gradient directional response (crowd-stall handled above)
 
 							}
 
@@ -284,8 +287,8 @@ namespace ug
 						{
 							//	Calculate Direccion = normal
 							MathVector<dim> DirectionGrowth;                                              // vector to save direction of the velocity
-							number gradientnorm = VecLength(vDirection[ip]);                     // obtain the norm of the gradient of the LevelSet
-							VecScale(DirectionGrowth, vDirection[ip], 1.0 / (gradientnorm + 0.0000001)); // normalize the gradient of the LevelSet
+							number gradientnorm = VecLength(m_useNormalDir ? vLevelSetGrad[ip] : vDirection[ip]);                     // obtain the norm of the gradient of the LevelSet
+							VecScale(DirectionGrowth, m_useNormalDir ? vLevelSetGrad[ip] : vDirection[ip], 1.0 / (gradientnorm + 0.0000001)); // normalize the gradient of the LevelSet
 
 							//	The sleecte top dont have the enough tubulin, but to mantain their position, we will put a small growth 
 							// Magnitud to mantain the position	of the top
@@ -387,12 +390,27 @@ namespace ug
 						{
 							//	Calculate Direccion = DirectionGrowth
 							MathVector<dim> DirectionGrowth;                                              // vector to save direction of the velocity
-							number gradientnorm = VecLength(vDirection[ip]);                     // obtain the norm of the gradient of the LevelSet
-							VecScale(DirectionGrowth, vDirection[ip], 1.0 / (gradientnorm + 0.0000001)); // normalize the gradient of the LevelSet
+							number gradientnorm = VecLength(m_useNormalDir ? vLevelSetGrad[ip] : vDirection[ip]);                     // obtain the norm of the gradient of the LevelSet
+							VecScale(DirectionGrowth, m_useNormalDir ? vLevelSetGrad[ip] : vDirection[ip], 1.0 / (gradientnorm + 0.0000001)); // normalize the gradient of the LevelSet
 
 							// Magnitud of the growth
-							number growth = MagnitudVelocity * vTubuline[ip]; // cantidad de concentración que entrará por las paredes
-							number magnitud = growth * vMAPb[ip]; // cantidad de concentración que entr
+							// ROBUST 20260706: saturate the tubulin response so one high-tubulin branch cannot
+							// dominate (winner-take-all: tubulin 0.3..36 -> 120x velocity spread -> one branch grows/
+							// thickens/pinches while others starve+thin). Michaelis-Menten tub/(Ksat+tub) compresses
+							// the range -> EVEN growth across branches. m_tubSat=0 keeps the original linear response.
+							number tubEff = (m_tubSat > 0.0) ? (vTubuline[ip] / (m_tubSat + vTubuline[ip])) : vTubuline[ip];
+							number growth = MagnitudVelocity * tubEff; // cantidad de concentración que entrará por las paredes
+							number magnitud = growth * (vMAPb[ip] > m_bFloor ? vMAPb[ip] : m_bFloor); // ROBUST: floor MAP2-bound // cantidad de concentración que entr
+							// ROBUST 20260706: TIP-SHARPENING. Concentrate the velocity where the growth
+							// direction aligns with the outward normal (the very tip: d.n ~ 1) and suppress it
+							// on the shaft (d axial, n radial: d.n ~ 0). magnitud *= (d.n)^(tipSharp-1) makes
+							// branches grow THIN and LONG instead of thickening over the tip patch. 1 = off.
+							if (m_tipSharp > 1.0) {
+								number _nn = VecLength(vLevelSetGrad[ip]) + 1e-9;
+								number _al = VecDot(DirectionGrowth, vLevelSetGrad[ip]) / _nn; // d.n (DirectionGrowth is unit)
+								if (_al < 0.0) _al = 0.0;
+								magnitud *= pow(_al, m_tipSharp - 1.0);
+							}
 
 							// obtener la velocidad : magnitud . direction
 							VecScale(vDarcyVel[ip], DirectionGrowth, magnitud);
@@ -406,13 +424,6 @@ namespace ug
 							
 								// 1. Calcular la norma del gradiente de inhibición
 								number inhibicionNorm = VecLength(vInhibitionGrad[ip]) ; // Magnitud de grad(inh)
-
-								// CROWD-STALL REMOVED (2026-07-08, Nicole): the isotropic gradient-cancel stall
-								// was an artificial numerical patch with no biological basis. "Surrounded ->
-								// stop advancing" is now handled biologically by RETRACTION (fires on the scalar
-								// inhibitor = whole-cone collapse under uniform repellent); branch spacing is the
-								// inhibitor field's own lateral inhibition. Directional response runs unconditionally.
-								{
 
 								// 2. Calcular el cuadrado de la norma del gradiente de inhibición
 								number inhibicionNorm2 = inhibicionNorm * inhibicionNorm + 0.0000001; // /grad(inh)/^2, evitando divisiones por cero
@@ -441,15 +452,11 @@ namespace ug
 
 								/// ===== CALIBRATED velocity modification (20260702, UG4_test1 copy) =====
 								/// Mirrors evaluate(): AVOIDANCE steers away preserving speed; RETRACTION recedes.
-								const number retractRate = 4.0; // STRONG (was 0.5): exceeds growth so tips genuinely RECEDE, not stall
+								const number retractRate = 0.5; // TODO expose as CLI -retract_rate; tune with Nicole
 								if (vInhibition[ip] >= minimoInhSign && minimoInhibition < minimoInhSign)
 								{
-									// RETRACTION: recede along the growth axis at a magnitude that EXCEEDS growth
-									// (floored), so the tip genuinely RECEDES (net area loss), not just stalls (Nicole 2026-07-08).
-									number rmag = retractRate * magnitud;
-									const number rfloor = 0.6 * MagnitudVelocity;
-									if (rmag < rfloor) rmag = rfloor;
-									VecScale(vDarcyVel[ip], DirectionGrowth, -rmag);
+									// RETRACTION: controlled recede along the (inward) growth axis
+									VecScale(vDarcyVel[ip], vDarcyVel[ip], -retractRate);
 								}
 								else
 								{
@@ -459,7 +466,6 @@ namespace ug
 									number steerNorm = VecLength(steer) + 0.0000001;
 									VecScale(vDarcyVel[ip], steer, magnitud / steerNorm);
 								}
-								} // end else: clear-gradient directional response (crowd-stall handled above)
 
 							}
 						
@@ -469,8 +475,8 @@ namespace ug
 						{
 							//	Calculate Direccion = normal
 							MathVector<dim> DirectionGrowth;                                              // vector to save direction of the velocity
-							number gradientnorm = VecLength(vDirection[ip]);                     // obtain the norm of the gradient of the LevelSet
-							VecScale(DirectionGrowth, vDirection[ip], 1.0 / (gradientnorm + 0.0000001)); // normalize the gradient of the LevelSet
+							number gradientnorm = VecLength(m_useNormalDir ? vLevelSetGrad[ip] : vDirection[ip]);                     // obtain the norm of the gradient of the LevelSet
+							VecScale(DirectionGrowth, m_useNormalDir ? vLevelSetGrad[ip] : vDirection[ip], 1.0 / (gradientnorm + 0.0000001)); // normalize the gradient of the LevelSet
 
 							//	The sleecte top dont have the enough tubulin, but to mantain their position, we will put a small growth 
 							// Magnitud to mantain the position	of the top
@@ -659,6 +665,10 @@ namespace ug
 
 
 			///	set LevelSet gradient import
+			void set_map_b_floor(number data) { m_bFloor = data; } // ROBUST
+			void set_use_normal_direction(number data) { m_useNormalDir = (int) data; } // ROBUST direction toggle
+			void set_tubulin_saturation(number data) { m_tubSat = data; } // ROBUST: >0 => Michaelis-Menten tubulin response (even growth across branches)
+			void set_tip_sharpness(number data) { m_tipSharp = data; } // ROBUST: >1 => concentrate growth at the tip point (thin, long branches)
 			void set_magnitud_velocity(number data)
 			{
 				m_spMagnitudVelocity = data;
@@ -734,6 +744,10 @@ namespace ug
 
 			///	import the values of magnitud
 			number m_spMagnitudVelocity;
+			number m_bFloor = 0.0; // ROBUST floor for MAP2-bound
+			int m_useNormalDir = 0; // ROBUST: 1 => grow along OUTWARD LSF normal (fix inward-direction retraction)
+			number m_tubSat = 0.0; // ROBUST: tubulin saturation const Ksat (Michaelis-Menten tub/(Ksat+tub)); 0 = linear (winner-take-all)
+			number m_tipSharp = 1.0; // ROBUST: tip-sharpening exponent on (d.n); >1 => thin/long branches
 
 		};
 

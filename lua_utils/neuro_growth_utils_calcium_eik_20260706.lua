@@ -303,6 +303,18 @@ function GenerateImaginaryMolecule2(ApproxSpace_lsf, gridfunction_gradiente, gri
     -- solve never finishes. Allow CLI overrides to match dt/endTime to the actual mesh.
     geo_dt      = util.GetParamNumber("-eikDt",      geo_dt,      "eikonal substep dt (override; lower for fine meshes)")
     geo_endTime = util.GetParamNumber("-eikEndTime", geo_endTime, "eikonal end time (override; front must reach the tips)")
+    -- [ADAPTIVE 20260706] Decouple the INITIAL full-coverage pass from the per-step WARM-START.
+    -- The eikonal advects at speed ~1, so the front needs endTime >= max distance-from-soma to reach ALL
+    -- branches. On a bigger grid the default endTime is too short -> far branches (e.g. SSW) stay
+    -- under-covered -> their gradient inverts. Fix by covering fully ONCE, then warm-starting cheaply:
+    --   inicial=true  (once at setup): GENEROUS endTime -> the front reaches the whole geometry.
+    --   inicial=false (every growth step): SHORT endTime -> the previous field already covers the old
+    --     geometry, so we only advect enough to reach the small NEW growth increment (fast).
+    if inicial then
+        geo_endTime = util.GetParamNumber("-eikInitEndTime", math.max(geo_endTime, 8.0), "eikonal INITIAL coverage endTime (generous; covers whole geometry once)")
+    else
+        geo_endTime = util.GetParamNumber("-eikWarmEndTime", math.min(geo_endTime, 0.6), "eikonal WARM-START endTime (short; covers the new growth increment)")
+    end
     geo_NumTimeSteps = math.ceil(geo_endTime / geo_dt)
     print(string.format("[eikonal] geo_dt=%.5g endTime=%.5g NumTimeSteps=%d", geo_dt, geo_endTime, geo_NumTimeSteps))
 
@@ -535,21 +547,38 @@ function GenerateImaginaryMolecule2(ApproxSpace_lsf, gridfunction_gradiente, gri
         ---------------------------------c-----------------------------------------------
         --  Timestepping
         --------------------------------------------------------------------------------
-        for step = 1, geo_NumTimeSteps do --- 
-            timeDisc_Gradient:prepare_step(solTimeSeries, geo_dt)
-            geo_newtonSolver:prepare(u)
-            geo_newtonSolver:apply(u)
+        -- [ADAPTIVE 20260706] Fixed substeps, but decoupled per pass (see top of function):
+        -- INITIAL = generous (covers whole geometry once); WARM-START = short (covers the new growth).
+        -- [CHECKPOINT 20260707] On the INITIAL pass ONLY (inicial=true), optionally LOAD a previously-saved
+        -- field instead of running the ~800-substep advection. gradiente_domainDisc + algebra are already built
+        -- above, so downstream (deck GridFuncLSGradientData) stays valid. SaveToFile/ReadFromFile is the
+        -- PST-safe restart primitive (ConnectionViewer's LoadVector restores PST_UNDEFINED and breaks the
+        -- gradient). Valid ONLY for identical mesh+numRef+numPreRef+nprocs+geometry. Warm-starts always advect.
+        local _loadEik = (inicial and util.GetParam("-loadEikInit", "", "load saved INITIAL eikonal (skip advection; identical mesh+nprocs+geometry only)")) or ""
+        local _saveEik = (inicial and util.GetParam("-saveEikInit", "", "save the INITIAL eikonal after computing it (reuse across runs)")) or ""
+        if _loadEik ~= "" then
+            print("[eik] INITIAL: LOADING checkpoint " .. _loadEik .. " (skip " .. geo_NumTimeSteps .. "-substep advection)")
+            ReadFromFile(u, _loadEik)
+        else
+            print(string.format("[eik] %s: %d substeps (endTime=%.3g, dt=%.4g)",
+                  (inicial and "INITIAL coverage" or "warm-start"), geo_NumTimeSteps, geo_endTime, geo_dt))
+            for step = 1, geo_NumTimeSteps do
+                timeDisc_Gradient:prepare_step(solTimeSeries, geo_dt)
+                geo_newtonSolver:prepare(u)
+                geo_newtonSolver:apply(u)
 
-            -- update new time
-            time = timeDisc_Gradient:future_time()
-            --geo_vtkOut:print(folder .. "gradientess", u, step, time) --- antes era time
+                -- update new time
+                time = timeDisc_Gradient:future_time()
 
-            -- update time series
-            local oldestSol = solTimeSeries:oldest() -- obtain  the reference the oldest solution
-            VecAssign(oldestSol, u) -- ssign the neew to the oldes - reinitialize the oldest solution with the new values
-            solTimeSeries:push_discard_oldest(oldestSol, time) -- push the oldest solition swith the new values  to the front, oldest sol pointer is poped  fromn end
-            --  gradiente_domainDisc:project_LSF()
-
+                -- update time series
+                local oldestSol = solTimeSeries:oldest() -- obtain the reference to the oldest solution
+                VecAssign(oldestSol, u) -- assign the new to the oldest - reinitialize with the new values
+                solTimeSeries:push_discard_oldest(oldestSol, time) -- push the oldest with the new values to the front
+            end
+            if _saveEik ~= "" then
+                SaveToFile(u, _saveEik)
+                print("[eik] INITIAL: saved checkpoint -> " .. _saveEik)
+            end
         end
 
     elseif dim == 3 then
@@ -633,242 +662,9 @@ function GenerateImaginaryMolecule2(ApproxSpace_lsf, gridfunction_gradiente, gri
     return u
 end
 
--- =============================================================================================
---  HEAT METHOD for the interior growth direction  (Crane, Weischedel & Wardetzky)
---  20260713 — replaces the eikonal ADVECTION (GenerateImaginaryMolecule2) above.
---
---  WHY: the eikonal solves  dE/dt + div(E*V) = 1,  V = grad(E)/|grad(E)|  by advecting to steady
---  state. That operator is CONVECTION-DOMINATED, so GMG diverges at ref2 (we had to fall back to
---  GMRES+ILU) and it is CFL-limited => hundreds of nonlinear substeps => ~50 min per growth step.
---
---  KEY INSIGHT: every velocity linker NORMALIZES the direction
---    (ls_concentration_dependent_velocity_*linker.h: VecScale(dir, grad, 1/(|grad|+1e-7)))
---  => only the DIRECTION of grad(E) matters; |grad(E)|=1 ("eikonal cleanliness") is irrelevant.
---  So ANY scalar field whose gradient points soma->tip is a valid drop-in.
---
---  THE METHOD (all steps are ELLIPTIC/SPD => GMG is optimal; no CFL, no Newton, no convection):
---    1. screened Poisson:  -t*Lap(u) + u = 0 ,  u = 1 Dirichlet on the SOMA subset ("Bottom"),
---       Neumann-0 at the membrane (LSGF) => u ~ exp(-d_geodesic/sqrt(t)), maximal at the soma.
---    2. X = -grad(u)/|grad(u)|   (points AWAY from the soma = soma->tip)  = EikonalVel(u, scaling=-1)
---    3. Poisson recovery:  Lap(phi) = div(X) ,  phi = 0 on the soma  => phi ~ geodesic distance,
---       grad(phi) points soma->tip. Consumed exactly like the eikonal was.
---
---  *** THE SIGN TRAP ***  UG4's ConvectionDiffusion convention (convection_diffusion_base.h:57-58) is
---        d/dt(m1*c) - div( D*grad(c) - v*c - F ) + r1*c + r2 = f + div(f2)
---  so with set_diffusion(1) it assembles  -Lap(phi) = div(f2).  Crane needs  Lap(phi) = div(X),
---  hence  f2 = -X = +grad(u)/|grad(u)|  =>  set_vector_source( EikonalVel(u):set_scaling(+1) ).
---  Using -1 here silently yields a direction pointing INTO the soma (retraction/thickening that
---  looks like a physics bug). -heatSign flips it; validate_heat_direction reports the sign.
---
---  CHOOSING t:  Crane's default t ~ h^2 is WRONG here. With sqrt(t) ~ h the field decays ~0.38 per
---  cell; at ref2 (L/h ~ 128) the tip value is ~1e-53 — far below the linear solver's residual floor,
---  so grad(u) at the distal tips would be pure Krylov NOISE. Instead set the smoothing length
---        l = sqrt(t) = max(4h, L/10)          =>  t = l^2      (h0=0.125, L=5  =>  l=0.5, t=0.25)
---  which keeps u_tip/u_soma ~ e^-10 = 4.5e-5 (well above a 1e-10 solve) AND resolves the layer
---  (l/h >= 4). Large t is safe: inside a TUBE the level sets of any soma-anchored diffusion are
---  cross-sections, so the gradient stays AXIAL regardless of t — and the linkers normalize anyway.
--- =============================================================================================
-
---- Solver descriptor for the heat/Poisson solves: the SAME bicgstab+GMG block that
---- GenerateImaginaryMolecule already runs successfully at ref2. Both operators here are SPD
---- (-t*Lap+1 and -Lap+eps), so GMG is optimal — -eikConvSolver (GMRES+ILU) is NOT needed.
--- The soma heat source: a ball centred on the soma. Consumed as LuaUserNumber("HeatSomaSource") by
--- GenerateHeatDirection (which sets the HEAT_SOMA_* globals). Signature is UG4's (x, y, z, t).
-HEAT_SOMA_X, HEAT_SOMA_Y, HEAT_SOMA_Z, HEAT_SOMA_R, HEAT_SOMA_S = 0.0, 0.0, 0.0, 0.28, 1.0
-function HeatSomaSource(x, y, z, t)
-    local dx, dy, dz = x - HEAT_SOMA_X, y - HEAT_SOMA_Y, z - HEAT_SOMA_Z
-    if dx * dx + dy * dy + dz * dz <= HEAT_SOMA_R * HEAT_SOMA_R then return HEAT_SOMA_S end
-    return 0.0
-end
-
--- Both heat solves are SPD. Step 1 (screened Poisson, strongly diagonally dominant) is happy with
--- BiCGStab+ILU. Step 3 (the Poisson recovery) is only weakly regularized, and T0 showed BiCGStab
--- BREAKING DOWN on it ("alpha = 0") -> phi came back as a garbage partial iterate, which is what wrecked
--- the direction (G=0.12 vs the eikonal's 0.82), NOT the huge ||phi|| (a constant offset cannot change
--- grad(phi)). For SPD systems CG cannot break down -- but it requires a SYMMETRIC preconditioner, so
--- pair it with a symmetric smoother (sgs), never ILU.
-function HeatSolverDesc(approxSpace, absTol, krylov, smoother)
-    return {
-        type = krylov or "bicgstab",
-        precond = {
-            type = "gmg",
-            approxSpace = approxSpace,
-            smoother = smoother or "ilu",
-            cycle = "V",
-            preSmooth = 2,
-            postSmooth = 2,
-            rap = true,
-            baseSolver = (dim == 3) and ((util.GetParamNumber("-robustInteriorSolve", 0, "3D interior GMG base solver: 0=BiCGStab+ILU, 1=LU") == 1) and "lu" or { type = "bicgstab", precond = { type = "ilu" }, convCheck = { type = "standard", iterations = 200, absolute = 1e-9, reduction = 1e-2, verbose = false } }) or "lu",
-            baselevel = numPreRefs
-        },
-        convCheck = {
-            type = "standard",
-            iterations = 150,
-            absolute = absTol or 1e-10,   -- tight: u at the tips is ~4.5e-5, must not be solver noise
-            reduction = 1e-12,
-            verbose = false
-        }
-    }
-end
-
---- Drop-in replacement for GenerateImaginaryMolecule2 (same signature).
---- Fills `gridfunction_gradiente` with a field whose gradient points soma -> tip.
-function GenerateHeatDirection(ApproxSpace_lsf, gridfunction_gradiente, gridfunction_ls, domain, inicial_pregunta, params)
-    print("Start: HEAT METHOD (interior direction)")
-    local t0 = os.time()
-
-    local approxSpace = ApproxSpace_lsf
-    local lsf         = gridfunction_ls
-    local phi         = gridfunction_gradiente   -- result, written in place
-
-    ------------------------------------------------------------------
-    -- 0. diffusion time t  (l = sqrt(t) is the smoothing length)
-    ------------------------------------------------------------------
-    local h0  = util.GetParamNumber("-heatH0",  0.125, "base mesh size h at numRefs=0 (box 5.0 / 40 cells)")
-    local h   = h0 / math.pow(2, numRefs)
-    local L   = util.GetParamNumber("-heatL",   5.0,   "longest soma->tip geodesic (domain units); only used by the auto-t rule")
-    local ell = util.GetParamNumber("-heatLen", -1.0,  "heat length l=sqrt(t); -1 = auto max(4h, L/10)")
-    if ell <= 0 then
-        local tCLI = util.GetParamNumber("-heatTime", -1.0, "heat diffusion time t; -1 = auto")
-        if tCLI > 0 then ell = math.sqrt(tCLI) else ell = math.max(4.0 * h, L / 10.0) end
-    end
-    local tHeat = ell * ell
-
-    local somaSub  = util.GetParam("-heatSoma", "Bottom", "Dirichlet subset holding the soma value (NOT Outflow!)")
-    local heatSign = util.GetParamNumber("-heatSign", 1.0, "ESCAPE HATCH: flip to -1 if the arrows point INTO the soma")
-    local shortcut = util.HasParamOption("-heatShortcut", "1-solve variant: return -u directly (grad already soma->tip); skips the Poisson recovery")
-    -- Regularisation of the Poisson recovery. 1e-6 left the operator so close to singular that the Krylov
-    -- solver broke down (T0). 1e-3 screens over 1/sqrt(reg) ~ 32 >> L=5, so it does NOT distort the field,
-    -- but it conditions the matrix. (An additive constant is harmless anyway: grad(phi) ignores it.)
-    local reg      = util.GetParamNumber("-heatReg", 1e-3, "reaction-rate regularisation of the Poisson recovery (conditions the near-singular pure-Neumann operator)")
-
-    print(string.format("[heat] t=%.5g  l=sqrt(t)=%.5g  h=%.5g  l/h=%.2f  L/l=%.2f  soma='%s'  sign=%+.0f  %s",
-                        tHeat, ell, h, ell/h, L/ell, somaSub, heatSign, shortcut and "SHORTCUT(1 solve)" or "3-step(2 solves)"))
-    if ell/h < 2.0 then print("[heat] WARN: l/h < 2 -> the screened-Poisson boundary layer is UNDER-RESOLVED (FV1 may oscillate). Raise -heatLen.") end
-    if L/ell > 15.0 then print("[heat] WARN: L/l > 15 -> u at the distal tips ~exp(-15)=3e-7, near the solver noise floor. Raise -heatLen (3-step self-heals).") end
-    if L/ell < 1.0  then print("[heat] WARN: L/l < 1 -> u is nearly CONSTANT; the gradient may be round-off dominated. Lower -heatLen.") end
-
-    ------------------------------------------------------------------
-    -- STEP 1: screened Poisson   -t*Lap(u) + u = 0 ,  u = somaVal on the soma subset
-    --         Neumann-0 at the membrane => GEODESIC (inside-the-neuron) field.  SPD.
-    ------------------------------------------------------------------
-    local u_heat = GridFunction(approxSpace)
-    u_heat:set(0.0)
-
-    ------------------------------------------------------------------
-    -- HOW THE SOMA DRIVES THE HEAT: a localized VOLUME SOURCE, *not* a Dirichlet BC.
-    --
-    -- T0 (job 12811310) proved a nonzero Dirichlet on the soma subset does NOT couple through the
-    -- LSGF projection: the assembled RHS came out identically zero, so BiCGStab hit
-    --   "Method breakdown tt = 0.000000e+00"  (zero initial residual = nothing to solve) and u_heat == 0.
-    -- Note that EVERY working solve in this file (GenerateImaginaryMolecule's set_vector_source, the
-    -- eikonal's set_source(1.0)) is driven by a SOURCE, never by a nonzero Dirichlet. So we use the
-    -- forcing path that is proven to assemble: a source ball centred on the soma.
-    --   -t*Lap(u) + u = S  inside the ball,  0 outside,  Neumann-0 at the membrane.
-    -- Physically identical (heat injected at the soma, decaying with GEODESIC distance) and it is also
-    -- robust to the other candidate cause -- the soma subset's nodes lying outside the level set --
-    -- because the ball is centred on the soma CENTRE, which is interior by construction.
-    -- No Dirichlet at all: the screening term (+u) already makes the operator SPD and non-singular.
-    ------------------------------------------------------------------
-    HEAT_SOMA_X = util.GetParamNumber("-heatSomaX", 0.120585, "soma centre x (default: real pyramidal)")
-    HEAT_SOMA_Y = util.GetParamNumber("-heatSomaY", 0.270423, "soma centre y")
-    HEAT_SOMA_Z = util.GetParamNumber("-heatSomaZ", -0.339068, "soma centre z")
-    -- >= 2h so the ball always captures several nodes, even at ref0 (h = 0.125)
-    HEAT_SOMA_R = util.GetParamNumber("-heatSomaR", math.max(0.28, 2.0 * h), "soma source-ball radius")
-    -- SHORTCUT: a NEGATIVE source makes u most-negative at the soma and RISING outward, so grad(u)
-    -- already points soma->tip and u is a valid drop-in with no recovery solve.
-    HEAT_SOMA_S = shortcut and (-1.0 * heatSign) or 1.0
-
-    local heatEq = ConvectionDiffusionFV1("ca_cyt", "Outer")
-    heatEq:set_diffusion(tHeat)     -- D = t
-    heatEq:set_reaction_rate(1.0)   -- r1 = 1  =>  -t*Lap(u) + u = S   (the +u removes the pure-Laplace degeneracy)
-    heatEq:set_source(LuaUserNumber("HeatSomaSource"))   -- the soma ball (globals above)
-
-    local heatDisc = LSGFsimpleDomainDiscretization(approxSpace)
-    heatDisc:add(heatEq)
-    heatDisc:set_LSF(lsf)
-    heatDisc:set_Neumann0_on_if_for("ca_cyt")   -- no-flux at the membrane => geodesic, not Euclidean
-    heatDisc:project_LSF()
-
-    print(string.format("[heat] soma ball: c=(%.4g,%.4g,%.4g) R=%.4g S=%+.0f", HEAT_SOMA_X, HEAT_SOMA_Y,
-                        HEAT_SOMA_Z, HEAT_SOMA_R, HEAT_SOMA_S))
-
-    local solver1 = util.solver.CreateSolver(HeatSolverDesc(approxSpace, 1e-10))
-    local A1 = AssembledLinearOperator(heatDisc)
-    local b1 = GridFunction(approxSpace); b1:set(0.0)
-    heatDisc:adjust_solution(u_heat)
-    heatDisc:assemble_linear(A1, b1)
-    local nb = VecNorm(b1)
-    solver1:init(A1, u_heat)
-    solver1:apply(u_heat, b1)
-
-    local nu = VecNorm(u_heat)
-    print(string.format("[heat] step1 (screened Poisson) done   ||b|| = %.6g   ||u_heat|| = %.6g", nb, nu))
-    if nb < 1e-14 then
-        print("[heat] FATAL: the assembled RHS is ZERO -> the soma source ball caught no interior node. " ..
-              "Check -heatSomaX/Y/Z/R against the geometry (this is the T0 failure mode).")
-    end
-
-    ------------------------------------------------------------------
-    -- SHORTCUT (1 solve): return u directly; grad(u) already points soma->tip (somaVal = -1)
-    ------------------------------------------------------------------
-    if shortcut then
-        phi:assign(u_heat)
-        gradiente_domainDisc = heatDisc   -- GLOBAL: consumed by GridFuncLSGradientData in the model
-        print(string.format("finish: HEAT METHOD (shortcut, 1 solve) in %d s", os.time() - t0))
-        return phi
-    end
-
-    ------------------------------------------------------------------
-    -- STEP 2+3 (DEFAULT): Poisson  Lap(phi) = div(X),  X = -grad(u)/|grad(u)|
-    --   UG4 assembles  -Lap(phi) = div(f2)   =>   f2 = -X = +grad(u)/|grad(u)|
-    --   => vector source = EikonalVel(u_heat) with scaling = +1   (NOT -1 — see the SIGN TRAP above)
-    --
-    --   Graceful degradation: where u_heat has decayed into solver noise, EikonalVel returns the ZERO
-    --   vector (normvel_util.h: |grad|>1e-15 else 0), so the Poisson gets no forcing there => phi is
-    --   HARMONIC there => in a tube with Neumann side-walls a harmonic function is LINEAR along the
-    --   tube => the direction is STILL AXIAL. (The shortcut has no such safety net at the distal tips.)
-    ------------------------------------------------------------------
-    local Xsrc = EikonalVel(u_heat)
-    Xsrc:set_scaling(heatSign)          -- +1
-
-    local poisEq = ConvectionDiffusionFV1("ca_cyt", "Outer")
-    poisEq:set_diffusion(1.0)
-    poisEq:set_vector_source(Xsrc)
-    if reg > 0 then poisEq:set_reaction_rate(reg) end   -- 1e-6: decay length 1e3 >> L=5 (harmless),
-                                                        -- but makes disconnected fragments non-singular
-
-    local poisDir = DirichletBoundary()
-    poisDir:add(0.0, "ca_cyt", somaSub)   -- phi = 0 at the soma (the distance anchor)
-
-    local poisDisc = LSGFsimpleDomainDiscretization(approxSpace)
-    poisDisc:add(poisEq)
-    poisDisc:add(poisDir)
-    poisDisc:set_LSF(lsf)
-    poisDisc:set_Neumann0_on_if_for("ca_cyt")
-    poisDisc:project_LSF()
-
-    phi:set(0.0)
-    -- CG + a SYMMETRIC smoother: this solve is SPD and BiCGStab broke down on it in T0 (see HeatSolverDesc).
-    local solver2 = util.solver.CreateSolver(HeatSolverDesc(approxSpace, 1e-8,
-                        util.GetParam("-heatKrylov", "cg", "Krylov for the Poisson recovery: cg|bicgstab"),
-                        util.GetParam("-heatSmoother", "sgs", "GMG smoother for the recovery (sgs = symmetric, required by cg)")))
-    local A2 = AssembledLinearOperator(poisDisc)
-    local b2 = GridFunction(approxSpace); b2:set(0.0)
-    poisDisc:adjust_solution(phi)
-    poisDisc:assemble_linear(A2, b2)
-    solver2:init(A2, phi)
-    solver2:apply(phi, b2)
-
-    gradiente_domainDisc = poisDisc   -- GLOBAL: the disc matching the RETURNED field
-    print(string.format("[heat] step3 (Poisson recovery) done   ||phi|| = %.6g", VecNorm(phi)))
-    print(string.format("finish: HEAT METHOD (3-step, 2 solves) in %d s", os.time() - t0))
-    return phi
-end
-
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 --  Function to obtain the direction of the tubuline inside the neuron
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 function GenerateImaginaryMolecule(ApproxSpace_lsf, gridfunction_ls, domain)
     print("Start: Stationary Difusion inside")
 
