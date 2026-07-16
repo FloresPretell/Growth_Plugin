@@ -43,10 +43,13 @@
 //#include "Tensor_discr.h"
 
 #include "ls_concentration_dependent_velocity_linker.h"
+#include "ls_concentration_dependent_velocity_robust_linker.h"
+#include "ls_avoidance_bend_velocity_linker.h"
 #include "ls_extend_velocity_linker.h"
 
 #include "ls_tubulin_velocity_linker.h"
 #include "ls_interface_influx_linker.h"
+#include "ls_interface_leak_linker.h"   // [leak BC] additive: new LSInterfaceLeak class
 #include "ls_cone_selection_linker.h"
 
 
@@ -339,7 +342,82 @@ namespace ug
 					reg.add_class_to_group(name, "LSConcentrationDepentVelocity", tag);
 				}
 
-				//	Special linker for calculate the velocity of the extencion of the calculated velocity of the interface
+				// BEND variant: avoidance by DIFFERENTIAL NORMAL GROWTH (tip bends away instead of a
+				// tangential steer that the interface projects out). New class; main linker untouched.
+				{
+					string name = string("LSAvoidanceBendVelocity").append(suffix);
+					typedef LSAvoidanceBendVelocity<TDomain, TAlgebra> T;
+					typedef DependentUserData<MathVector<dim>, dim> TBase;
+					typedef IInterfaceExtrapolation<TDomain, TAlgebra> TExtrapol;
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_method("set_calcium", static_cast<void (T::*)(number)>(&T::set_calcium))
+						 .add_method("set_calcium", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_calcium))
+						 .add_method("set_tubuline", static_cast<void (T::*)(number)>(&T::set_tubuline))
+						 .add_method("set_tubuline", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_tubuline))
+						 .add_method("set_MAPu", static_cast<void (T::*)(number)>(&T::set_MAPu))
+						 .add_method("set_MAPu", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_MAPu))
+						 .add_method("set_MAPb", static_cast<void (T::*)(number)>(&T::set_MAPb))
+						 .add_method("set_MAPb", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_MAPb))
+						 .add_method("set_MAPp", static_cast<void (T::*)(number)>(&T::set_MAPp))
+						 .add_method("set_MAPp", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_MAPp))
+						 .add_method("set_Inhibition", static_cast<void (T::*)(number)>(&T::set_Inhibition))
+						 .add_method("set_Inhibition", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_Inhibition))
+						 .add_method("set_LevelSet_gradient", &T::set_LevelSet_gradient)
+						 .add_method("set_gradient_stationary_difussion", &T::set_gradient_stationary_difussion)
+						 .add_method("set_Inhibition_gradient", &T::set_Inhibition_gradient)
+						 .add_method("set_Curvature", static_cast<void (T::*)(number)>(&T::set_Curvature))
+						 .add_method("set_Curvature", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_Curvature))
+						 .add_method("set_interval_min", static_cast<void (T::*)(number)>(&T::set_interval_min))
+						 .add_method("set_interval_max", static_cast<void (T::*)(number)>(&T::set_interval_max))
+						 .add_method("set_interval_min_Calcium", static_cast<void (T::*)(number)>(&T::set_interval_min_Calcium))
+						 .add_method("set_interval_min_Inhibition", static_cast<void (T::*)(number)>(&T::set_interval_min_Inhibition))
+						 .add_method("set_interval_min_Inhibition_sign", static_cast<void (T::*)(number)>(&T::set_interval_min_Inhibition_sign))
+						 .add_method("set_magnitud_velocity", static_cast<void (T::*)(number)>(&T::set_magnitud_velocity))
+						 .template add_constructor<void (*)(SmartPtr<TExtrapol>)>("DomainDisc")
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "LSAvoidanceBendVelocity", tag);
+				}
+
+				// ROBUST variant: floors MAP2-bound so the growth velocity is robust at the tips (shared class untouched)
+{
+					string name = string("LSConcentrationDepentVelocityRobust").append(suffix);
+					typedef LSConcentrationDepentVelocityRobust<TDomain, TAlgebra> T;
+					typedef DependentUserData<MathVector<dim>, dim> TBase;
+					typedef IInterfaceExtrapolation<TDomain, TAlgebra> TExtrapol;
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_method("set_calcium", static_cast<void (T::*)(number)>(&T::set_calcium))
+						 .add_method("set_calcium", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_calcium))
+						 .add_method("set_tubuline", static_cast<void (T::*)(number)>(&T::set_tubuline))
+						 .add_method("set_tubuline", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_tubuline))
+						 .add_method("set_MAPu", static_cast<void (T::*)(number)>(&T::set_MAPu))
+						 .add_method("set_MAPu", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_MAPu))
+						 .add_method("set_MAPb", static_cast<void (T::*)(number)>(&T::set_MAPb))
+						 .add_method("set_MAPb", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_MAPb))
+						 .add_method("set_MAPp", static_cast<void (T::*)(number)>(&T::set_MAPp))
+						 .add_method("set_MAPp", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_MAPp))
+						 .add_method("set_Inhibition", static_cast<void (T::*)(number)>(&T::set_Inhibition))
+						 .add_method("set_Inhibition", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_Inhibition))
+						 .add_method("set_LevelSet_gradient", &T::set_LevelSet_gradient)
+						 .add_method("set_gradient_stationary_difussion", &T::set_gradient_stationary_difussion)
+						 .add_method("set_Inhibition_gradient", &T::set_Inhibition_gradient)
+						 .add_method("set_Curvature", static_cast<void (T::*)(number)>(&T::set_Curvature))
+						 .add_method("set_Curvature", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_Curvature))
+						 .add_method("set_interval_min", static_cast<void (T::*)(number)>(&T::set_interval_min))
+						 .add_method("set_interval_max", static_cast<void (T::*)(number)>(&T::set_interval_max))
+						 .add_method("set_interval_min_Calcium", static_cast<void (T::*)(number)>(&T::set_interval_min_Calcium))
+						 .add_method("set_interval_min_Inhibition", static_cast<void (T::*)(number)>(&T::set_interval_min_Inhibition))
+						 .add_method("set_interval_min_Inhibition_sign", static_cast<void (T::*)(number)>(&T::set_interval_min_Inhibition_sign))
+						 .add_method("set_magnitud_velocity", static_cast<void (T::*)(number)>(&T::set_magnitud_velocity))
+						 .add_method("set_map_b_floor", static_cast<void (T::*)(number)>(&T::set_map_b_floor))
+						 .add_method("set_use_normal_direction", static_cast<void (T::*)(number)>(&T::set_use_normal_direction))
+						 .add_method("set_tubulin_saturation", static_cast<void (T::*)(number)>(&T::set_tubulin_saturation))
+						 .add_method("set_tip_sharpness", static_cast<void (T::*)(number)>(&T::set_tip_sharpness))
+						 .template add_constructor<void (*)(SmartPtr<TExtrapol>)>("DomainDisc")
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "LSConcentrationDepentVelocityRobust", tag);
+				}
+
+//	Special linker for calculate the velocity of the extencion of the calculated velocity of the interface
 				{
 					string name = string("LSExtendVelocity").append(suffix);
 					typedef LSExtendVelocity<TDomain, TAlgebra> T;
@@ -415,6 +493,25 @@ namespace ug
 						 .template add_constructor<void (*)()>()
 						 .set_construct_as_smart_pointer(true);
 					reg.add_class_to_group(name, "LSInterfaceInflux", tag);
+				}
+
+				//	[leak BC] LSInterfaceLeak: membrane flux = v_leak*(CaExt - Ca_cyt) (neuro_collection
+				//	Leak form) when set_CaExt(>=0); else identical constant influx. Separate class so
+				//	LSInterfaceInflux is untouched (additive).
+				{
+					string name = string("LSInterfaceLeak").append(suffix);
+					typedef LSInterfaceLeak<TDomain, TAlgebra> T;
+					typedef DependentUserData<MathVector<dim>, dim> TBase;
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_method("set_LevelSet_gradient", &T::set_LevelSet_gradient)
+						 .add_method("set_Tubuline", static_cast<void (T::*)(number)>(&T::set_Tubuline))
+						 .add_method("set_Tubuline", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_Tubuline))
+						 .add_method("set_domain_discretizacion", &T::set_domain_discretizacion)
+						 .add_method("set_magnitud_influx", static_cast<void (T::*)(number)>(&T::set_magnitud_influx))
+						 .add_method("set_CaExt", &T::set_CaExt)
+						 .template add_constructor<void (*)()>()
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "LSInterfaceLeak", tag);
 				}
 
 								//	Linker for give the value to influx for the boundary (cut elements)
