@@ -94,7 +94,16 @@ function GetParams()
     ---@field inhibitionMinConcentrationRetraction number "Concentration of Inhibitor to start the retraction process"
     ---@field tubulineConcentrationThreshold number "Concentration of Tubulin to start the growth process; and if the value is less, the interface wont deform"
 
+    ---@class EikanolinsideParams
+    ---@field diffusion number "Diffusion coefficient of Eikanol inside the geometry: 0.05 × (10 μm)^2/(500 s) = 0.01 μm²/s"
+    ---@field initialdiffusion number "Initial diffusion coefficient of Eikanol inside the geometry: 0.06 × (10 μm)^2/(500 s) = 0.012 μm²/s"
+
+    ---@class initialGeometryParams
+    ---@field radius table<number, number> "Initial radius of the geometry, keyed by ref_def, where ref_def is 5 (numRefs ≤ 5) or 6 (numRefs ≥ 6)"
+
     ---@class LevelSetParams
+    ---@field Initialgeometry initialGeometryParams
+    ---@field Eikanolinside EikanolinsideParams
     ---@field elongation  elongationParams
     ---@field smooth smoothParams
 
@@ -135,7 +144,9 @@ function GetParams()
                 },  
             },
             map = {
-                initial = util.GetParamNumber("-initialMAP", 0, "Initial MAP protein concentration"),
+                initial   = util.GetParamNumber("-initialMAP",   0, "Initial MAP-2 free (U) concentration"),
+                initial_B = util.GetParamNumber("-initialMAP_B", 0, "Initial MAP-2 bound (B) concentration"),
+                initial_P = util.GetParamNumber("-initialMAP_P", 0, "Initial MAP-2 phospho (P) concentration"),
                 diffusion = util.GetParamNumber("-mapDiffusion", 1,    "Diffusion coefficient of MAP proteins"), -- 1 × (10 μm)^2/(500 s) = 0.2 μm²/s
                 source    = util.GetParamNumber("-mapSource",    -0.5, "Source coefficient (direction × intensity)"), -- -0.5 × (6.25 μM)/(500 s) = -0.00625 μM/s
                 K1 = util.GetParamNumber("-reactionRateK1", 1,     "Reaction constant K1"), -- 1 x 1/500 s = 0.002 s⁻¹
@@ -265,7 +276,16 @@ function GetParams()
 
     -- Interface parameters for level set method
         LevelSet = {
-
+            Initialgeometry = {
+                radius = {
+                    [5] = util.GetParamNumber("-initialRadius", 0.1, "Initial radius of the circular geometry in refiment 5 or lower "), -- refinement lower or eual than 5
+                    [6] = util.GetParamNumber("-initialRadius", 0.06, "Initial radius of the spherical geometry in refiment 6 or higher"), -- refinement higher than 5
+                }
+            },
+            Eikanolinside = {
+                diffusion = util.GetParamNumber("-eikanolinsideDiffusion", 0.05, "Diffusion coefficient of Eikanol inside the geometry"), -- 0.05 × (10 μm)^2/(500 s) = 0.01 μm²/s
+                initialdiffusion = util.GetParamNumber("-initialeikanolinsideDiffusion", 0.1, "Initial Diffusion coefficient of Eikanol inside the geometry"), -- 0.1 × (10 μm)^2/(500 s) =
+            },
         -- Velocity parameters
             elongation = {
                 rate = util.GetParamNumber("-elongationRate", 225, "Elongation rate"), -- 225 × (10 μm)/(500 s · 40 μM · 6.25 μM) = 0.018 μm/(s·μM²)
