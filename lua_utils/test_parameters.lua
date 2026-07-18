@@ -22,6 +22,58 @@ ug_load_script("util/load_balancing_util.lua")
 --   A nested table containing all parameters ready for use in the simulation  
 function GetParams()
 
+    -- =====================================================================
+    -- PERFILES DEL GATE DE CURVATURA   (flag:  -gateProfile <nombre>)
+    -- ---------------------------------------------------------------------
+    -- POR QUE EXISTE ESTO: cada linea de trabajo mide curvaturas de punta
+    -- DISTINTAS (depende de la geometria de referencia, del radio inicial y
+    -- del refinamiento), asi que un solo par de umbrales no puede servir a
+    -- todas. Antes, cambiar el default para una linea se lo cambiaba a las
+    -- demas en silencio. Con perfiles, cada linea tiene los suyos y nadie
+    -- pisa a nadie.
+    --
+    -- PERFILES:
+    --   inhibitor (POR DEFECTO) -- linea de inhibicion / adaptividad.
+    --       Son los valores que ya estaban vigentes; NO se tocan, para que
+    --       toda corrida existente siga dando exactamente lo mismo.
+    --   calcium -- linea de calcio / MAP-2 (VDCC, ECCOMAS).
+    --       min 2.7 / max 14 en 2D. Medido: la curvatura real de los conos
+    --       de crecimiento en el arbol de referencia es kappa_tip ~ 2.5-5.1,
+    --       asi que con un minimo de 6-7 el gate se PERDIA entre el 38% y el
+    --       60% de los conos (velocidad exactamente 0 -> el cono no avanza y
+    --       las ramas se fusionan). Con 2.7 la cobertura de conos sube de
+    --       ~55% a ~76%. El maximo baja a 14 para no capturar los pliegues
+    --       de alta curvatura del cuerpo, que no son conos.
+    --
+    -- COMO SE USA:  -gateProfile calcium     (por defecto: inhibitor)
+    -- Un -VelCurvaturemin / -VelCurvaturemax explicito en la linea de
+    -- comandos SIGUE MANDANDO sobre el perfil (el perfil solo fija el valor
+    -- por defecto), asi que ningun submit script antiguo cambia de conducta.
+    --
+    -- OJO (limitacion heredada, no la introduce este bloque): -VelCurvaturemin
+    -- y -VelCurvaturemax son un unico flag compartido entre 2D y 3D, asi que
+    -- pasarlos explicitamente fija AMBAS dimensiones al mismo numero. Si
+    -- alguna vez hace falta separarlas, hay que añadir flags distintos.
+    -- =====================================================================
+    local gateProfiles = {
+        inhibitor = { min2d = 3.0, max2d = 18, min3d = 20, max3d = 27 },
+        calcium   = { min2d = 2.7, max2d = 14, min3d = 20, max3d = 27 },
+    }
+    local gateProfileName = util.GetParam("-gateProfile", "inhibitor",
+                                          "Perfil del gate de curvatura: inhibitor | calcium")
+    local GATE = gateProfiles[gateProfileName]
+    if GATE == nil then
+        print("[gateProfile] AVISO: perfil desconocido '" .. tostring(gateProfileName)
+              .. "' -> se usa 'inhibitor'. Perfiles validos: inhibitor, calcium")
+        GATE = gateProfiles.inhibitor
+        gateProfileName = "inhibitor"
+    end
+    print("[gateProfile] " .. gateProfileName
+          .. "  ->  2D min=" .. string.format("%.2f", GATE.min2d)
+          .. " max=" .. string.format("%.2f", GATE.max2d)
+          .. " | 3D min=" .. string.format("%.2f", GATE.min3d)
+          .. " max=" .. string.format("%.2f", GATE.max3d))
+
     -- #region Define all the parameters in the code
     ---@class TubulinParams
     ---@field initial number "Initial tubulin concentration: 0.3 adim "
@@ -301,8 +353,10 @@ function GetParams()
                     local refNorm       = 5
                     local h_ratio       = math.pow(2.0, refNorm - numRefs_local)
                     local gate_scale    = (gateNorm == 0) and 1.0 or math.pow(h_ratio, gateNorm)
-                    local base_min_2d   = util.GetParamNumber("-VelCurvaturemin",  3,  "Base min curvature threshold (2D)")
-                    local base_min_3d   = util.GetParamNumber("-VelCurvaturemin", 20,  "Base min curvature threshold (3D)")
+                    -- el default sale del PERFIL (-gateProfile); un -VelCurvaturemin
+                    -- explicito sigue mandando sobre el.
+                    local base_min_2d   = util.GetParamNumber("-VelCurvaturemin", GATE.min2d,  "Base min curvature threshold (2D)")
+                    local base_min_3d   = util.GetParamNumber("-VelCurvaturemin", GATE.min3d,  "Base min curvature threshold (3D)")
                     print("[gateNorm=" .. tostring(gateNorm) .. "] numRef=" .. tostring(numRefs_local)
                           .. "  h_ratio=" .. string.format("%.4f", h_ratio)
                           .. "  gate_scale=" .. string.format("%.4f", gate_scale)
@@ -323,8 +377,10 @@ function GetParams()
                     local refNorm       = 5
                     local h_ratio       = math.pow(2.0, refNorm - numRefs_local)
                     local gate_scale    = (gateNorm == 0) and 1.0 or math.pow(h_ratio, gateNorm)
-                    local base_max_2d   = util.GetParamNumber("-VelCurvaturemax", 18,  "Base max curvature threshold (2D)")
-                    local base_max_3d   = util.GetParamNumber("-VelCurvaturemax", 27,  "Base max curvature threshold (3D)")
+                    -- el default sale del PERFIL (-gateProfile); un -VelCurvaturemax
+                    -- explicito sigue mandando sobre el.
+                    local base_max_2d   = util.GetParamNumber("-VelCurvaturemax", GATE.max2d,  "Base max curvature threshold (2D)")
+                    local base_max_3d   = util.GetParamNumber("-VelCurvaturemax", GATE.max3d,  "Base max curvature threshold (3D)")
                     return {
                         [2] = {
                             [5] = base_max_2d * gate_scale,
