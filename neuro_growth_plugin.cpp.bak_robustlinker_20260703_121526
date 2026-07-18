@@ -1,0 +1,648 @@
+/*
+ * Copyright (c) 2011-2015:  G-CSC, Goethe University Frankfurt
+ * Author: Christian Wehner
+ *
+ * This file is part of UG4.
+ *
+ * UG4 is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU Lesser General Public License version 3 (as published by the
+ * Free Software Foundation) with the following additional attribution
+ * requirements (according to LGPL/GPL v3 §7):
+ *
+ * (1) The following notice must be displayed in the Appropriate Legal Notices
+ * of covered and combined works: "Based on UG4 (www.ug4.org/license)".
+ *
+ * (2) The following notice must be displayed at a prominent place in the
+ * terminal output of covered works: "Based on UG4 (www.ug4.org/license)".
+ *
+ * (3) The following bibliography is recommended for citation and must be
+ * preserved in all covered files:
+ * "Reiter, S., Vogel, A., Heppner, I., Rupp, M., and Wittum, G. A massively
+ *   parallel geometric multigrid solver on hierarchically distributed grids.
+ *   Computing and visualization in science 16, 4 (2013), 151-164"
+ * "Vogel, A., Reiter, S., Rupp, M., Nägel, A., and Wittum, G. UG4 -- a novel
+ *   flexible software system for simulating pde based models on high performance
+ *   computers. Computing and visualization in science 16, 4 (2013), 165-179"
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ */
+
+// ug4 headers
+#include "bridge/util.h"
+#include "bridge/util_domain_dependent.h"
+#include "bridge/util_domain_algebra_dependent.h"
+#include "lib_disc/operator/non_linear_operator/newton_solver/newton_update_interface.h"
+#include "lib_disc/spatial_disc/dom_disc_embb.h"
+
+// plugin headers
+#include "kappla_discr.h"
+#include "Export.h"
+//#include "Tensor_discr.h"
+
+#include "ls_concentration_dependent_velocity_linker.h"
+#include "ls_calcium_velocity_linker.h"
+#include "ls_extend_velocity_linker.h"
+
+#include "ls_tubulin_velocity_linker.h"
+#include "ls_interface_influx_linker.h"
+#include "ls_interface_leak_linker.h"   // [leak BC] additive: new LSInterfaceLeak class
+#include "ls_cone_selection_linker.h"
+
+
+
+#include "ls_interface_influx_outside_linker.h"
+#include "ls_interface_influx_top_based_curvature_linker.h"
+#include "ls_interface_reaction_linker.h" // top based curvature also
+#include "ls_interface_reaction_linker_inside_curv.h"
+#include "ls_initial_value.h"
+#include "ls_initial_value_interface.h"
+#include "ls_tensor_linker.h"
+#include "ls_vector_source_mass_rate.h"
+#include "curvature_eval_discr.h"  // Experimental evaluator-only stable curvature (does not modify Kappla_LS).
+
+using namespace std;
+using namespace ug::bridge;
+
+namespace ug
+{
+	namespace NeuroGrowth
+	{
+
+		/**
+		 * Class exporting the functionality of the plugin. All functionality that is to
+		 * be used in scripts or visualization must be registered here.
+		 */
+		struct Functionality
+		{
+
+			/**
+			 * Function called for the registration of Domain dependent parts
+			 * of the plugin. All Functions and Classes depending on the Domain
+			 * are to be placed here when registering. The method is called for all
+			 * available Domain types, based on the current build options.
+			 *
+			 * @param reg				registry
+			 * @param parentGroup		group for sorting of functionality
+			 */
+			template <typename TDomain>
+			static void Domain(Registry &reg, string grp)
+			{
+				static const int dim = TDomain::dim;
+				typedef CPUAlgebra TLSFAlgebra;
+				typedef GridFunction<TDomain, TLSFAlgebra> TLSFct;
+				string suffix = GetDomainSuffix<TDomain>();
+				string tag = GetDomainTag<TDomain>();
+
+				// 	KAPPLA : calculate curvature
+				{
+					typedef Kappla_LS<TLSFct> T;
+					typedef DebugWritingObject<TLSFAlgebra> TBase;
+
+					// typedef typename function_type::domain_type domain_type;
+					string name = string("Kappla_LS").append(suffix);
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_constructor()
+
+						 .add_method("set_solutions", static_cast<void (T::*)(SmartPtr<TLSFct>, SmartPtr<TLSFct>)>(&T::set_solutions), "old#new", "Solutions at the time levels")
+						 .add_method("set_LSF", static_cast<void (T::*)(SmartPtr<TLSFct>)>(&T::set_LSF), "", "Level-Set function to specity the interface")
+						 .add_method("set_SDF", static_cast<void (T::*)(SmartPtr<TLSFct>)>(&T::set_SDF), "", "Signed-distance function to get the eff. dt at the interface")
+						 .add_method("set_vel_potential", static_cast<void (T::*)(SmartPtr<TLSFct>)>(&T::set_vel_potential), "", "Potential of the velocity")
+
+						 .add_method("set_velocity", static_cast<void (T::*)(SmartPtr<CplUserData<MathVector<dim>, dim>>)>(&T::set_velocity), "", "Velocity vector field")
+						 .add_method("set_normal_velocity", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_normal_velocity), "", "Normal velocity field")
+						 .add_method("set_interface_data", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_interface_data), "", "Dirichlet BC at the interface")
+						 .add_method("compute_kappla", static_cast<void (T::*)(SmartPtr<TLSFct>, SmartPtr<TLSFct>)>(&T::compute_kappla), "Gridfunction of level set", "Gridfunction to save Kappla")
+
+						 //.add_method("set_outflow_boundary", &T::set_outflow_boundary)
+
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "Kappla_LS", tag);
+				}
+
+				// Experimental evaluator-only stable curvature.
+				// Independent of Kappla_LS. Not used by the official model.
+				// Lua: local k = CurvatureEval_LS()
+				//      k:set_epsilon(1e-6)               -- optional
+				//      k:compute_stable_kappa(lsf, kappa_out)
+				{
+					typedef CurvatureEval_LS<TLSFct> T;
+					string name = string("CurvatureEval_LS").append(suffix);
+					reg.add_class_<T>(name, grp)
+						 .add_constructor()
+						 .add_method("set_epsilon",
+							static_cast<void (T::*)(number)>(&T::set_epsilon),
+							"", "epsilon",
+							"Smooth regularization for sqrt(|grad phi|^2 + epsilon^2)")
+						 .add_method("epsilon",
+							static_cast<number (T::*)() const>(&T::epsilon),
+							"", "",
+							"Current smoothing parameter epsilon")
+						 .add_method("compute_stable_kappa",
+							static_cast<void (T::*)(SmartPtr<TLSFct>, SmartPtr<TLSFct>)>(&T::compute_stable_kappa),
+							"", "spLSF#spKappaStable",
+							"Compute kappa = div(grad phi / sqrt(|grad phi|^2 + eps^2)) into spKappaStable")
+						 // Step A: fixed-radius physical averaging
+						 .add_method("set_averaging_radius",
+							static_cast<void (T::*)(number)>(&T::set_averaging_radius),
+							"", "R_avg", "Physical Gaussian-averaging radius")
+						 .add_method("averaging_radius",
+							static_cast<number (T::*)() const>(&T::averaging_radius),
+							"", "", "Current averaging radius")
+						 .add_method("compute_kappa_fixed_radius",
+							static_cast<void (T::*)(SmartPtr<TLSFct>, SmartPtr<TLSFct>)>(&T::compute_kappa_fixed_radius),
+							"", "spLSF#spKappaOut",
+							"Mesh-independent fixed-physical-radius averaged curvature")
+						 .add_method("avg_singleton_count",
+							static_cast<size_t (T::*)() const>(&T::avg_singleton_count),
+							"", "", "Vertices that fell back to raw FV1 (R_avg too small)")
+						 .add_method("avg_total_count",
+							static_cast<size_t (T::*)() const>(&T::avg_total_count),
+							"", "", "Total vertices visited by last fixed-radius pass")
+						 // Step B: weighted least-squares quadratic reconstruction
+						 .add_method("set_lsq_ring_depth",
+							static_cast<void (T::*)(int)>(&T::set_lsq_ring_depth),
+							"", "depth", "Neighborhood ring depth (1 or 2; default 2)")
+						 .add_method("lsq_ring_depth",
+							static_cast<int (T::*)() const>(&T::lsq_ring_depth),
+							"", "", "Current LSQ ring depth")
+						 .add_method("set_lsq_weight_exponent",
+							static_cast<void (T::*)(number)>(&T::set_lsq_weight_exponent),
+							"", "p", "LSQ inverse-distance weight exponent (default 2.0)")
+						 .add_method("lsq_weight_exponent",
+							static_cast<number (T::*)() const>(&T::lsq_weight_exponent),
+							"", "", "Current LSQ weight exponent")
+						 .add_method("set_lsq_band_phi",
+							static_cast<void (T::*)(number)>(&T::set_lsq_band_phi),
+							"", "phi_threshold",
+							"LSQ band: |phi(v)| > phi_threshold gets 0.0; default infinity")
+						 .add_method("lsq_band_phi",
+							static_cast<number (T::*)() const>(&T::lsq_band_phi),
+							"", "", "Current LSQ band threshold")
+						 .add_method("compute_kappa_lsq",
+							static_cast<void (T::*)(SmartPtr<TLSFct>, SmartPtr<TLSFct>)>(&T::compute_kappa_lsq),
+							"", "spLSF#spKappaOut",
+							"Weighted-LSQ quadratic reconstruction of curvature in the band")
+						 .add_method("lsq_fallback_count",
+							static_cast<size_t (T::*)() const>(&T::lsq_fallback_count),
+							"", "", "Band vertices that fell back during last LSQ pass")
+						 .add_method("lsq_total_count",
+							static_cast<size_t (T::*)() const>(&T::lsq_total_count),
+							"", "", "Total band vertices visited by last LSQ pass")
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "CurvatureEval_LS", tag);
+				}
+
+				/*
+				// 	KAPPLA : calculate curvature
+				{
+					typedef TensorDiffusion_LS<TLSFct> T;
+					typedef DebugWritingObject<TLSFAlgebra> TBase;
+
+					// typedef typename function_type::domain_type domain_type;
+					string name = string("TensorDiffusion_LS").append(suffix);
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_constructor()
+
+						 .add_method("set_solutions", static_cast<void (T::*)(SmartPtr<TLSFct>, SmartPtr<TLSFct>)>(&T::set_solutions), "old#new", "Solutions at the time levels")
+						 .add_method("set_LSF", static_cast<void (T::*)(SmartPtr<TLSFct>)>(&T::set_LSF), "", "Level-Set function to specity the interface")
+						 .add_method("set_SDF", static_cast<void (T::*)(SmartPtr<TLSFct>)>(&T::set_SDF), "", "Signed-distance function to get the eff. dt at the interface")
+						 .add_method("set_vel_potential", static_cast<void (T::*)(SmartPtr<TLSFct>)>(&T::set_vel_potential), "", "Potential of the velocity")
+
+						 .add_method("set_velocity", static_cast<void (T::*)(SmartPtr<CplUserData<MathVector<dim>, dim>>)>(&T::set_velocity), "", "Velocity vector field")
+						 .add_method("set_normal_velocity", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_normal_velocity), "", "Normal velocity field")
+						 .add_method("set_interface_data", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_interface_data), "", "Dirichlet BC at the interface")
+						 .add_method("ComputeDiffusionTensorBeltrami", static_cast<void (T::*)(SmartPtr<TLSFct>, SmartPtr<CplUserData<MathMatrix<dim, dim>, dim> >)>(&T::ComputeDiffusionTensorBeltrami), "Gridfunction of level set", "Gridfunction to save Kappla")
+
+						 //.add_method("set_outflow_boundary", &T::set_outflow_boundary)
+
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "TensorDiffusion_LS", tag);
+				}
+				*/
+				// 	Export : Export a linker as a gridfunction
+				{
+					typedef Export<TLSFct> T;
+					typedef DebugWritingObject<TLSFAlgebra> TBase;
+
+					// typedef typename function_type::domain_type domain_type;
+					string name = string("Export").append(suffix);
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_constructor()
+
+						 .add_method("set_solutions", static_cast<void (T::*)(SmartPtr<TLSFct>, SmartPtr<TLSFct>)>(&T::set_solutions), "old#new", "Solutions at the time levels")
+						 .add_method("set_LSF", static_cast<void (T::*)(SmartPtr<TLSFct>)>(&T::set_LSF), "", "Level-Set function to specity the interface")
+						 .add_method("set_SDF", static_cast<void (T::*)(SmartPtr<TLSFct>)>(&T::set_SDF), "", "Signed-distance function to get the eff. dt at the interface")
+						 .add_method("set_vel_potential", static_cast<void (T::*)(SmartPtr<TLSFct>)>(&T::set_vel_potential), "", "Potential of the velocity")
+						 .add_method("set_velocity", static_cast<void (T::*)(SmartPtr<CplUserData<MathVector<dim>, dim>>)>(&T::set_velocity), "", "Velocity vector field")
+						 .add_method("set_normal_velocity", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_normal_velocity), "", "Normal velocity field")
+						 .add_method("set_interface_data", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_interface_data), "", "Dirichlet BC at the interface")
+						 .add_method("Save_Linker_to_Gridfuntion", static_cast<void (T::*)(SmartPtr<CplUserData<MathVector<dim>, dim>>, SmartPtr<TLSFct>)>(&T::Save_Linker_to_Gridfuntion), "VelField#NormalVel", "Compute normal velocity")
+						 .add_method("Save_Linker_to_Gridfuntion_by_component", static_cast<void (T::*)(SmartPtr<CplUserData<MathVector<dim>, dim>>, SmartPtr<TLSFct>, const char* )>(&T::Save_Linker_to_Gridfuntion_by_component), "VelField#NormalVel", "Compute normal velocity","Componeten a elegir")
+						 
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "Export", tag);
+				}
+
+
+				
+			}
+
+
+
+
+			/**
+			* Function called for the registration of Dimension dependent parts.
+			* All Functions and Classes depending on the Dimension
+			* are to be placed here when registering. The method is called for all
+			* available Dimension types, based on the current build options.
+			*
+			* @param reg				registry
+			* @param parentGroup		group for sorting of functionality
+			*/
+			template <int dim>
+			static void Dimension(Registry& reg, string grp)
+			{
+				string suffix = GetDimensionSuffix<dim>();
+				string tag = GetDimensionTag<dim>();
+
+				//	Linker for TENSOR
+				{
+					string name = string("LSTensorLinker").append(suffix);
+					typedef LSTensorLinker<dim> T;
+					typedef DependentUserData<MathMatrix<dim, dim>, dim> TBase;
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_method("set_gradient_stationary_difussion", &T::set_gradient_stationary_difussion)
+						 .add_method("set_diffusion_coeff", static_cast<void (T::*)(number)>(&T::set_diffusion_coeff))
+						 .add_constructor()
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "LSTensorLinker", tag);
+				}
+
+
+			} // end Domain Algebra
+
+
+			/**
+			 * Function called for the registration of Domain and Algebra dependent parts
+			 * of the plugin. All Functions and Classes depending on both Domain and Algebra
+			 * are to be placed here when registering. The method is called for all
+			 * available Domain and Algebra types, based on the current build options.
+			 *
+			 * @param reg				registry
+			 * @param parentGroup		group for sorting of functionality
+			 */
+			template <typename TDomain, typename TAlgebra>
+			static void DomainAlgebra(Registry &reg, string grp)
+			{
+				string suffix = GetDomainAlgebraSuffix<TDomain, TAlgebra>();
+				string tag = GetDomainAlgebraTag<TDomain, TAlgebra>();
+
+				// typedef typename TAlgebra::vector_type vector_type;
+				// typedef typename TAlgebra::matrix_type matrix_type;
+				// typedef ApproximationSpace<TDomain> approximation_space_type;
+				typedef GridFunction<TDomain, TAlgebra> function_type;
+				static const int dim = TDomain::dim;
+
+				//	Special linker for the Darcy velocity
+				{
+					string name = string("LSConcentrationDepentVelocity").append(suffix);
+					typedef LSConcentrationDepentVelocity<TDomain, TAlgebra> T;
+					typedef DependentUserData<MathVector<dim>, dim> TBase;
+					typedef IInterfaceExtrapolation<TDomain, TAlgebra> TExtrapol;
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_method("set_calcium", static_cast<void (T::*)(number)>(&T::set_calcium))
+						 .add_method("set_calcium", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_calcium))
+						 .add_method("set_tubuline", static_cast<void (T::*)(number)>(&T::set_tubuline))
+						 .add_method("set_tubuline", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_tubuline))
+						 .add_method("set_MAPu", static_cast<void (T::*)(number)>(&T::set_MAPu))
+						 .add_method("set_MAPu", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_MAPu))
+						 .add_method("set_MAPb", static_cast<void (T::*)(number)>(&T::set_MAPb))
+						 .add_method("set_MAPb", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_MAPb))
+						 .add_method("set_MAPp", static_cast<void (T::*)(number)>(&T::set_MAPp))
+						 .add_method("set_MAPp", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_MAPp))
+						 .add_method("set_Inhibition", static_cast<void (T::*)(number)>(&T::set_Inhibition))
+						 .add_method("set_Inhibition", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_Inhibition))
+						 .add_method("set_LevelSet_gradient", &T::set_LevelSet_gradient)
+						 .add_method("set_gradient_stationary_difussion", &T::set_gradient_stationary_difussion)
+						 .add_method("set_Inhibition_gradient", &T::set_Inhibition_gradient)
+						 .add_method("set_Curvature", static_cast<void (T::*)(number)>(&T::set_Curvature))
+						 .add_method("set_Curvature", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_Curvature))
+						 .add_method("set_interval_min", static_cast<void (T::*)(number)>(&T::set_interval_min))
+						 .add_method("set_interval_max", static_cast<void (T::*)(number)>(&T::set_interval_max))
+						 .add_method("set_interval_min_Calcium", static_cast<void (T::*)(number)>(&T::set_interval_min_Calcium))
+						 .add_method("set_interval_min_Inhibition", static_cast<void (T::*)(number)>(&T::set_interval_min_Inhibition))
+						 .add_method("set_interval_min_Inhibition_sign", static_cast<void (T::*)(number)>(&T::set_interval_min_Inhibition_sign))
+						 .add_method("set_magnitud_velocity", static_cast<void (T::*)(number)>(&T::set_magnitud_velocity))
+						 .template add_constructor<void (*)(SmartPtr<TExtrapol>)>("DomainDisc")
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "LSConcentrationDepentVelocity", tag);
+				}
+
+				//	Direct calcium->velocity coupling variant (duplicate; shared LSConcentrationDepentVelocity untouched)
+				{
+					string name = string("LSCalciumVelocity").append(suffix);
+					typedef LSCalciumVelocity<TDomain, TAlgebra> T;
+					typedef DependentUserData<MathVector<dim>, dim> TBase;
+					typedef IInterfaceExtrapolation<TDomain, TAlgebra> TExtrapol;
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_method("set_calcium", static_cast<void (T::*)(number)>(&T::set_calcium))
+						 .add_method("set_calcium", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_calcium))
+						 .add_method("set_tubuline", static_cast<void (T::*)(number)>(&T::set_tubuline))
+						 .add_method("set_tubuline", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_tubuline))
+						 .add_method("set_MAPu", static_cast<void (T::*)(number)>(&T::set_MAPu))
+						 .add_method("set_MAPu", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_MAPu))
+						 .add_method("set_MAPb", static_cast<void (T::*)(number)>(&T::set_MAPb))
+						 .add_method("set_MAPb", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_MAPb))
+						 .add_method("set_MAPp", static_cast<void (T::*)(number)>(&T::set_MAPp))
+						 .add_method("set_MAPp", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_MAPp))
+						 .add_method("set_Inhibition", static_cast<void (T::*)(number)>(&T::set_Inhibition))
+						 .add_method("set_Inhibition", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_Inhibition))
+						 .add_method("set_LevelSet_gradient", &T::set_LevelSet_gradient)
+						 .add_method("set_gradient_stationary_difussion", &T::set_gradient_stationary_difussion)
+						 .add_method("set_Inhibition_gradient", &T::set_Inhibition_gradient)
+						 .add_method("set_Curvature", static_cast<void (T::*)(number)>(&T::set_Curvature))
+						 .add_method("set_Curvature", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_Curvature))
+						 .add_method("set_interval_min", static_cast<void (T::*)(number)>(&T::set_interval_min))
+						 .add_method("set_interval_max", static_cast<void (T::*)(number)>(&T::set_interval_max))
+						 .add_method("set_interval_min_Calcium", static_cast<void (T::*)(number)>(&T::set_interval_min_Calcium))
+						 .add_method("set_interval_min_Inhibition", static_cast<void (T::*)(number)>(&T::set_interval_min_Inhibition))
+						 .add_method("set_interval_min_Inhibition_sign", static_cast<void (T::*)(number)>(&T::set_interval_min_Inhibition_sign))
+						 .add_method("set_ca_gain", static_cast<void (T::*)(number)>(&T::set_ca_gain))
+						 .add_method("set_ca_rest", static_cast<void (T::*)(number)>(&T::set_ca_rest))
+						 .add_method("set_magnitud_velocity", static_cast<void (T::*)(number)>(&T::set_magnitud_velocity))
+						 .template add_constructor<void (*)(SmartPtr<TExtrapol>)>("DomainDisc")
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "LSCalciumVelocity", tag);
+				}
+
+				//	Special linker for calculate the velocity of the extencion of the calculated velocity of the interface
+				{
+					string name = string("LSExtendVelocity").append(suffix);
+					typedef LSExtendVelocity<TDomain, TAlgebra> T;
+					typedef DependentUserData<MathVector<dim>, dim> TBase;
+					typedef IInterfaceExtrapolation<TDomain, TAlgebra> TExtrapol;
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_method("set_gradient", &T::set_gradient)
+						 .add_method("set_direction", &T::set_direction)
+						 .template add_constructor<void (*)(SmartPtr<TExtrapol>)>("DomainDisc")
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "LSExtendVelocity", tag);
+				}
+
+
+				//	Special linker for initial values
+				{
+					string name = string("LSInitialValue").append(suffix);
+					typedef LSInitialValue<TDomain, TAlgebra> T;
+					typedef DependentUserData<MathVector<dim>, dim> TBase;
+					typedef IInterfaceExtrapolation<TDomain, TAlgebra> TExtrapol;
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_method("set_initial_value", static_cast<void (T::*)(number)>(&T::set_initial_value))
+						 .template add_constructor<void (*)(SmartPtr<TExtrapol>)>("DomainDisc")
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "LSInitialValue", tag);
+				}
+
+				
+				//	Special linker for initial values IN THE INTERFAXE
+				{
+					string name = string("LSInitialValueInterface").append(suffix);
+					typedef LSInitialValueInterface<TDomain, TAlgebra> T;
+					typedef DependentUserData<MathVector<dim>, dim> TBase;
+					typedef IInterfaceExtrapolation<TDomain, TAlgebra> TExtrapol;
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_method("set_initial_value", static_cast<void (T::*)(number)>(&T::set_initial_value))
+						 .template add_constructor<void (*)(SmartPtr<TExtrapol>)>("DomainDisc")
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "LSInitialValueInterface", tag);
+				}
+
+
+				//	Linker for obtain the direction of the tubulin
+				{
+					string name = string("LSTubulinVelocity").append(suffix);
+					typedef LSTubulinVelocity<TDomain, TAlgebra> T;
+					typedef DependentUserData<MathVector<dim>, dim> TBase;
+					typedef IInterfaceExtrapolation<TDomain, TAlgebra> TExtrapol;
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_method("set_gradient_stationary_difussion", &T::set_gradient_stationary_difussion)
+						 .add_method("set_domain_discretizacion", &T::set_domain_discretizacion)
+						 .add_method("set_magnitud", static_cast<void (T::*)(number)>(&T::set_magnitud))
+						 .template add_constructor<void (*)()>()
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "LSTubulinVelocity", tag);
+				}
+
+
+
+				//	Linker for give the value to influx for the boundary (cut elements)
+				{
+					string name = string("LSInterfaceInflux").append(suffix);
+					typedef LSInterfaceInflux<TDomain, TAlgebra> T;
+					typedef DependentUserData<MathVector<dim>, dim> TBase;
+					typedef IInterfaceExtrapolation<TDomain, TAlgebra> TExtrapol;
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_method("set_LevelSet_gradient", &T::set_LevelSet_gradient)
+						 .add_method("set_Tubuline", static_cast<void (T::*)(number)>(&T::set_Tubuline))
+						 .add_method("set_Tubuline", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_Tubuline))
+						 .add_method("set_domain_discretizacion", &T::set_domain_discretizacion)
+						 .add_method("set_magnitud_influx", static_cast<void (T::*)(number)>(&T::set_magnitud_influx))
+						 //.add_method("set_domain_disc_1d"       , &T::set_domain_disc_1d, "", "domainDisc","Set the 1d cable domain discretization.")
+						 .template add_constructor<void (*)()>()
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "LSInterfaceInflux", tag);
+				}
+
+				//	[leak BC] LSInterfaceLeak: membrane flux = v_leak*(CaExt - Ca_cyt) (neuro_collection
+				//	Leak form) when set_CaExt(>=0); else identical constant influx. Separate class so
+				//	LSInterfaceInflux is untouched (additive).
+				{
+					string name = string("LSInterfaceLeak").append(suffix);
+					typedef LSInterfaceLeak<TDomain, TAlgebra> T;
+					typedef DependentUserData<MathVector<dim>, dim> TBase;
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_method("set_LevelSet_gradient", &T::set_LevelSet_gradient)
+						 .add_method("set_Tubuline", static_cast<void (T::*)(number)>(&T::set_Tubuline))
+						 .add_method("set_Tubuline", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_Tubuline))
+						 .add_method("set_domain_discretizacion", &T::set_domain_discretizacion)
+						 .add_method("set_magnitud_influx", static_cast<void (T::*)(number)>(&T::set_magnitud_influx))
+						 .add_method("set_CaExt", &T::set_CaExt)
+						 .template add_constructor<void (*)()>()
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "LSInterfaceLeak", tag);
+				}
+
+								//	Linker for give the value to influx for the boundary (cut elements)
+				{
+					string name = string("LSConesSelection").append(suffix);
+					typedef LSConesSelection<TDomain, TAlgebra> T;
+					typedef DependentUserData<MathVector<dim>, dim> TBase;
+					typedef IInterfaceExtrapolation<TDomain, TAlgebra> TExtrapol;
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_method("set_LevelSet_gradient", &T::set_LevelSet_gradient)
+						 .add_method("set_Eikanol_gradient", &T::set_Eikanol_gradient)
+						 .add_method("set_Tubuline", static_cast<void (T::*)(number)>(&T::set_Tubuline))
+						 .add_method("set_Tubuline", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_Tubuline))
+						 .add_method("set_domain_discretizacion", &T::set_domain_discretizacion)
+						 .add_method("set_magnitud_influx", static_cast<void (T::*)(number)>(&T::set_magnitud_influx))
+						 //.add_method("set_domain_disc_1d"       , &T::set_domain_disc_1d, "", "domainDisc","Set the 1d cable domain discretization.")
+						 .template add_constructor<void (*)()>()
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "LSConesSelection", tag);
+				}
+
+
+
+				//	Linker for give the value to influx for the boundary (cut elements) to outside the domain
+				{
+					string name = string("LSInterfaceInfluxoutside").append(suffix);
+					typedef LSInterfaceInfluxoutside<TDomain, TAlgebra> T;
+					typedef DependentUserData<MathVector<dim>, dim> TBase;
+					typedef IInterfaceExtrapolation<TDomain, TAlgebra> TExtrapol;
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_method("set_LevelSet_gradient", &T::set_LevelSet_gradient)
+						 .add_method("set_Tubuline", static_cast<void (T::*)(number)>(&T::set_Tubuline))
+						 .add_method("set_Tubuline", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_Tubuline))
+ 						 .add_method("set_Curvature", static_cast<void (T::*)(number)>(&T::set_Curvature))
+						 .add_method("set_Curvature", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_Curvature))
+						 .add_method("set_domain_discretizacion", &T::set_domain_discretizacion)
+						 .add_method("set_carrying_capacity", static_cast<void (T::*)(number)>(&T::set_carrying_capacity))
+						 .add_method("set_growth_rate", static_cast<void (T::*)(number)>(&T::set_growth_rate))
+						 .add_method("set_interval_min", static_cast<void (T::*)(number)>(&T::set_interval_min))
+						 .add_method("set_interval_max", static_cast<void (T::*)(number)>(&T::set_interval_max))
+							//.add_method("set_domain_disc_1d"       , &T::set_domain_disc_1d, "", "domainDisc","Set the 1d cable domain discretization.")
+						 .template add_constructor<void (*)()>()
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "LSInterfaceInfluxoutside", tag);
+				}
+
+				//	Linker for give the value to influx for the boundary (cut elements) - This will select the top of the branch with a curvature specify
+				{
+					string name = string("LSInfluxTopBranch").append(suffix);
+					typedef LSInfluxTopBranch<TDomain, TAlgebra> T;
+					typedef DependentUserData<MathVector<dim>, dim> TBase;
+					typedef IInterfaceExtrapolation<TDomain, TAlgebra> TExtrapol;
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_method("set_LevelSet_gradient", &T::set_LevelSet_gradient)
+						 .add_method("set_magnitud_influx", static_cast<void (T::*)(number)>(&T::set_magnitud_influx))	 
+						 .add_method("set_Curvature", static_cast<void (T::*)(number)>(&T::set_Curvature))
+						 .add_method("set_Curvature", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_Curvature))
+						 .add_method("set_domain_discretizacion", &T::set_domain_discretizacion)
+						 .add_method("set_interval_min", static_cast<void (T::*)(number)>(&T::set_interval_min))
+						 .add_method("set_interval_max", static_cast<void (T::*)(number)>(&T::set_interval_max))
+						 //.add_method("set_domain_disc_1d"       , &T::set_domain_disc_1d, "", "domainDisc","Set the 1d cable domain discretization.")
+						 .template add_constructor<void (*)()>()
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "LSInfluxTopBranch", tag);
+				}
+
+
+
+				//	Linker for give the value to REACTION for the boundary (cut elements) - This will select the top of the branch with a curvature specify
+				{
+					string name = string("LSReactionTopBranch").append(suffix);
+					typedef LSReactionTopBranch<TDomain, TAlgebra> T;
+					typedef DependentUserData<number, dim> TBase;
+					typedef IInterfaceExtrapolation<TDomain, TAlgebra> TExtrapol;
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_method("set_FirstTerm", static_cast<void (T::*)(number)>(&T::set_FirstTerm))
+						 .add_method("set_FirstTerm", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_FirstTerm))
+						 .add_method("set_SecondTerm", static_cast<void (T::*)(number)>(&T::set_SecondTerm))
+						 .add_method("set_SecondTerm", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_SecondTerm))
+						 .add_method("set_LevelSet_gradient", &T::set_LevelSet_gradient)
+						 .add_method("set_Curvature", static_cast<void (T::*)(number)>(&T::set_Curvature))
+						 .add_method("set_Curvature", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_Curvature))
+						 .add_method("set_velocity_deformation", static_cast<void (T::*)(number)>(&T::set_velocity_deformation))
+						 .add_method("set_velocity_deformation", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_velocity_deformation))
+						 .add_method("set_domain_discretizacion", &T::set_domain_discretizacion)
+						 .add_method("set_interval_min", static_cast<void (T::*)(number)>(&T::set_interval_min))
+						 .add_method("set_interval_max", static_cast<void (T::*)(number)>(&T::set_interval_max))
+						 .add_method("set_magnitud_influx", static_cast<void (T::*)(number)>(&T::set_magnitud_influx))
+						 .add_method("set_constant_div", static_cast<void (T::*)(number)>(&T::set_constant_div))
+						 .add_method("set_constant_addition", static_cast<void (T::*)(number)>(&T::set_constant_addition))
+
+						 //.add_method("set_domain_disc_1d"       , &T::set_domain_disc_1d, "", "domainDisc","Set the 1d cable domain discretization.")
+						 .template add_constructor<void (*)()>()
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "LSReactionTopBranch", tag);
+				}
+
+				//	Linker for give the value to REACTION for the boundary (cut elements) - This will select the top of the branch with a curvature specify
+				{
+					string name = string("LSReactionInsideCurv").append(suffix);
+					typedef LSReactionInsideCurv<TDomain, TAlgebra> T;
+					typedef DependentUserData<number, dim> TBase;
+					typedef IInterfaceExtrapolation<TDomain, TAlgebra> TExtrapol;
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_method("set_FirstTerm", static_cast<void (T::*)(number)>(&T::set_FirstTerm))
+						 .add_method("set_FirstTerm", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_FirstTerm))
+						 .add_method("set_SecondTerm", static_cast<void (T::*)(number)>(&T::set_SecondTerm))
+						 .add_method("set_SecondTerm", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_SecondTerm))
+						 .add_method("set_Curvature", static_cast<void (T::*)(number)>(&T::set_Curvature))
+						 .add_method("set_Curvature", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_Curvature))
+						 .add_method("set_velocity_deformation", static_cast<void (T::*)(number)>(&T::set_velocity_deformation))
+						 .add_method("set_velocity_deformation", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_velocity_deformation))
+						 .add_method("set_domain_discretizacion", &T::set_domain_discretizacion)
+						 .add_method("set_interval_min", static_cast<void (T::*)(number)>(&T::set_interval_min))
+						 .add_method("set_interval_max", static_cast<void (T::*)(number)>(&T::set_interval_max))
+						 .add_method("set_magnitud_influx", static_cast<void (T::*)(number)>(&T::set_magnitud_influx))
+						 .add_method("set_constant_div", static_cast<void (T::*)(number)>(&T::set_constant_div))
+						 .add_method("set_constant_addition", static_cast<void (T::*)(number)>(&T::set_constant_addition))
+
+						 //.add_method("set_domain_disc_1d"       , &T::set_domain_disc_1d, "", "domainDisc","Set the 1d cable domain discretization.")
+						 .template add_constructor<void (*)()>()
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "LSReactionInsideCurv", tag);
+				}
+
+				// Diagnostic helper: net FV1 mass rate from vector source into lsf<=0 region.
+				// Equivalent to summing SCVF flux contributions to intracellular nodes.
+				// Lua: local h = FVLSVectorSourceIntegral(lsf_gf)
+				//      h:set_vector_source(src); h:compute(t); h:result()
+				{
+					typedef FVLSVectorSourceIntegral<function_type> T;
+					typedef typename T::ls_gf_type ls_gf_type;
+					string name = string("FVLSVectorSourceIntegral").append(suffix);
+					reg.add_class_<T>(name, grp)
+						 .template add_constructor<void (*)(SmartPtr<ls_gf_type>)>("LSF")
+						 .add_method("set_vector_source",
+							static_cast<void (T::*)(SmartPtr<typename T::vec_src_type>)>(&T::set_vector_source),
+							"", "vecSource", "Set the vector-valued CplUserData to integrate")
+						 .add_method("compute",
+							static_cast<void (T::*)(number)>(&T::compute),
+							"", "time", "Compute net mass rate into lsf<=0 at given time")
+						 .add_method("result",
+							static_cast<number (T::*)() const>(&T::result),
+							"", "", "Net mass rate into Omega_i after compute()")
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "FVLSVectorSourceIntegral", tag);
+				}
+			}
+
+
+
+		}; // end Functionality
+	} // end namespace NeuroGrowth
+
+	/**
+	 * This function is called when the plugin is loaded.
+	 */
+	extern "C" void
+	InitUGPlugin_NeuroGrowth(Registry *reg, string grp)
+	{
+		grp.append("/SpatialDisc/NeuroGrowth");
+		typedef NeuroGrowth::Functionality Functionality;
+
+		try
+		{
+			RegisterDimensionDependent<Functionality>(*reg,grp);
+			RegisterDomain2d3dDependent<Functionality>(*reg, grp);
+			RegisterDomain2d3dAlgebraDependent<Functionality>(*reg, grp);
+		}
+		UG_REGISTRY_CATCH_THROW(grp);
+	}
+
+} // namespace ug
