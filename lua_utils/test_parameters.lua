@@ -99,12 +99,12 @@ function GetParams()
     ---@field initialdiffusion number "Initial diffusion coefficient of Eikanol inside the geometry: 0.06 × (10 μm)^2/(500 s) = 0.012 μm²/s"
 
     ---@class initialGeometryParams
-    ---@field radius table<number, number> "Initial radius of the geometry, keyed by ref_def, where ref_def is 5 (numRefs ≤ 5) or 6 (numRefs ≥ 6)"
+    ---@field radius table<number, number> "Initial radius of the geometry, keyed by ref_def, where ref_def is 5 (numRefs ≤ 5) or 6 (numRefs ≥ 6)" 
 
     ---@class LevelSetParams
     ---@field Initialgeometry initialGeometryParams
     ---@field Eikanolinside EikanolinsideParams
-    ---@field elongation  elongationParams
+    ---@field elongation elongationParams
     ---@field smooth smoothParams
 
     ---@class Params
@@ -278,7 +278,7 @@ function GetParams()
         LevelSet = {
             Initialgeometry = {
                 radius = {
-                    [5] = util.GetParamNumber("-initialRadius", 0.1, "Initial radius of the circular geometry in refiment 5 or lower "), -- refinement lower or eual than 5
+                    [5] = util.GetParamNumber("-initialRadius", 0.1, "Initial radius of the circular geometry in refiment 5 or lower "), -- refinement lower or eual than 5 
                     [6] = util.GetParamNumber("-initialRadius", 0.06, "Initial radius of the spherical geometry in refiment 6 or higher"), -- refinement higher than 5
                 }
             },
@@ -292,24 +292,49 @@ function GetParams()
                 inhibitionMinConcentrationAvoidance = util.GetParamNumber("-inhibitionAvoidance", 0.0062, "Concentration of Inhibitor to start the avoidance process, value less than this number is elongation"),
                 inhibitionMinConcentrationRetraction = util.GetParamNumber("-inhibitionRetraction", 0.0074, "Concentration of Inhibitor to start the retraction process"),
                 tubulineConcentrationThreshold = util.GetParamNumber("-tubulineGrowthThreshold", 0.4, "Concentration of Tubulin to start the growth process, value less than this number is retraction"),
-                VelocityCurvatureMinimun = {
-                    [2] = {
-                        [5] = util.GetParamNumber("-VelCurvaturemin",  7,  "Min interval (2D, ref≤5)"),
-                        [6] = util.GetParamNumber("-VelCurvaturemin", 10.5,  "Min interval (2D, ref≥6)"),
-                    },
-                    [3] = {
-                        [5] = util.GetParamNumber("-VelCurvaturemin", 20,  "Min interval (3D, use ref≤5)"),
-                    },
-                    },
-                VelocityCurvatureMaximun = {
-                    [2] = {
-                        [5] = util.GetParamNumber("-VelCurvaturemax", 18, "Max interval (2D, ref≤5)"),
-                        [6] = util.GetParamNumber("-VelCurvaturemax", 20,   "Max interval (2D, ref≥6)"),
-                    },
-                    [3] = {
-                        [5] = util.GetParamNumber("-VelCurvaturemax", 27,   "Max interval (3D, use ref≤5)"),
-                    },
-                },
+                VelocityCurvatureMinimun = (function()
+                    -- h-normalisation: multiply base threshold by (h/h_ref)^gateNorm
+                    -- h = h_0/2^numRef  →  h_ratio = 2^(refNorm - numRefs_local)
+                    -- gateNorm=0: no scaling (legacy); gateNorm=1: h-linear; gateNorm=2: h^2
+                    local gateNorm      = util.GetParamNumber("-gateNorm", 0, "Curvature gate h-normalisation exponent (0=off, 1=h, 2=h^2)")
+                    local numRefs_local = util.GetParamNumber("-numRef",   5, "Refinement level (gateNorm reference at 5)")
+                    local refNorm       = 5
+                    local h_ratio       = math.pow(2.0, refNorm - numRefs_local)
+                    local gate_scale    = (gateNorm == 0) and 1.0 or math.pow(h_ratio, gateNorm)
+                    local base_min_2d   = util.GetParamNumber("-VelCurvaturemin",  3,  "Base min curvature threshold (2D)")
+                    local base_min_3d   = util.GetParamNumber("-VelCurvaturemin", 20,  "Base min curvature threshold (3D)")
+                    print("[gateNorm=" .. tostring(gateNorm) .. "] numRef=" .. tostring(numRefs_local)
+                          .. "  h_ratio=" .. string.format("%.4f", h_ratio)
+                          .. "  gate_scale=" .. string.format("%.4f", gate_scale)
+                          .. "  VelCurvMin=" .. string.format("%.2f", base_min_2d * gate_scale))
+                    return {
+                        [2] = {
+                            [5] = base_min_2d * gate_scale,
+                            [6] = base_min_2d * gate_scale,
+                        },
+                        [3] = {
+                            [5] = base_min_3d * gate_scale,
+                        },
+                    }
+                end)(),
+                VelocityCurvatureMaximun = (function()
+                    local gateNorm      = util.GetParamNumber("-gateNorm", 0, "Curvature gate h-normalisation exponent (0=off, 1=h, 2=h^2)")
+                    local numRefs_local = util.GetParamNumber("-numRef",   5, "Refinement level (gateNorm reference at 5)")
+                    local refNorm       = 5
+                    local h_ratio       = math.pow(2.0, refNorm - numRefs_local)
+                    local gate_scale    = (gateNorm == 0) and 1.0 or math.pow(h_ratio, gateNorm)
+                    local base_max_2d   = util.GetParamNumber("-VelCurvaturemax", 18,  "Base max curvature threshold (2D)")
+                    local base_max_3d   = util.GetParamNumber("-VelCurvaturemax", 27,  "Base max curvature threshold (3D)")
+                    return {
+                        [2] = {
+                            [5] = base_max_2d * gate_scale,
+                            [6] = base_max_2d * gate_scale,
+                        },
+                        [3] = {
+                            [5] = base_max_3d * gate_scale,
+                        },
+                    }
+                end)(),
             },
 
         -- Smooth parameters 
