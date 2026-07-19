@@ -44,6 +44,7 @@
 
 #include "ls_concentration_dependent_velocity_linker.h"
 #include "ls_concentration_dependent_velocity_robust_linker.h"
+#include "ls_tip_growth_velocity_linker.h"
 #include "ls_avoidance_bend_velocity_linker.h"
 #include "ls_extend_velocity_linker.h"
 
@@ -438,6 +439,60 @@ namespace ug
 						 .template add_constructor<void (*)(SmartPtr<TExtrapol>)>("DomainDisc")
 						 .set_construct_as_smart_pointer(true);
 					reg.add_class_to_group(name, "LSConcentrationDepentVelocityRobust", tag);
+				}
+
+				// [TIP GROWTH 20260719] Crecimiento APICAL sin gate de curvatura.
+				// El gate min<kappa<max es artificial y se rompe solo: al engordar kappa=1/R
+				// baja, la punta sale del gate, la velocidad es CERO exacto y la rama se
+				// congela como bola (trampa monotona). En biologia el crecimiento es apical
+				// porque (a) el material solo llega al apice y (b) la pared solo es blanda
+				// mientras es joven. Esta clase sustituye el gate por esos dos factores:
+				//   ENTREGA     (d_transporte . n)^q   -> localiza en la punta por geometria
+				//   MADURACION  1/(1+edad/tau)          -> el tubo de detras deja de responder
+				// Conserva la quimica v ~ tubulina * MAP2-ligado (que es donde entra el calcio).
+{
+					string name = string("LSTipGrowthVelocity").append(suffix);
+					typedef LSTipGrowthVelocity<TDomain, TAlgebra> T;
+					typedef DependentUserData<MathVector<dim>, dim> TBase;
+					typedef IInterfaceExtrapolation<TDomain, TAlgebra> TExtrapol;
+					reg.add_class_<T, TBase>(name, grp)
+						 .add_method("set_calcium", static_cast<void (T::*)(number)>(&T::set_calcium))
+						 .add_method("set_calcium", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_calcium))
+						 .add_method("set_tubuline", static_cast<void (T::*)(number)>(&T::set_tubuline))
+						 .add_method("set_tubuline", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_tubuline))
+						 .add_method("set_MAPu", static_cast<void (T::*)(number)>(&T::set_MAPu))
+						 .add_method("set_MAPu", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_MAPu))
+						 .add_method("set_MAPb", static_cast<void (T::*)(number)>(&T::set_MAPb))
+						 .add_method("set_MAPb", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_MAPb))
+						 .add_method("set_MAPp", static_cast<void (T::*)(number)>(&T::set_MAPp))
+						 .add_method("set_MAPp", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_MAPp))
+						 .add_method("set_Inhibition", static_cast<void (T::*)(number)>(&T::set_Inhibition))
+						 .add_method("set_Inhibition", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_Inhibition))
+						 .add_method("set_LevelSet_gradient", &T::set_LevelSet_gradient)
+						 .add_method("set_gradient_stationary_difussion", &T::set_gradient_stationary_difussion)
+						 .add_method("set_Inhibition_gradient", &T::set_Inhibition_gradient)
+						 .add_method("set_Curvature", static_cast<void (T::*)(number)>(&T::set_Curvature))
+						 .add_method("set_Curvature", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_Curvature))
+						 .add_method("set_interval_min", static_cast<void (T::*)(number)>(&T::set_interval_min))
+						 .add_method("set_interval_max", static_cast<void (T::*)(number)>(&T::set_interval_max))
+						 .add_method("set_interval_min_Calcium", static_cast<void (T::*)(number)>(&T::set_interval_min_Calcium))
+						 .add_method("set_interval_min_Inhibition", static_cast<void (T::*)(number)>(&T::set_interval_min_Inhibition))
+						 .add_method("set_interval_min_Inhibition_sign", static_cast<void (T::*)(number)>(&T::set_interval_min_Inhibition_sign))
+						 .add_method("set_magnitud_velocity", static_cast<void (T::*)(number)>(&T::set_magnitud_velocity))
+						 .add_method("set_map_b_floor", static_cast<void (T::*)(number)>(&T::set_map_b_floor))
+						 .add_method("set_use_normal_direction", static_cast<void (T::*)(number)>(&T::set_use_normal_direction))
+						 .add_method("set_tubulin_saturation", static_cast<void (T::*)(number)>(&T::set_tubulin_saturation))
+						 .add_method("set_tip_sharpness", static_cast<void (T::*)(number)>(&T::set_tip_sharpness))
+						 .add_method("set_Age", static_cast<void (T::*)(number)>(&T::set_Age))
+						 .add_method("set_Age", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim>>)>(&T::set_Age))
+						 .add_method("set_maturation_time", static_cast<void (T::*)(number)>(&T::set_maturation_time))
+						 .add_method("set_delivery_power", static_cast<void (T::*)(number)>(&T::set_delivery_power))
+						 .add_method("set_maturation_power", static_cast<void (T::*)(number)>(&T::set_maturation_power))
+						 .add_method("set_curvature_regularisation", static_cast<void (T::*)(number)>(&T::set_curvature_regularisation))
+						 .add_method("set_use_curvature_gate", static_cast<void (T::*)(bool)>(&T::set_use_curvature_gate))
+						 .template add_constructor<void (*)(SmartPtr<TExtrapol>)>("DomainDisc")
+						 .set_construct_as_smart_pointer(true);
+					reg.add_class_to_group(name, "LSTipGrowthVelocity", tag);
 				}
 
 //	Special linker for calculate the velocity of the extencion of the calculated velocity of the interface
