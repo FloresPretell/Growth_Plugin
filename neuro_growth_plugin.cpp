@@ -573,6 +573,7 @@ namespace ug
 						 .add_method("set_domain_discretizacion", &T::set_domain_discretizacion)
 						 .add_method("set_carrying_capacity", static_cast<void (T::*)(number)>(&T::set_carrying_capacity))
 						 .add_method("set_growth_rate", static_cast<void (T::*)(number)>(&T::set_growth_rate))
+						 .add_method("set_base_production", static_cast<void (T::*)(number)>(&T::set_base_production))
 						 .add_method("set_interval_min", static_cast<void (T::*)(number)>(&T::set_interval_min))
 						 .add_method("set_interval_max", static_cast<void (T::*)(number)>(&T::set_interval_max))
 							//.add_method("set_domain_disc_1d"       , &T::set_domain_disc_1d, "", "domainDisc","Set the 1d cable domain discretization.")

@@ -73,6 +73,7 @@ namespace ug
                                m_spTubuline(NULL), m_spDTubuline(NULL),
                                m_spMagnitudCapacity(NULL),
                                m_spMagnitudGrowthRate(NULL),
+                               m_spBaseProduction(0.0),
                                m_spCurvature(NULL), m_spDCurvature(NULL),
                                m_spMinimo(NULL), m_spMaximo(NULL),
                                m_spLevelSetGrad(NULL) //, m_spDLevelSetGrad(NULL)
@@ -147,6 +148,7 @@ namespace ug
                                 elem, vCornerCoords, vLocIP, nip, u, vJT);
 			   const number MagnitudCapacity = m_spMagnitudCapacity; // 0.0005 // cantidad de concentración que entrará por las paredes
 			   const number GrowthRate = m_spMagnitudGrowthRate; // La tasa de crecimiento en el tiempo --> 10 
+               const number BaseProd = m_spBaseProduction;   // r0: constant membrane production (0 = legacy)
 
 
             for (size_t ip = 0; ip < nip; ++ip)
@@ -162,8 +164,8 @@ namespace ug
                   // Magnitud of the flux
                   //number flux = MagnitudCapacity * -1;  // cantidad de concentración que entrará por las paredes
                   number flux = 1 - (vTubuline[ip] / MagnitudCapacity);
-                  number flux2 = flux * vTubuline[ip];
-                  number flux3 = flux2 * GrowthRate;
+                  // V = dir * (r*c + r0) * (1 - c/K).  r0=0 reproduces the legacy r*c*(1-c/K) exactly.
+                  number flux3 = (GrowthRate * vTubuline[ip] + BaseProd) * flux;
                   VecScale(vValue[ip], direccion, flux3);
                 }
                else
@@ -220,6 +222,7 @@ namespace ug
 
 			   const number MagnitudCapacity = m_spMagnitudCapacity; // 0.0005 // cantidad de concentración que entrará por las paredes
 			   const number GrowthRate = m_spMagnitudGrowthRate; // La tasa de crecimiento en el tiempo --> 10 
+               const number BaseProd = m_spBaseProduction;   // r0: constant membrane production (0 = legacy)
             const number minimo = m_spMinimo; // 5.5
             const number maximo = m_spMaximo; // 18.5
             // const MathVector<dim> *vLevelSetGrad = m_spLevelSetGrad->values(s);
@@ -237,8 +240,8 @@ namespace ug
                      // Magnitud of the flux
                      //number flux =  MagnitudCapacity * -1;  // cantidad de concentración que entrará por las paredes
                      number flux = 1 - (vTubuline[ip] / MagnitudCapacity);
-                     number flux2 = flux * vTubuline[ip];
-                     number flux3 = flux2 * GrowthRate;
+                     // V = dir * (r*c + r0) * (1 - c/K).  r0=0 reproduces the legacy r*c*(1-c/K) exactly.
+                     number flux3 = (GrowthRate * vTubuline[ip] + BaseProd) * flux;
                      VecScale(vDarcyVel[ip], direccion, flux3);
                }
                else
@@ -278,7 +281,9 @@ namespace ug
                const number gradientnorm = VecLength(vLevelSetGrad[ip]);
                VecScale(direccion, vLevelSetGrad[ip], 1.0 / (gradientnorm + 0.00001));
 
-               const number dflux3_dc = GrowthRate * (1.0 - 2.0 * vTubuline[ip] / MagnitudCapacity);
+               // d/dc[(r*c + r0)(1 - c/K)] = r(1 - 2c/K) - r0/K   (r0=0 -> legacy r(1-2c/K))
+               const number dflux3_dc = GrowthRate * (1.0 - 2.0 * vTubuline[ip] / MagnitudCapacity)
+                                        - m_spBaseProduction / MagnitudCapacity;
 
                for (size_t fct = 0; fct < m_spDTubuline->num_fct(); ++fct)
                {
@@ -345,6 +350,13 @@ namespace ug
 				m_spMagnitudGrowthRate = data;
 			}
 
+			/// constant membrane production r0 (2026-07-19): makes r_inh a monotone DIAL instead of
+			/// an ignition switch. Default 0.0 keeps the legacy pure-autocatalytic source bit-identical.
+			void set_base_production(number data)
+			{
+				m_spBaseProduction = data;
+			}
+
                   ///	set LevelSet gradient import
          void set_interval_min(number data)
          {
@@ -381,6 +393,8 @@ namespace ug
 
          number m_spMagnitudCapacity;
          number m_spMagnitudGrowthRate;
+         /// constant (c-independent) membrane production r0; 0.0 = legacy pure-autocatalytic
+         number m_spBaseProduction;
 
          //	import the values of the interval to select the curvarure
          number m_spMinimo;
